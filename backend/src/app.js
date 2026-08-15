@@ -74,5 +74,12 @@ app.use('/club/ligas', requireAuth, requireRole('super_admin', 'club_admin'), re
 app.use('/liga/fichajes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFichajesRoutes'));
 app.use('/liga/carnets', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaCarnetsRoutes'));
 
+// ===== MÓDULO NOTICIAS Y NOTIFICACIONES =====
+// Lado Liga: crear/publicar noticias y enviar notificaciones a uno o todos
+// sus clubes. Lado Club: ver las notificaciones que le llegaron.
+app.use('/liga/noticias', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaNoticiasRoutes'));
+app.use('/liga/notificaciones', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaNotificacionesRoutes'));
+app.use('/club/notificaciones', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubNotificacionesRoutes'));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API escuchando en ${PORT}`));

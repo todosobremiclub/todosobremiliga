@@ -123,4 +123,22 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
   }
 });
 
+// GET /web/ligas/:slug/noticias — noticias públicas (publicadas) de una Liga
+router.get('/ligas/:slug/noticias', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+       FROM noticias n
+       JOIN ligas l ON l.id = n.liga_id
+       WHERE l.slug = $1 AND l.activo = TRUE AND n.estado = 'publicada'
+       ORDER BY n.destacada DESC, n.publicado_at DESC`,
+      [req.params.slug]
+    );
+    res.json({ ok: true, noticias: rows });
+  } catch (err) {
+    console.error('Error en GET noticias publicas:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 module.exports = router;
