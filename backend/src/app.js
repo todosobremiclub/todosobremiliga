@@ -59,10 +59,10 @@ app.use('/admin/usuarios', requireAuth, requireRole('super_admin'), require('./r
 // filtrado a la Liga correspondiente (ver middleware resolveLigaId).
 const resolveLigaId = require('./middleware/resolveLigaId');
 app.use('/liga/clubes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaClubesRoutes'));
+app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaTorneosRoutes'));
 
-// A medida que avancemos con los próximos módulos (categorías, torneos,
-// fixtures, Web, Fichajes) se irán agregando acá, siguiendo el mismo patrón:
-// app.use('/liga/torneos', ...);
+// A medida que avancemos con los próximos módulos (fixtures, resultados,
+// Web, Fichajes) se irán agregando acá, siguiendo el mismo patrón:
 // app.use('/app', require('./routes/appRoutes'));
 
 const PORT = process.env.PORT || 3000;
