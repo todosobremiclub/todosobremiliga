@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super Admin - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <h1>Todo Sobre mi Liga — Super Admin</h1>
+    <div class="usuario-info">
+      <span id="usuarioNombre"></span>
+      <button id="btnLogout">Salir</button>
+    </div>
+  </div>
+
+  <div class="contenido">
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Ligas</h2>
+        <button class="btn" id="btnMostrarFormLiga">+ Nueva Liga</button>
+      </div>
+
+      <form id="formLiga" class="oculto">
+        <input type="hidden" id="ligaIdEdicion">
+        <div class="form-grid">
+          <div>
+            <label for="ligaNombre">Nombre *</label>
+            <input type="text" id="ligaNombre" required>
+          </div>
+          <div>
+            <label for="ligaSlug">Slug (opcional, se genera solo)</label>
+            <input type="text" id="ligaSlug" placeholder="ej: liga-regional-sur">
+          </div>
+          <div>
+            <label for="ligaDireccion">Dirección</label>
+            <input type="text" id="ligaDireccion">
+          </div>
+          <div>
+            <label for="ligaTelefono">Teléfono</label>
+            <input type="text" id="ligaTelefono">
+          </div>
+          <div>
+            <label for="ligaEmail">Email de contacto</label>
+            <input type="email" id="ligaEmail">
+          </div>
+          <div>
+            <label for="ligaLogoUrl">URL del logo</label>
+            <input type="text" id="ligaLogoUrl">
+          </div>
+          <div>
+            <label for="ligaColorPrimario">Color primario</label>
+            <input type="text" id="ligaColorPrimario" placeholder="#1d4ed8">
+          </div>
+          <div>
+            <label for="ligaColorSecundario">Color secundario</label>
+            <input type="text" id="ligaColorSecundario" placeholder="#1e3a8a">
+          </div>
+        </div>
+        <button type="submit" class="btn">Guardar</button>
+        <button type="button" class="btn btn-secundario" id="btnCancelarFormLiga">Cancelar</button>
+        <p class="mensaje-error oculto" id="ligaFormError"></p>
+      </form>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Slug</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaLigas">
+          <tr><td colspan="4">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="panelUsuarios">
+      <div class="panel-header">
+        <h2 id="tituloUsuarios">Usuarios de la Liga</h2>
+        <button class="btn btn-secundario" id="btnCerrarUsuarios">Cerrar</button>
+      </div>
+
+      <form id="formUsuario">
+        <input type="hidden" id="usuarioLigaId">
+        <div class="form-grid">
+          <div>
+            <label for="usuarioNombreInput">Nombre *</label>
+            <input type="text" id="usuarioNombreInput" required>
+          </div>
+          <div>
+            <label for="usuarioEmail">Email *</label>
+            <input type="email" id="usuarioEmail" required>
+          </div>
+          <div>
+            <label for="usuarioPassword">Contraseña inicial *</label>
+            <input type="text" id="usuarioPassword" required>
+          </div>
+        </div>
+        <button type="submit" class="btn">Crear usuario liga_admin</button>
+        <p class="mensaje-error oculto" id="usuarioFormError"></p>
+        <p class="mensaje-ok oculto" id="usuarioFormOk"></p>
+      </form>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tablaUsuarios">
+          <tr><td colspan="4">Seleccioná una Liga para ver sus usuarios.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

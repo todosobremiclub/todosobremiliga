@@ -1,0 +1,251 @@
+:root {
+  --azul: #1d4ed8;
+  --azul-oscuro: #1e3a8a;
+  --verde: #16a34a;
+  --rojo: #dc2626;
+  --gris-100: #f3f4f6;
+  --gris-300: #d1d5db;
+  --gris-600: #4b5563;
+  --gris-900: #111827;
+  --blanco: #ffffff;
+  --radio: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--gris-100);
+  color: var(--gris-900);
+}
+
+/* ===== Login ===== */
+.login-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul));
+}
+
+.login-card {
+  background: var(--blanco);
+  padding: 40px;
+  border-radius: var(--radio);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h1 {
+  font-size: 20px;
+  margin: 0 0 24px;
+  text-align: center;
+  color: var(--azul-oscuro);
+}
+
+.login-card label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 14px 0 4px;
+  color: var(--gris-600);
+}
+
+.login-card input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gris-300);
+  border-radius: var(--radio);
+  font-size: 14px;
+}
+
+.login-card button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 11px;
+  background: var(--azul);
+  color: var(--blanco);
+  border: none;
+  border-radius: var(--radio);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-card button:hover { background: var(--azul-oscuro); }
+
+.error-msg {
+  color: var(--rojo);
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 16px;
+}
+
+/* ===== Layout de panel (admin / liga / club) ===== */
+.topbar {
+  background: var(--blanco);
+  border-bottom: 1px solid var(--gris-300);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar h1 {
+  font-size: 17px;
+  margin: 0;
+  color: var(--azul-oscuro);
+}
+
+.topbar .usuario-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--gris-600);
+}
+
+.topbar button {
+  background: none;
+  border: 1px solid var(--gris-300);
+  border-radius: var(--radio);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.contenido {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--blanco);
+  border-radius: var(--radio);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0 0 16px;
+  color: var(--azul-oscuro);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.panel-header h2 { margin: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th, td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--gris-100);
+}
+
+th { color: var(--gris-600); font-weight: 600; }
+
+tr:hover td { background: var(--gris-100); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge-activo { background: #dcfce7; color: var(--verde); }
+.badge-inactivo { background: #fee2e2; color: var(--rojo); }
+.badge-pendiente { background: #fef9c3; color: #854d0e; }
+
+button.btn {
+  background: var(--azul);
+  color: var(--blanco);
+  border: none;
+  border-radius: var(--radio);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+button.btn:hover { background: var(--azul-oscuro); }
+
+button.btn-secundario {
+  background: var(--blanco);
+  color: var(--gris-900);
+  border: 1px solid var(--gris-300);
+}
+button.btn-secundario:hover { background: var(--gris-100); }
+
+button.btn-pequeno {
+  padding: 4px 10px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+button.btn-peligro {
+  background: var(--blanco);
+  color: var(--rojo);
+  border: 1px solid var(--rojo);
+}
+button.btn-peligro:hover { background: #fee2e2; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-grid.una-columna { grid-template-columns: 1fr; }
+
+.form-grid label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gris-600);
+  margin-bottom: 4px;
+}
+
+.form-grid input, .form-grid select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gris-300);
+  border-radius: var(--radio);
+  font-size: 13px;
+}
+
+.oculto { display: none !important; }
+
+.mensaje-error {
+  color: var(--rojo);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.mensaje-ok {
+  color: var(--verde);
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.texto-ayuda {
+  color: var(--gris-600);
+  font-size: 12px;
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
