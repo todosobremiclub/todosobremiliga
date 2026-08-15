@@ -249,3 +249,91 @@ button.btn-peligro:hover { background: #fee2e2; }
   margin-top: -8px;
   margin-bottom: 12px;
 }
+
+/* ===== Sitio web público ===== */
+.sitio-header {
+  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul));
+  color: var(--blanco);
+  padding: 28px 24px;
+}
+
+.sitio-header .sitio-header-inner {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sitio-header h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.sitio-header a {
+  color: var(--blanco);
+  text-decoration: none;
+}
+
+.sitio-breadcrumb {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 6px;
+}
+
+.sitio-breadcrumb a { text-decoration: underline; }
+
+.sitio-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--blanco);
+}
+
+.sitio-contenido {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card-link {
+  display: block;
+  background: var(--blanco);
+  border-radius: var(--radio);
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  text-decoration: none;
+  color: var(--gris-900);
+  transition: box-shadow 0.15s;
+}
+
+.card-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+
+.card-link h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--azul-oscuro);
+}
+
+.card-link p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--gris-600);
+}
+
+.sitio-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+
+.sitio-vacio {
+  color: var(--gris-600);
+  font-size: 13px;
+  padding: 20px 0;
+}
