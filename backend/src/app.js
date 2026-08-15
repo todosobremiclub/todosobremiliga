@@ -36,17 +36,6 @@ app.use('/auth', require('./routes/authRoutes'));
 const requireAuth = require('./middleware/requireAuth');
 const requireRole = require('./middleware/requireRole');
 
-// ===== RUTAS DE PRUEBA POR ROL (Club / App) =====
-// Todavía no construimos esos módulos, quedan estas rutas de prueba hasta
-// que lleguemos a esas fases (6 y 7 del roadmap).
-app.get('/club/ping', requireAuth, requireRole('super_admin', 'liga_admin', 'club_admin'), (req, res) => {
-  res.json({ ok: true, mensaje: 'Acceso Club OK', usuario: req.usuario });
-});
-
-app.get('/app/ping', requireAuth, (req, res) => {
-  res.json({ ok: true, mensaje: 'Acceso autenticado OK (cualquier rol)', usuario: req.usuario });
-});
-
 // ===== MÓDULO SUPER ADMIN =====
 // Alta/gestión de Ligas y de sus usuarios. Todo lo que cuelgue de /admin
 // requiere estar logueado y tener rol super_admin.
@@ -69,9 +58,19 @@ app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), 
 // torneos, categorías, tabla de posiciones y fixture.
 app.use('/web', require('./routes/webRoutes'));
 
-// A medida que avancemos con el próximo módulo (Fichajes) se irá agregando
-// acá, siguiendo el mismo patrón:
-// app.use('/app', require('./routes/appRoutes'));
+// ===== MÓDULO DE FICHAJES =====
+// Lado Club (club_admin): carga de jugadores y solicitud de fichajes, queda
+// filtrado automáticamente a SU club (ver middleware resolveClubId).
+const resolveClubId = require('./middleware/resolveClubId');
+app.use('/club/jugadores', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubJugadoresRoutes'));
+// Se monta en el mismo prefijo: agrega POST /club/jugadores/:jugadorId/fichajes y GET /club/fichajes.
+app.use('/club/fichajes', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubFichajesRoutes'));
+app.use('/club/jugadores', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubFichajesRoutes'));
+
+// Lado Liga (liga_admin): aprobar/rechazar fichajes y verificar carnets el
+// día de partido, filtrado automáticamente a SU liga.
+app.use('/liga/fichajes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFichajesRoutes'));
+app.use('/liga/carnets', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaCarnetsRoutes'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API escuchando en ${PORT}`));

@@ -1,0 +1,97 @@
+const express = require('express');
+const crypto = require('crypto');
+const router = express.Router();
+
+const { query } = require('../db');
+
+// Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
+
+// GET /liga/fichajes?estado=pendiente — solicitudes de fichaje de MI liga
+// (por defecto trae todas; se puede filtrar por estado)
+router.get('/', async (req, res) => {
+  const { estado } = req.query;
+  try {
+    let sql = `
+      SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
+             c.nombre AS club_nombre, t.nombre AS torneo_nombre
+      FROM fichajes f
+      JOIN jugadores j ON j.id = f.jugador_id
+      JOIN clubes c ON c.id = f.club_id
+      LEFT JOIN torneos t ON t.id = f.torneo_id
+      WHERE f.liga_id = $1
+    `;
+    const params = [req.ligaId];
+    if (estado) {
+      params.push(estado);
+      sql += ` AND f.estado = $${params.length}`;
+    }
+    sql += ' ORDER BY f.fecha_solicitud DESC';
+
+    const { rows } = await query(sql, params);
+    res.json({ ok: true, fichajes: rows });
+  } catch (err) {
+    console.error('Error en GET /liga/fichajes:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/fichajes/:fichajeId/aprobar — aprueba el fichaje y genera
+// automáticamente el carnet digital del jugador para ese torneo.
+router.patch('/:fichajeId/aprobar', async (req, res) => {
+  try {
+    const fichajeResult = await query(
+      'SELECT * FROM fichajes WHERE id = $1 AND liga_id = $2',
+      [req.params.fichajeId, req.ligaId]
+    );
+    const fichaje = fichajeResult.rows[0];
+    if (!fichaje) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    if (fichaje.estado === 'aprobado') {
+      return res.status(409).json({ ok: false, error: 'Ese fichaje ya estaba aprobado' });
+    }
+
+    const actualizado = await query(
+      `UPDATE fichajes SET estado = 'aprobado', aprobado_por = $1, fecha_resolucion = NOW(), motivo_rechazo = NULL
+       WHERE id = $2 RETURNING *`,
+      [req.usuario.id, req.params.fichajeId]
+    );
+
+    // Genera el carnet digital, si todavía no existe uno para este fichaje.
+    const carnetExistente = await query('SELECT * FROM carnets WHERE fichaje_id = $1', [req.params.fichajeId]);
+    let carnet = carnetExistente.rows[0];
+    if (!carnet) {
+      const codigoQr = crypto.randomUUID();
+      const carnetResult = await query(
+        `INSERT INTO carnets (jugador_id, torneo_id, fichaje_id, codigo_qr)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [fichaje.jugador_id, fichaje.torneo_id, req.params.fichajeId, codigoQr]
+      );
+      carnet = carnetResult.rows[0];
+    }
+
+    res.json({ ok: true, fichaje: actualizado.rows[0], carnet });
+  } catch (err) {
+    console.error('Error en PATCH aprobar fichaje:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/fichajes/:fichajeId/rechazar
+router.patch('/:fichajeId/rechazar', async (req, res) => {
+  const { motivo_rechazo } = req.body;
+  try {
+    const { rows } = await query(
+      `UPDATE fichajes SET estado = 'rechazado', motivo_rechazo = $1, fecha_resolucion = NOW(), aprobado_por = $2
+       WHERE id = $3 AND liga_id = $4
+       RETURNING *`,
+      [motivo_rechazo || null, req.usuario.id, req.params.fichajeId, req.ligaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    res.json({ ok: true, fichaje: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH rechazar fichaje:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+module.exports = router;

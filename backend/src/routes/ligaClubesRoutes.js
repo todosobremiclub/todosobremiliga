@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcrypt');
 const router = express.Router();
 
 const { query, getClient } = require('../db');
@@ -132,6 +133,43 @@ router.patch('/:clubId/activo', async (req, res) => {
     res.json({ ok: true, membresia: rows[0] });
   } catch (err) {
     console.error('Error en PATCH /liga/clubes/:clubId/activo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes/:clubId/usuarios — la Liga crea el usuario club_admin
+// que va a administrar ese club (cargar jugadores, pedir fichajes, mostrar
+// carnets el día de partido). El club_admin no queda atado a esta Liga en
+// particular (un club puede jugar en más de una), solo al club.
+router.post('/:clubId/usuarios', async (req, res) => {
+  const { email, password, nombre } = req.body;
+
+  if (!email || !password || !nombre) {
+    return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios (email, password, nombre)' });
+  }
+
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const { rows } = await query(
+      `INSERT INTO usuarios (email, password_hash, nombre, rol, club_id, activo)
+       VALUES ($1, $2, $3, 'club_admin', $4, TRUE)
+       RETURNING id, email, nombre, rol, club_id, activo, creado_at`,
+      [email.trim().toLowerCase(), passwordHash, nombre.trim(), req.params.clubId]
+    );
+    res.status(201).json({ ok: true, usuario: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ ok: false, error: `Ya existe un usuario con el email "${email}"` });
+    }
+    console.error('Error en POST /liga/clubes/:clubId/usuarios:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
