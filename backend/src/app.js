@@ -66,6 +66,8 @@ app.use('/club/jugadores', requireAuth, requireRole('super_admin', 'club_admin')
 // Se monta en el mismo prefijo: agrega POST /club/jugadores/:jugadorId/fichajes y GET /club/fichajes.
 app.use('/club/fichajes', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubFichajesRoutes'));
 app.use('/club/jugadores', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubFichajesRoutes'));
+// Ligas en las que participa mi club (para armar el desplegable al pedir un fichaje).
+app.use('/club/ligas', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubLigasRoutes'));
 
 // Lado Liga (liga_admin): aprobar/rechazar fichajes y verificar carnets el
 // día de partido, filtrado automáticamente a SU liga.
