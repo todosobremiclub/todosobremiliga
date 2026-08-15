@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Categoría - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .tab-btn {
+    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
+  }
+  .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+</style>
+</head>
+<body>
+  <div class="sitio-header">
+    <div class="sitio-header-inner">
+      <div>
+        <h1 id="nombreCategoria">Cargando...</h1>
+        <div class="sitio-breadcrumb"><a href="/sitio/index.html">← Todas las Ligas</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sitio-contenido">
+    <div class="sitio-tabs">
+      <button class="tab-btn activo" id="tabBtnTabla">Tabla de posiciones</button>
+      <button class="tab-btn" id="tabBtnFixture">Fixture y resultados</button>
+    </div>
+
+    <div class="panel" id="seccionTabla">
+      <table>
+        <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+        <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionFixture">
+      <table>
+        <thead><tr><th>Jornada</th><th>Local</th><th>Resultado</th><th>Visitante</th><th>Fecha</th></tr></thead>
+        <tbody id="tablaFixture"><tr><td colspan="5">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/sitio/js/sitio-categoria.js"></script>
+</body>
+</html>
