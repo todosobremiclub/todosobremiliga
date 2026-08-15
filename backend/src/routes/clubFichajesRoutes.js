@@ -11,11 +11,14 @@ router.get('/', async (req, res) => {
   try {
     const { rows } = await query(
       `SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
-              l.nombre AS liga_nombre, t.nombre AS torneo_nombre
+              l.nombre AS liga_nombre, t.nombre AS torneo_nombre,
+              c.codigo_qr AS carnet_codigo_qr, c.vigente_desde AS carnet_vigente_desde,
+              c.vigente_hasta AS carnet_vigente_hasta, c.activo AS carnet_activo
        FROM fichajes f
        JOIN jugadores j ON j.id = f.jugador_id
        JOIN ligas l ON l.id = f.liga_id
        LEFT JOIN torneos t ON t.id = f.torneo_id
+       LEFT JOIN carnets c ON c.fichaje_id = f.id
        WHERE f.club_id = $1
        ORDER BY f.fecha_solicitud DESC`,
       [req.clubId]
