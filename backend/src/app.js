@@ -52,9 +52,10 @@ app.get('/app/ping', requireAuth, (req, res) => {
 });
 
 // ===== MÓDULO SUPER ADMIN =====
-// Alta/gestión de Ligas. Todo lo que cuelgue de /admin requiere estar
-// logueado y tener rol super_admin.
+// Alta/gestión de Ligas y de sus usuarios. Todo lo que cuelgue de /admin
+// requiere estar logueado y tener rol super_admin.
 app.use('/admin/ligas', requireAuth, requireRole('super_admin'), require('./routes/adminLigasRoutes'));
+app.use('/admin/usuarios', requireAuth, requireRole('super_admin'), require('./routes/adminUsuariosRoutes'));
 
 // A medida que avancemos con los próximos módulos (Liga, Web, Fichajes)
 // se irán agregando acá, siguiendo el mismo patrón:
