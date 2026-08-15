@@ -1,0 +1,35 @@
+# Render Blueprint — permite crear el Web Service + la base Postgres
+# de un solo saque desde "New > Blueprint" en el dashboard de Render,
+# apuntando a este repositorio.
+#
+# Referencia: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: todosobremiliga-db
+    plan: free           # subir a "starter" o superior cuando haya datos reales/producción
+    databaseName: todosobremiliga
+    user: todosobremiliga
+
+services:
+  - type: web
+    name: todosobremiliga-backend
+    runtime: node
+    plan: free            # idem, subir de plan para producción (el free "duerme" con inactividad)
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: todosobremiliga-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        sync: false       # se carga a mano desde el panel de Render (no queda en el repo)
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false

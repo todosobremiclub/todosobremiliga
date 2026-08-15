@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Todo Sobre mi Liga — Modelo de Datos (Fase 1)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #262b36;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #4f8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px 24px 64px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .diagram-scroll { overflow-x: auto; }
+  .mermaid { min-width: 900px; }
+  ul.notes { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Todo Sobre mi Liga — Modelo de Base de Datos</h1>
+  <p class="subtitle">Fase 1 · Diseño de esquema PostgreSQL · 2026-08-15</p>
+
+  <div class="card">
+    <h2>Diagrama entidad-relación</h2>
+    <div class="diagram-scroll">
+      <pre class="mermaid">
+erDiagram
+    LIGAS ||--o{ CLUB_LIGA : tiene
+    CLUBES ||--o{ CLUB_LIGA : participa_en
+    LIGAS ||--o{ USUARIOS : administra
+    CLUBES ||--o{ USUARIOS : administra
+    LIGAS ||--o{ TORNEOS : organiza
+    TORNEOS ||--o{ CATEGORIAS : define
+    TORNEOS ||--o{ EQUIPOS_TORNEO : inscribe
+    CATEGORIAS ||--o{ EQUIPOS_TORNEO : agrupa
+    CLUBES ||--o{ EQUIPOS_TORNEO : representa
+    CLUBES ||--o{ JUGADORES : registra
+    JUGADORES ||--o{ FICHAJES : solicita
+    LIGAS ||--o{ FICHAJES : aprueba
+    JUGADORES ||--o{ CARNETS : posee
+    TORNEOS ||--o{ CARNETS : habilita
+    TORNEOS ||--o{ PARTIDOS : programa
+    CATEGORIAS ||--o{ PARTIDOS : agrupa
+    EQUIPOS_TORNEO ||--o{ PARTIDOS : juega_local
+    EQUIPOS_TORNEO ||--o{ PARTIDOS : juega_visitante
+    TORNEOS ||--o{ TABLA_POSICIONES : calcula
+    EQUIPOS_TORNEO ||--o{ TABLA_POSICIONES : figura_en
+    LIGAS ||--o{ NOTICIAS : publica
+    LIGAS ||--o{ NOTIFICACIONES : envia
+    NOTIFICACIONES ||--o{ NOTIFICACIONES_LECTURAS : registra
+    LIGAS ||--o{ AGENDA_EVENTOS : organiza
+    LIGAS ||--o{ GASTOS : registra
+    LIGAS ||--o{ INGRESOS : registra
+      </pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ideas de diseño clave</h2>
+    <ul class="notes">
+      <li>Multi-tenant por Liga: casi todas las tablas cuelgan de <code>liga_id</code>.</li>
+      <li>Multi-deporte a nivel Torneo: <code>torneos.deporte</code>, <code>formato_juego</code> y <code>sistema_puntaje</code> (JSON) permiten que fútbol, vóley y handball convivan en la misma base.</li>
+      <li>Club es entidad global: un club puede jugar en más de una Liga (tabla puente <code>club_liga</code>).</li>
+      <li><code>equipos_torneo</code> es quien juega realmente el fixture (inscripción de un club a una categoría de un torneo), no el club directamente.</li>
+      <li><code>partidos</code> es genérico: sirve para deportes de "gol" y de "sets" (vóley), con <code>detalle_resultado</code> en JSON para el desglose.</li>
+      <li><code>tabla_posiciones</code> es una caché recalculada tras cada resultado cargado.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Entidades</h2>
+    <table>
+      <tr><th>Tabla</th><th>Qué representa</th></tr>
+      <tr><td>ligas</td><td>Cada Liga dada de alta por el Super Admin (nombre, logo, colores, dirección).</td></tr>
+      <tr><td>clubes</td><td>Clubes, entidad global (pueden pertenecer a más de una liga).</td></tr>
+      <tr><td>club_liga</td><td>Membresía de un club en una liga.</td></tr>
+      <tr><td>usuarios</td><td>Login del sistema: super_admin, liga_admin, club_admin, jugador.</td></tr>
+      <tr><td>torneos</td><td>Torneo dentro de una liga: define deporte, formato y sistema de puntos.</td></tr>
+      <tr><td>categorias</td><td>Categorías de un torneo (Primera, Sub-15, Femenino, etc.).</td></tr>
+      <tr><td>equipos_torneo</td><td>Inscripción de un club a una categoría de un torneo (quien juega el fixture).</td></tr>
+      <tr><td>jugadores</td><td>Jugadores/socios registrados por un club.</td></tr>
+      <tr><td>fichajes</td><td>Solicitud de habilitación de un jugador ante la Liga. Módulo de Fichajes.</td></tr>
+      <tr><td>carnets</td><td>Carnet digital del jugador para el día de partido.</td></tr>
+      <tr><td>partidos</td><td>Fixture y resultados de cada categoría de cada torneo.</td></tr>
+      <tr><td>tabla_posiciones</td><td>Posiciones calculadas por categoría/torneo.</td></tr>
+      <tr><td>noticias</td><td>Noticias publicadas por la Liga.</td></tr>
+      <tr><td>notificaciones / notificaciones_lecturas</td><td>Avisos de la Liga a uno o todos los clubes, con seguimiento de lectura.</td></tr>
+      <tr><td>agenda_eventos</td><td>Agenda de la Liga (reuniones, capacitaciones, eventos).</td></tr>
+      <tr><td>gastos / ingresos</td><td>Contabilidad de la Liga (no de los clubes).</td></tr>
+    </table>
+  </div>
+</div>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+</script>
+</body>
+</html>
