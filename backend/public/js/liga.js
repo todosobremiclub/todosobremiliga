@@ -22,6 +22,8 @@ function init() {
 function conectarEventos() {
   document.getElementById('tabBtnClubes').addEventListener('click', () => cambiarTab('clubes'));
   document.getElementById('tabBtnTorneos').addEventListener('click', () => cambiarTab('torneos'));
+  document.getElementById('tabBtnNoticias').addEventListener('click', () => cambiarTab('noticias'));
+  document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
 
   // ---- Clubes ----
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
@@ -89,11 +91,41 @@ function conectarEventos() {
     document.getElementById('formPartido').classList.add('oculto');
   });
   document.getElementById('formPartido').addEventListener('submit', guardarPartido);
+
+  // ---- Noticias ----
+  document.getElementById('btnMostrarFormNoticia').addEventListener('click', () => {
+    document.getElementById('formNoticia').reset();
+    document.getElementById('noticiaFormError').classList.add('oculto');
+    document.getElementById('formNoticia').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormNoticia').addEventListener('click', () => {
+    document.getElementById('formNoticia').classList.add('oculto');
+  });
+  document.getElementById('formNoticia').addEventListener('submit', guardarNoticia);
+
+  // ---- Notificaciones ----
+  document.getElementById('btnMostrarFormNotificacion').addEventListener('click', () => {
+    document.getElementById('formNotificacion').reset();
+    document.getElementById('notificacionFormError').classList.add('oculto');
+    document.getElementById('notificacionFormOk').classList.add('oculto');
+    poblarSelectClubesNotificacion();
+    document.getElementById('formNotificacion').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormNotificacion').addEventListener('click', () => {
+    document.getElementById('formNotificacion').classList.add('oculto');
+  });
+  document.getElementById('formNotificacion').addEventListener('submit', enviarNotificacion);
 }
 
 function cambiarTab(nombre) {
-  const secciones = { clubes: 'seccionClubes', torneos: 'seccionTorneos' };
-  const botones = { clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos' };
+  const secciones = {
+    clubes: 'seccionClubes', torneos: 'seccionTorneos',
+    noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones'
+  };
+  const botones = {
+    clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos',
+    noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones'
+  };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
@@ -101,6 +133,8 @@ function cambiarTab(nombre) {
   if (nombre === 'torneos' && !torneosCache.length) {
     cargarTorneos();
   }
+  if (nombre === 'noticias') cargarNoticias();
+  if (nombre === 'notificaciones') cargarNotificaciones();
 }
 
 // ===================== CLUBES (sin cambios) =====================
@@ -501,6 +535,127 @@ async function cargarTabla() {
     `).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// ===================== NOTICIAS =====================
+
+async function cargarNoticias() {
+  const tbody = document.getElementById('tablaNoticias');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/noticias');
+    const noticias = data.noticias;
+    if (!noticias.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no publicaste ninguna noticia.</td></tr>';
+      return;
+    }
+    const badgesEstado = { publicada: 'badge-activo', borrador: 'badge-pendiente', archivada: 'badge-inactivo' };
+    tbody.innerHTML = noticias.map((n) => `
+      <tr>
+        <td>${escapeHtml(n.titulo)}</td>
+        <td><span class="badge ${badgesEstado[n.estado] || ''}">${escapeHtml(n.estado)}</span></td>
+        <td>${n.destacada ? 'Sí' : '-'}</td>
+        <td>${new Date(n.publicado_at).toLocaleDateString('es-AR')}</td>
+        <td>
+          ${n.estado !== 'publicada' ? `<button class="btn btn-secundario btn-pequeno" onclick="cambiarEstadoNoticia('${n.id}', 'publicada')">Publicar</button>` : ''}
+          ${n.estado !== 'archivada' ? `<button class="btn btn-secundario btn-pequeno" onclick="cambiarEstadoNoticia('${n.id}', 'archivada')">Archivar</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarNoticia(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('noticiaFormError');
+  errorEl.classList.add('oculto');
+
+  const cuerpo = {
+    titulo: document.getElementById('noticiaTitulo').value.trim(),
+    contenido: document.getElementById('noticiaContenido').value.trim(),
+    imagen_url: document.getElementById('noticiaImagenUrl').value.trim() || undefined,
+    destacada: document.getElementById('noticiaDestacada').checked
+  };
+
+  try {
+    await apiFetch('/liga/noticias', { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formNoticia').classList.add('oculto');
+    cargarNoticias();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function cambiarEstadoNoticia(noticiaId, nuevoEstado) {
+  try {
+    await apiFetch(`/liga/noticias/${noticiaId}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado: nuevoEstado })
+    });
+    cargarNoticias();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ===================== NOTIFICACIONES =====================
+
+function poblarSelectClubesNotificacion() {
+  const select = document.getElementById('notificacionClub');
+  const opciones = clubesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  select.innerHTML = '<option value="">Todos los clubes de la Liga</option>' + opciones;
+}
+
+async function cargarNotificaciones() {
+  const tbody = document.getElementById('tablaNotificaciones');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/notificaciones');
+    const notificaciones = data.notificaciones;
+    if (!notificaciones.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no enviaste ninguna notificación.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = notificaciones.map((n) => `
+      <tr>
+        <td>${escapeHtml(n.titulo)}</td>
+        <td>${escapeHtml(n.club_nombre || 'Todos los clubes')}</td>
+        <td>${escapeHtml(n.tipo)}</td>
+        <td>${new Date(n.creado_at).toLocaleDateString('es-AR')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function enviarNotificacion(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('notificacionFormError');
+  const okEl = document.getElementById('notificacionFormOk');
+  errorEl.classList.add('oculto');
+  okEl.classList.add('oculto');
+
+  const cuerpo = {
+    titulo: document.getElementById('notificacionTitulo').value.trim(),
+    mensaje: document.getElementById('notificacionMensaje').value.trim(),
+    tipo: document.getElementById('notificacionTipo').value,
+    club_id: document.getElementById('notificacionClub').value || undefined
+  };
+
+  try {
+    await apiFetch('/liga/notificaciones', { method: 'POST', body: JSON.stringify(cuerpo) });
+    okEl.textContent = 'Notificación enviada correctamente.';
+    okEl.classList.remove('oculto');
+    document.getElementById('formNotificacion').reset();
+    cargarNotificaciones();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
   }
 }
 

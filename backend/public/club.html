@@ -29,6 +29,7 @@
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnJugadores">Jugadores</button>
       <button class="tab-btn" id="tabBtnFichajes">Fichajes y Carnets</button>
+      <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
     </div>
 
     <!-- ===== SECCIÓN JUGADORES ===== -->
@@ -122,6 +123,19 @@
             <tr><th>Jugador</th><th>Liga</th><th>Torneo</th><th>Estado</th><th>Carnet</th></tr>
           </thead>
           <tbody id="tablaFichajes"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN NOTIFICACIONES ===== -->
+    <div id="seccionNotificaciones" class="oculto">
+      <div class="panel">
+        <h2>Notificaciones de tu(s) Liga(s)</h2>
+        <table>
+          <thead>
+            <tr><th>Liga</th><th>Título</th><th>Mensaje</th><th>Fecha</th><th></th></tr>
+          </thead>
+          <tbody id="tablaNotificacionesClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

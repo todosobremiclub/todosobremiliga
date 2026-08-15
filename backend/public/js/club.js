@@ -14,6 +14,7 @@ function init() {
 function conectarEventos() {
   document.getElementById('tabBtnJugadores').addEventListener('click', () => cambiarTab('jugadores'));
   document.getElementById('tabBtnFichajes').addEventListener('click', () => cambiarTab('fichajes'));
+  document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
 
   document.getElementById('btnMostrarFormJugador').addEventListener('click', () => {
     document.getElementById('formJugador').reset();
@@ -34,13 +35,14 @@ function conectarEventos() {
 }
 
 function cambiarTab(nombre) {
-  const secciones = { jugadores: 'seccionJugadores', fichajes: 'seccionFichajes' };
-  const botones = { jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes' };
+  const secciones = { jugadores: 'seccionJugadores', fichajes: 'seccionFichajes', notificaciones: 'seccionNotificaciones' };
+  const botones = { jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes', notificaciones: 'tabBtnNotificaciones' };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
   if (nombre === 'fichajes') cargarFichajes();
+  if (nombre === 'notificaciones') cargarNotificacionesClub();
 }
 
 // ===================== JUGADORES =====================
@@ -274,6 +276,43 @@ async function cargarFichajes() {
     }).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// ===================== NOTIFICACIONES =====================
+
+async function cargarNotificacionesClub() {
+  const tbody = document.getElementById('tablaNotificacionesClub');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/club/notificaciones');
+    const notificaciones = data.notificaciones;
+    if (!notificaciones.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no recibiste ninguna notificación.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = notificaciones.map((n) => `
+      <tr style="${n.leida ? '' : 'font-weight:600;'}">
+        <td>${escapeHtml(n.liga_nombre)}</td>
+        <td>${escapeHtml(n.titulo)}</td>
+        <td>${escapeHtml(n.mensaje)}</td>
+        <td>${new Date(n.creado_at).toLocaleDateString('es-AR')}</td>
+        <td>${n.leida
+          ? '<span class="badge badge-activo">Leída</span>'
+          : `<button class="btn btn-secundario btn-pequeno" onclick="marcarNotificacionLeida('${n.id}')">Marcar leída</button>`}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function marcarNotificacionLeida(notificacionId) {
+  try {
+    await apiFetch(`/club/notificaciones/${notificacionId}/leida`, { method: 'PATCH' });
+    cargarNotificacionesClub();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 

@@ -27,6 +27,8 @@
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnClubes">Clubes</button>
       <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
+      <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
+      <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
     </div>
 
     <!-- ===== SECCIÓN CLUBES ===== -->
@@ -259,6 +261,93 @@
             <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN NOTICIAS ===== -->
+    <div id="seccionNoticias" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Noticias</h2>
+          <button class="btn" id="btnMostrarFormNoticia">+ Nueva Noticia</button>
+        </div>
+
+        <form id="formNoticia" class="oculto">
+          <div class="form-grid una-columna">
+            <div>
+              <label for="noticiaTitulo">Título *</label>
+              <input type="text" id="noticiaTitulo" required>
+            </div>
+            <div>
+              <label for="noticiaContenido">Contenido *</label>
+              <textarea id="noticiaContenido" required rows="5" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit;"></textarea>
+            </div>
+            <div>
+              <label for="noticiaImagenUrl">URL de imagen</label>
+              <input type="text" id="noticiaImagenUrl">
+            </div>
+            <div>
+              <label><input type="checkbox" id="noticiaDestacada" style="width:auto; margin-right:6px;">Destacada</label>
+            </div>
+          </div>
+          <button type="submit" class="btn">Publicar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormNoticia">Cancelar</button>
+          <p class="mensaje-error oculto" id="noticiaFormError"></p>
+        </form>
+
+        <table>
+          <thead>
+            <tr><th>Título</th><th>Estado</th><th>Destacada</th><th>Fecha</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tablaNoticias"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN NOTIFICACIONES ===== -->
+    <div id="seccionNotificaciones" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Notificaciones a los Clubes</h2>
+          <button class="btn" id="btnMostrarFormNotificacion">+ Nueva Notificación</button>
+        </div>
+
+        <form id="formNotificacion" class="oculto">
+          <div class="form-grid">
+            <div>
+              <label for="notificacionTitulo">Título *</label>
+              <input type="text" id="notificacionTitulo" required>
+            </div>
+            <div>
+              <label for="notificacionClub">Destinatario</label>
+              <select id="notificacionClub">
+                <option value="">Todos los clubes de la Liga</option>
+              </select>
+            </div>
+            <div>
+              <label for="notificacionTipo">Tipo</label>
+              <select id="notificacionTipo">
+                <option value="general">General</option>
+                <option value="fichajes">Fichajes</option>
+                <option value="fixture">Fixture</option>
+                <option value="administrativo">Administrativo</option>
+              </select>
+            </div>
+          </div>
+          <label for="notificacionMensaje">Mensaje *</label>
+          <textarea id="notificacionMensaje" required rows="4" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit; margin-bottom:16px;"></textarea>
+          <button type="submit" class="btn">Enviar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormNotificacion">Cancelar</button>
+          <p class="mensaje-error oculto" id="notificacionFormError"></p>
+          <p class="mensaje-ok oculto" id="notificacionFormOk"></p>
+        </form>
+
+        <table>
+          <thead>
+            <tr><th>Título</th><th>Destinatario</th><th>Tipo</th><th>Fecha</th></tr>
+          </thead>
+          <tbody id="tablaNotificaciones"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>

@@ -49,6 +49,26 @@ async function init() {
   } catch (err) {
     contenedorTorneos.innerHTML = `<p class="sitio-vacio">Error cargando torneos: ${escapeHtml(err.message)}</p>`;
   }
+
+  const contenedorNoticias = document.getElementById('listaNoticias');
+  try {
+    const resNoticias = await fetch(`/web/ligas/${encodeURIComponent(slug)}/noticias`);
+    const dataNoticias = await resNoticias.json();
+    if (!dataNoticias.ok || !dataNoticias.noticias.length) {
+      contenedorNoticias.innerHTML = '<p class="sitio-vacio">Esta Liga todavía no publicó noticias.</p>';
+      return;
+    }
+    contenedorNoticias.innerHTML = dataNoticias.noticias.map((n) => `
+      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
+        <h3>${escapeHtml(n.titulo)}</h3>
+        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
+        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
+        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
+      </div>
+    `).join('');
+  } catch (err) {
+    contenedorNoticias.innerHTML = `<p class="sitio-vacio">Error cargando noticias: ${escapeHtml(err.message)}</p>`;
+  }
 }
 
 function escapeHtml(texto) {
