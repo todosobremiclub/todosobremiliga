@@ -97,11 +97,168 @@
       </div>
     </div>
 
-    <!-- ===== SECCIÓN TORNEOS (se completa en el próximo paso) ===== -->
+    <!-- ===== SECCIÓN TORNEOS ===== -->
     <div id="seccionTorneos" class="oculto">
       <div class="panel">
-        <h2>Torneos</h2>
-        <p class="texto-ayuda">Esta sección se termina de construir en el próximo paso.</p>
+        <div class="panel-header">
+          <h2>Torneos</h2>
+          <button class="btn" id="btnMostrarFormTorneo">+ Nuevo Torneo</button>
+        </div>
+
+        <form id="formTorneo" class="oculto">
+          <div class="form-grid">
+            <div>
+              <label for="torneoNombre">Nombre *</label>
+              <input type="text" id="torneoNombre" required placeholder="ej: Apertura 2026">
+            </div>
+            <div>
+              <label for="torneoDeporte">Deporte *</label>
+              <select id="torneoDeporte" required>
+                <option value="futbol">Fútbol</option>
+                <option value="voley">Vóley</option>
+                <option value="handball">Handball</option>
+                <option value="basquet">Básquet</option>
+                <option value="futsal">Futsal</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label for="torneoTemporada">Temporada</label>
+              <input type="text" id="torneoTemporada" placeholder="ej: 2026">
+            </div>
+            <div>
+              <label for="torneoFormato">Formato de juego</label>
+              <select id="torneoFormato">
+                <option value="todos_contra_todos">Todos contra todos</option>
+                <option value="grupos_playoffs">Grupos + playoffs</option>
+                <option value="liguilla_ida_vuelta">Liguilla ida y vuelta</option>
+                <option value="eliminacion_directa">Eliminación directa</option>
+              </select>
+            </div>
+            <div>
+              <label for="torneoPtsVictoria">Puntos por victoria</label>
+              <input type="number" id="torneoPtsVictoria" value="3">
+            </div>
+            <div>
+              <label for="torneoPtsEmpate">Puntos por empate</label>
+              <input type="number" id="torneoPtsEmpate" value="1">
+            </div>
+          </div>
+          <p class="texto-ayuda">Para deportes sin empate (como vóley), dejá los puntos de empate en 0 — el sistema calcula igual quién gana según el resultado cargado.</p>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormTorneo">Cancelar</button>
+          <p class="mensaje-error oculto" id="torneoFormError"></p>
+        </form>
+
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>Deporte</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tablaTorneos"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Detalle de un torneo: sus categorías -->
+      <div class="panel oculto" id="panelCategorias">
+        <div class="panel-header">
+          <h2 id="tituloCategorias">Categorías</h2>
+          <div>
+            <button class="btn btn-secundario" id="btnMostrarFormCategoria">+ Nueva Categoría</button>
+            <button class="btn btn-secundario" id="btnCerrarCategorias">Cerrar</button>
+          </div>
+        </div>
+
+        <form id="formCategoria" class="oculto">
+          <input type="hidden" id="categoriaTorneoId">
+          <div class="form-grid">
+            <div>
+              <label for="categoriaNombre">Nombre *</label>
+              <input type="text" id="categoriaNombre" required placeholder="ej: Primera División">
+            </div>
+            <div>
+              <label for="categoriaGenero">Género</label>
+              <select id="categoriaGenero">
+                <option value="">Sin especificar</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+                <option value="mixto">Mixto</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
+          <p class="mensaje-error oculto" id="categoriaFormError"></p>
+        </form>
+
+        <table>
+          <thead><tr><th>Nombre</th><th>Género</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaCategorias"><tr><td colspan="3">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Detalle de una categoría: equipos / fixture / tabla -->
+      <div class="panel oculto" id="panelDetalleCategoria">
+        <div class="panel-header">
+          <h2 id="tituloDetalleCategoria">Categoría</h2>
+          <button class="btn btn-secundario" id="btnCerrarDetalleCategoria">Cerrar</button>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn activo" id="tabBtnEquipos">Equipos</button>
+          <button class="tab-btn" id="tabBtnFixture">Fixture</button>
+          <button class="tab-btn" id="tabBtnTabla">Tabla de posiciones</button>
+        </div>
+
+        <!-- Equipos -->
+        <div id="subSeccionEquipos">
+          <label for="selectClubInscribir">Inscribir club</label>
+          <div style="display:flex; gap:8px; margin-bottom:16px;">
+            <select id="selectClubInscribir" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
+            <button class="btn" id="btnInscribirClub">Inscribir</button>
+          </div>
+          <p class="mensaje-error oculto" id="equipoFormError"></p>
+          <table>
+            <thead><tr><th>Club</th></tr></thead>
+            <tbody id="tablaEquipos"><tr><td>Cargando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- Fixture -->
+        <div id="subSeccionFixture" class="oculto">
+          <div class="panel-header">
+            <span></span>
+            <button class="btn" id="btnMostrarFormPartido">+ Programar partido</button>
+          </div>
+          <form id="formPartido" class="oculto">
+            <div class="form-grid">
+              <div>
+                <label for="partidoLocal">Equipo local *</label>
+                <select id="partidoLocal" required></select>
+              </div>
+              <div>
+                <label for="partidoVisitante">Equipo visitante *</label>
+                <select id="partidoVisitante" required></select>
+              </div>
+              <div><label for="partidoJornada">Jornada</label><input type="number" id="partidoJornada"></div>
+              <div><label for="partidoFecha">Fecha</label><input type="date" id="partidoFecha"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormPartido">Cancelar</button>
+            <p class="mensaje-error oculto" id="partidoFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Jornada</th><th>Local</th><th>Resultado</th><th>Visitante</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaPartidos"><tr><td colspan="6">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- Tabla de posiciones -->
+        <div id="subSeccionTabla" class="oculto">
+          <table>
+            <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+            <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
