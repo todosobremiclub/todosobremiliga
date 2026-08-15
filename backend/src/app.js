@@ -30,6 +30,32 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+// ===== AUTH =====
+app.use('/auth', require('./routes/authRoutes'));
+
+const requireAuth = require('./middleware/requireAuth');
+const requireRole = require('./middleware/requireRole');
+
+// ===== RUTAS DE PRUEBA POR ROL =====
+// Sirven para validar el circuito login -> token -> permisos de punta a punta
+// antes de construir el CRUD real de cada módulo. Se van a ir reemplazando
+// por las rutas reales de cada fase (adminRoutes, ligaRoutes, clubRoutes, appRoutes).
+app.get('/admin/ping', requireAuth, requireRole('super_admin'), (req, res) => {
+  res.json({ ok: true, mensaje: 'Acceso Super Admin OK', usuario: req.usuario });
+});
+
+app.get('/liga/ping', requireAuth, requireRole('super_admin', 'liga_admin'), (req, res) => {
+  res.json({ ok: true, mensaje: 'Acceso Liga OK', usuario: req.usuario });
+});
+
+app.get('/club/ping', requireAuth, requireRole('super_admin', 'liga_admin', 'club_admin'), (req, res) => {
+  res.json({ ok: true, mensaje: 'Acceso Club OK', usuario: req.usuario });
+});
+
+app.get('/app/ping', requireAuth, (req, res) => {
+  res.json({ ok: true, mensaje: 'Acceso autenticado OK (cualquier rol)', usuario: req.usuario });
+});
+
 // ===== ROUTES =====
 // A medida que avancemos con cada módulo (Super Admin, Liga, Web, Fichajes)
 // se irán agregando acá, siguiendo el mismo patrón que TSMC:
