@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Liga - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab-btn {
+    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
+  }
+  .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Todo Sobre mi Liga — Panel Liga</h1>
+    <div class="usuario-info">
+      <span id="usuarioNombre"></span>
+      <button id="btnLogout">Salir</button>
+    </div>
+  </div>
+
+  <div class="contenido">
+    <div class="tabs">
+      <button class="tab-btn activo" id="tabBtnClubes">Clubes</button>
+      <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
+    </div>
+
+    <!-- ===== SECCIÓN CLUBES ===== -->
+    <div id="seccionClubes">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Clubes participantes</h2>
+          <button class="btn" id="btnMostrarFormClub">+ Nuevo Club</button>
+        </div>
+
+        <form id="formClub" class="oculto">
+          <div class="form-grid">
+            <div>
+              <label for="clubNombre">Nombre *</label>
+              <input type="text" id="clubNombre" required>
+            </div>
+            <div>
+              <label for="clubCuit">CUIT</label>
+              <input type="text" id="clubCuit">
+            </div>
+            <div>
+              <label for="clubDireccion">Dirección</label>
+              <input type="text" id="clubDireccion">
+            </div>
+            <div>
+              <label for="clubTelefono">Teléfono</label>
+              <input type="text" id="clubTelefono">
+            </div>
+            <div>
+              <label for="clubEmail">Email de contacto</label>
+              <input type="email" id="clubEmail">
+            </div>
+            <div>
+              <label for="clubLogoUrl">URL del logo</label>
+              <input type="text" id="clubLogoUrl">
+            </div>
+          </div>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormClub">Cancelar</button>
+          <p class="mensaje-error oculto" id="clubFormError"></p>
+        </form>
+
+        <table>
+          <thead>
+            <tr><th>Nombre</th><th>CUIT</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tablaClubes"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel oculto" id="panelUsuariosClub">
+        <div class="panel-header">
+          <h2 id="tituloUsuariosClub">Usuarios del Club</h2>
+          <button class="btn btn-secundario" id="btnCerrarUsuariosClub">Cerrar</button>
+        </div>
+        <form id="formUsuarioClub">
+          <input type="hidden" id="usuarioClubId">
+          <div class="form-grid">
+            <div><label for="ucNombre">Nombre *</label><input type="text" id="ucNombre" required></div>
+            <div><label for="ucEmail">Email *</label><input type="email" id="ucEmail" required></div>
+            <div><label for="ucPassword">Contraseña inicial *</label><input type="text" id="ucPassword" required></div>
+          </div>
+          <button type="submit" class="btn">Crear usuario club_admin</button>
+          <p class="mensaje-error oculto" id="usuarioClubFormError"></p>
+          <p class="mensaje-ok oculto" id="usuarioClubFormOk"></p>
+        </form>
+        <p class="texto-ayuda">Este es el usuario con el que el club va a poder entrar a su propio panel para cargar jugadores y pedir fichajes.</p>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN TORNEOS (se completa en el próximo paso) ===== -->
+    <div id="seccionTorneos" class="oculto">
+      <div class="panel">
+        <h2>Torneos</h2>
+        <p class="texto-ayuda">Esta sección se termina de construir en el próximo paso.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/liga.js"></script>
+</body>
+</html>
