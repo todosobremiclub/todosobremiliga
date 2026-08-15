@@ -64,8 +64,13 @@ app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), 
 // equipos inscriptos, fixture, resultados y tabla de posiciones.
 app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFixtureRoutes'));
 
-// A medida que avancemos con los próximos módulos (Web, Fichajes) se irán
-// agregando acá, siguiendo el mismo patrón:
+// ===== MÓDULO WEB (público, sin login) =====
+// Lo que consume el sitio web público de cada Liga: info de la liga,
+// torneos, categorías, tabla de posiciones y fixture.
+app.use('/web', require('./routes/webRoutes'));
+
+// A medida que avancemos con el próximo módulo (Fichajes) se irá agregando
+// acá, siguiendo el mismo patrón:
 // app.use('/app', require('./routes/appRoutes'));
 
 const PORT = process.env.PORT || 3000;
