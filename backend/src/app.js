@@ -36,13 +36,9 @@ app.use('/auth', require('./routes/authRoutes'));
 const requireAuth = require('./middleware/requireAuth');
 const requireRole = require('./middleware/requireRole');
 
-// ===== RUTAS DE PRUEBA POR ROL (Liga / Club / App) =====
+// ===== RUTAS DE PRUEBA POR ROL (Club / App) =====
 // Todavía no construimos esos módulos, quedan estas rutas de prueba hasta
-// que lleguemos a esas fases (5, 6 y 7 del roadmap).
-app.get('/liga/ping', requireAuth, requireRole('super_admin', 'liga_admin'), (req, res) => {
-  res.json({ ok: true, mensaje: 'Acceso Liga OK', usuario: req.usuario });
-});
-
+// que lleguemos a esas fases (6 y 7 del roadmap).
 app.get('/club/ping', requireAuth, requireRole('super_admin', 'liga_admin', 'club_admin'), (req, res) => {
   res.json({ ok: true, mensaje: 'Acceso Club OK', usuario: req.usuario });
 });
@@ -57,9 +53,16 @@ app.get('/app/ping', requireAuth, (req, res) => {
 app.use('/admin/ligas', requireAuth, requireRole('super_admin'), require('./routes/adminLigasRoutes'));
 app.use('/admin/usuarios', requireAuth, requireRole('super_admin'), require('./routes/adminUsuariosRoutes'));
 
-// A medida que avancemos con los próximos módulos (Liga, Web, Fichajes)
-// se irán agregando acá, siguiendo el mismo patrón:
-// app.use('/liga', require('./routes/ligaRoutes'));
+// ===== MÓDULO LIGA =====
+// Todo lo que cuelgue de /liga requiere estar logueado como liga_admin (o
+// super_admin operando en nombre de una liga) y queda automáticamente
+// filtrado a la Liga correspondiente (ver middleware resolveLigaId).
+const resolveLigaId = require('./middleware/resolveLigaId');
+app.use('/liga/clubes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaClubesRoutes'));
+
+// A medida que avancemos con los próximos módulos (categorías, torneos,
+// fixtures, Web, Fichajes) se irán agregando acá, siguiendo el mismo patrón:
+// app.use('/liga/torneos', ...);
 // app.use('/app', require('./routes/appRoutes'));
 
 const PORT = process.env.PORT || 3000;

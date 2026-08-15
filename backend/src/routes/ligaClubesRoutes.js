@@ -1,0 +1,139 @@
+const express = require('express');
+const router = express.Router();
+
+const { query, getClient } = require('../db');
+
+// Todas las rutas usan req.ligaId, calculado por el middleware resolveLigaId
+// (montado en app.js antes de este router).
+
+// GET /liga/clubes — clubes que participan en MI liga
+router.get('/', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.*, cl.id AS membresia_id, cl.activo AS activo_en_liga, cl.fecha_alta
+       FROM club_liga cl
+       JOIN clubes c ON c.id = cl.club_id
+       WHERE cl.liga_id = $1
+       ORDER BY c.nombre ASC`,
+      [req.ligaId]
+    );
+    res.json({ ok: true, clubes: rows });
+  } catch (err) {
+    console.error('Error en GET /liga/clubes:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes — alta de un club NUEVO, que queda automáticamente
+// inscripto en mi liga. (Vincular un club ya existente de otra liga es un
+// caso que se suma más adelante si hace falta.)
+router.post('/', async (req, res) => {
+  const {
+    nombre, logo_url, direccion, telefono,
+    email_contacto, color_primario, color_secundario, cuit
+  } = req.body;
+
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ ok: false, error: 'El nombre del club es obligatorio' });
+  }
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const clubResult = await client.query(
+      `INSERT INTO clubes (nombre, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario, cuit)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [nombre.trim(), logo_url || null, direccion || null, telefono || null,
+       email_contacto || null, color_primario || null, color_secundario || null, cuit || null]
+    );
+    const club = clubResult.rows[0];
+
+    const membresiaResult = await client.query(
+      `INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2) RETURNING *`,
+      [req.ligaId, club.id]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({
+      ok: true,
+      club: {
+        ...club,
+        membresia_id: membresiaResult.rows[0].id,
+        activo_en_liga: membresiaResult.rows[0].activo,
+        fecha_alta: membresiaResult.rows[0].fecha_alta
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en POST /liga/clubes:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /liga/clubes/:clubId — edición de los datos de un club (solo si
+// participa en MI liga, si no 404 aunque el club exista en la base)
+router.put('/:clubId', async (req, res) => {
+  const {
+    nombre, logo_url, direccion, telefono,
+    email_contacto, color_primario, color_secundario, cuit
+  } = req.body;
+
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ ok: false, error: 'El nombre del club es obligatorio' });
+  }
+
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+
+    const { rows } = await query(
+      `UPDATE clubes SET
+         nombre = $1, logo_url = $2, direccion = $3, telefono = $4,
+         email_contacto = $5, color_primario = $6, color_secundario = $7, cuit = $8,
+         actualizado_at = NOW()
+       WHERE id = $9
+       RETURNING *`,
+      [nombre.trim(), logo_url || null, direccion || null, telefono || null,
+       email_contacto || null, color_primario || null, color_secundario || null, cuit || null,
+       req.params.clubId]
+    );
+    res.json({ ok: true, club: rows[0] });
+  } catch (err) {
+    console.error('Error en PUT /liga/clubes/:clubId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/clubes/:clubId/activo — activar/desactivar la PARTICIPACIÓN
+// de ese club en mi liga (no borra ni afecta al club en sí, que puede seguir
+// jugando en otra liga).
+router.patch('/:clubId/activo', async (req, res) => {
+  const { activo } = req.body;
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ ok: false, error: 'Falta el campo "activo" (true/false)' });
+  }
+  try {
+    const { rows } = await query(
+      `UPDATE club_liga SET activo = $1
+       WHERE club_id = $2 AND liga_id = $3
+       RETURNING *`,
+      [activo, req.params.clubId, req.ligaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    res.json({ ok: true, membresia: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH /liga/clubes/:clubId/activo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+module.exports = router;
