@@ -102,8 +102,8 @@
               <select id="fichajeTorneo" required disabled></select>
             </div>
             <div>
-              <label for="fichajeCategoria">Categoría</label>
-              <select id="fichajeCategoria" disabled></select>
+              <label for="fichajeCategoria">Categoría *</label>
+              <select id="fichajeCategoria" required disabled></select>
             </div>
           </div>
           <button type="submit" class="btn">Enviar solicitud de fichaje</button>
@@ -120,9 +120,9 @@
         <h2>Fichajes solicitados</h2>
         <table>
           <thead>
-            <tr><th>Jugador</th><th>Liga</th><th>Torneo</th><th>Estado</th><th>Carnet</th></tr>
+            <tr><th>Jugador</th><th>Liga</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th></tr>
           </thead>
-          <tbody id="tablaFichajes"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <tbody id="tablaFichajes"><tr><td colspan="6">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

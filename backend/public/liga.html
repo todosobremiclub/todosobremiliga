@@ -12,6 +12,19 @@
     padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
   }
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+  .campo-color { display: flex; align-items: center; gap: 8px; }
+  .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
+  .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
+  .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .logo-miniatura { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  #headerLiga {
+    display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: var(--radio);
+    margin-bottom: 20px; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  }
+  #headerLiga img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
+  #headerLiga h2 { margin: 0; font-size: 20px; }
+  #headerLiga p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -24,9 +37,18 @@
   </div>
 
   <div class="contenido">
+    <div id="headerLiga" class="oculto" style="background: linear-gradient(135deg, #1d4ed8, #1e3a8a);">
+      <img id="headerLigaLogo" class="oculto" alt="Logo">
+      <div>
+        <h2 id="headerLigaNombre">Mi Liga</h2>
+        <p>Panel de gestión de la Liga</p>
+      </div>
+    </div>
+
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnClubes">Clubes</button>
       <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
+      <button class="tab-btn" id="tabBtnFichajes">Fichajes</button>
       <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
       <button class="tab-btn" id="tabBtnFinanzas">Finanzas</button>
@@ -42,6 +64,7 @@
         </div>
 
         <form id="formClub" class="oculto">
+          <input type="hidden" id="clubIdEdicion">
           <div class="form-grid">
             <div>
               <label for="clubNombre">Nombre *</label>
@@ -63,11 +86,36 @@
               <label for="clubEmail">Email de contacto</label>
               <input type="email" id="clubEmail">
             </div>
+          </div>
+
+          <div class="form-grid una-columna">
             <div>
-              <label for="clubLogoUrl">URL del logo</label>
-              <input type="text" id="clubLogoUrl">
+              <label for="clubLogoArchivo">Logo (elegir desde la computadora)</label>
+              <div class="logo-preview-wrap">
+                <img id="clubLogoPreview" class="oculto" alt="Logo">
+                <input type="file" id="clubLogoArchivo" accept="image/*">
+              </div>
+              <input type="hidden" id="clubLogoUrl">
             </div>
           </div>
+
+          <div class="form-grid">
+            <div>
+              <label for="clubColorPrimario">Color primario</label>
+              <div class="campo-color">
+                <input type="color" id="clubColorPrimario" value="#1d4ed8">
+                <span id="clubColorPrimarioHex">#1d4ed8</span>
+              </div>
+            </div>
+            <div>
+              <label for="clubColorSecundario">Color secundario</label>
+              <div class="campo-color">
+                <input type="color" id="clubColorSecundario" value="#1e3a8a">
+                <span id="clubColorSecundarioHex">#1e3a8a</span>
+              </div>
+            </div>
+          </div>
+
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormClub">Cancelar</button>
           <p class="mensaje-error oculto" id="clubFormError"></p>
@@ -75,9 +123,9 @@
 
         <table>
           <thead>
-            <tr><th>Nombre</th><th>CUIT</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
+            <tr><th>Logo</th><th>Nombre</th><th>CUIT</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaClubes"><tr><td colspan="4">Cargando...</td></tr></tbody>
+          <tbody id="tablaClubes"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -263,6 +311,29 @@
             <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN FICHAJES ===== -->
+    <div id="seccionFichajes" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Solicitudes de fichaje</h2>
+        </div>
+        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:16px;">
+          <select id="filtroEstadoFichaje" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="pendiente">Pendientes</option>
+            <option value="aprobado">Aprobados</option>
+            <option value="rechazado">Rechazados</option>
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Jugador</th><th>Club</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Acciones</th></tr>
+          </thead>
+          <tbody id="tablaFichajesLiga"><tr><td colspan="6">Cargando...</td></tr></tbody>
+        </table>
       </div>
     </div>
 

@@ -5,6 +5,7 @@ let torneosCache = [];
 let categoriasCache = [];
 let equiposCache = [];
 let partidosCache = [];
+let clubLogoBase64Actual = '';
 
 let torneoActualId = null;
 let torneoActualNombre = '';
@@ -16,12 +17,39 @@ function init() {
   if (!usuario) return;
   inicializarTopbar(usuario);
   conectarEventos();
+  cargarPerfilLiga();
   cargarClubes();
+}
+
+// Trae los datos de marca (nombre/logo/colores) de la propia Liga y pinta el
+// header con un degradé usando sus colores reales — look moderno pedido para
+// el Panel Liga.
+async function cargarPerfilLiga() {
+  try {
+    const data = await apiFetch('/liga/perfil');
+    const liga = data.liga;
+    const header = document.getElementById('headerLiga');
+    const primario = liga.color_primario || '#1d4ed8';
+    const secundario = liga.color_secundario || '#1e3a8a';
+    header.style.background = `linear-gradient(135deg, ${primario}, ${secundario})`;
+    header.classList.remove('oculto');
+    document.getElementById('headerLigaNombre').textContent = liga.nombre;
+    const logo = document.getElementById('headerLigaLogo');
+    if (liga.logo_url) {
+      logo.src = liga.logo_url;
+      logo.classList.remove('oculto');
+    } else {
+      logo.classList.add('oculto');
+    }
+  } catch (err) {
+    // Si falla, seguimos sin header de marca (no bloquea el resto del panel).
+  }
 }
 
 function conectarEventos() {
   document.getElementById('tabBtnClubes').addEventListener('click', () => cambiarTab('clubes'));
   document.getElementById('tabBtnTorneos').addEventListener('click', () => cambiarTab('torneos'));
+  document.getElementById('tabBtnFichajes').addEventListener('click', () => cambiarTab('fichajes'));
   document.getElementById('tabBtnNoticias').addEventListener('click', () => cambiarTab('noticias'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
   document.getElementById('tabBtnFinanzas').addEventListener('click', () => cambiarTab('finanzas'));
@@ -29,14 +57,19 @@ function conectarEventos() {
 
   // ---- Clubes ----
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
-    document.getElementById('formClub').reset();
-    document.getElementById('clubFormError').classList.add('oculto');
+    limpiarFormClub();
     document.getElementById('formClub').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormClub').addEventListener('click', () => {
     document.getElementById('formClub').classList.add('oculto');
   });
   document.getElementById('formClub').addEventListener('submit', guardarClub);
+  document.getElementById('clubLogoArchivo').addEventListener('change', onElegirLogoClub);
+  ['Primario', 'Secundario'].forEach((sufijo) => {
+    const input = document.getElementById(`clubColor${sufijo}`);
+    const span = document.getElementById(`clubColor${sufijo}Hex`);
+    input.addEventListener('input', () => { span.textContent = input.value; });
+  });
 
   document.getElementById('btnCerrarUsuariosClub').addEventListener('click', () => {
     document.getElementById('panelUsuariosClub').classList.add('oculto');
@@ -93,6 +126,9 @@ function conectarEventos() {
     document.getElementById('formPartido').classList.add('oculto');
   });
   document.getElementById('formPartido').addEventListener('submit', guardarPartido);
+
+  // ---- Fichajes ----
+  document.getElementById('filtroEstadoFichaje').addEventListener('change', cargarFichajesLiga);
 
   // ---- Noticias ----
   document.getElementById('btnMostrarFormNoticia').addEventListener('click', () => {
@@ -154,12 +190,12 @@ function conectarEventos() {
 
 function cambiarTab(nombre) {
   const secciones = {
-    clubes: 'seccionClubes', torneos: 'seccionTorneos',
+    clubes: 'seccionClubes', torneos: 'seccionTorneos', fichajes: 'seccionFichajes',
     noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones',
     finanzas: 'seccionFinanzas', agenda: 'seccionAgenda'
   };
   const botones = {
-    clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos',
+    clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos', fichajes: 'tabBtnFichajes',
     noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones',
     finanzas: 'tabBtnFinanzas', agenda: 'tabBtnAgenda'
   };
@@ -170,13 +206,72 @@ function cambiarTab(nombre) {
   if (nombre === 'torneos' && !torneosCache.length) {
     cargarTorneos();
   }
+  if (nombre === 'fichajes') cargarFichajesLiga();
   if (nombre === 'noticias') cargarNoticias();
   if (nombre === 'notificaciones') cargarNotificaciones();
   if (nombre === 'finanzas') cargarFinanzas();
   if (nombre === 'agenda') cargarAgenda();
 }
 
-// ===================== CLUBES (sin cambios) =====================
+// ===================== FICHAJES (aprobar/rechazar) =====================
+
+async function cargarFichajesLiga() {
+  const tbody = document.getElementById('tablaFichajesLiga');
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  const estado = document.getElementById('filtroEstadoFichaje').value;
+  try {
+    const params = estado ? `?estado=${estado}` : '';
+    const data = await apiFetch(`/liga/fichajes${params}`);
+    const fichajes = data.fichajes;
+    if (!fichajes.length) {
+      tbody.innerHTML = '<tr><td colspan="6">No hay solicitudes de fichaje en este estado.</td></tr>';
+      return;
+    }
+    const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
+    tbody.innerHTML = fichajes.map((f) => `
+      <tr>
+        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
+        <td>${escapeHtml(f.club_nombre)}</td>
+        <td>${escapeHtml(f.torneo_nombre || '-')}</td>
+        <td>${escapeHtml(f.categoria_nombre || '-')}</td>
+        <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
+        <td>
+          ${f.estado === 'pendiente' ? `
+            <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
+            <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
+          ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '-')}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function aprobarFichaje(fichajeId) {
+  try {
+    await apiFetch(`/liga/fichajes/${fichajeId}/aprobar`, { method: 'PATCH' });
+    cargarFichajesLiga();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function rechazarFichaje(fichajeId) {
+  const motivo = prompt('Motivo del rechazo (opcional):');
+  if (motivo === null) return;
+  try {
+    await apiFetch(`/liga/fichajes/${fichajeId}/rechazar`, {
+      method: 'PATCH',
+      body: JSON.stringify({ motivo_rechazo: motivo.trim() || undefined })
+    });
+    cargarFichajesLiga();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ===================== CLUBES =====================
 
 async function cargarClubes() {
   const tbody = document.getElementById('tablaClubes');
@@ -184,23 +279,84 @@ async function cargarClubes() {
     const data = await apiFetch('/liga/clubes');
     clubesCache = data.clubes;
     if (!clubesCache.length) {
-      tbody.innerHTML = '<tr><td colspan="4">Todavía no cargaste ningún club.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún club.</td></tr>';
       return;
     }
     tbody.innerHTML = clubesCache.map((club) => `
       <tr>
+        <td>${club.logo_url ? `<img class="logo-miniatura" src="${club.logo_url}" alt="">` : '<span class="logo-miniatura"></span>'}</td>
         <td>${escapeHtml(club.nombre)}</td>
         <td>${escapeHtml(club.cuit || '-')}</td>
         <td><span class="badge ${club.activo_en_liga ? 'badge-activo' : 'badge-inactivo'}">${club.activo_en_liga ? 'Activo' : 'Inactivo'}</span></td>
         <td>
+          <button class="btn btn-secundario btn-pequeno" onclick="editarClub('${club.id}')">Editar</button>
           <button class="btn btn-secundario btn-pequeno" onclick="verUsuariosClub('${club.id}', '${escapeHtml(club.nombre)}')">Usuarios</button>
           <button class="btn ${club.activo_en_liga ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoClub('${club.id}', ${!club.activo_en_liga})">${club.activo_en_liga ? 'Desactivar' : 'Activar'}</button>
         </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function onElegirLogoClub(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    clubLogoBase64Actual = lector.result;
+    const preview = document.getElementById('clubLogoPreview');
+    preview.src = clubLogoBase64Actual;
+    preview.classList.remove('oculto');
+    document.getElementById('clubLogoUrl').value = clubLogoBase64Actual;
+  };
+  lector.readAsDataURL(archivo);
+}
+
+function limpiarFormClub() {
+  document.getElementById('clubIdEdicion').value = '';
+  document.getElementById('clubNombre').value = '';
+  document.getElementById('clubCuit').value = '';
+  document.getElementById('clubDireccion').value = '';
+  document.getElementById('clubTelefono').value = '';
+  document.getElementById('clubEmail').value = '';
+  document.getElementById('clubLogoUrl').value = '';
+  document.getElementById('clubLogoArchivo').value = '';
+  document.getElementById('clubLogoPreview').classList.add('oculto');
+  clubLogoBase64Actual = '';
+  document.getElementById('clubColorPrimario').value = '#1d4ed8';
+  document.getElementById('clubColorPrimarioHex').textContent = '#1d4ed8';
+  document.getElementById('clubColorSecundario').value = '#1e3a8a';
+  document.getElementById('clubColorSecundarioHex').textContent = '#1e3a8a';
+  document.getElementById('clubFormError').classList.add('oculto');
+}
+
+function editarClub(clubId) {
+  const club = clubesCache.find((c) => c.id === clubId);
+  if (!club) return;
+  document.getElementById('clubIdEdicion').value = club.id;
+  document.getElementById('clubNombre').value = club.nombre || '';
+  document.getElementById('clubCuit').value = club.cuit || '';
+  document.getElementById('clubDireccion').value = club.direccion || '';
+  document.getElementById('clubTelefono').value = club.telefono || '';
+  document.getElementById('clubEmail').value = club.email_contacto || '';
+  document.getElementById('clubLogoUrl').value = club.logo_url || '';
+  clubLogoBase64Actual = club.logo_url || '';
+  const preview = document.getElementById('clubLogoPreview');
+  if (club.logo_url) {
+    preview.src = club.logo_url;
+    preview.classList.remove('oculto');
+  } else {
+    preview.classList.add('oculto');
+  }
+  document.getElementById('clubLogoArchivo').value = '';
+  document.getElementById('clubColorPrimario').value = club.color_primario || '#1d4ed8';
+  document.getElementById('clubColorPrimarioHex').textContent = club.color_primario || '#1d4ed8';
+  document.getElementById('clubColorSecundario').value = club.color_secundario || '#1e3a8a';
+  document.getElementById('clubColorSecundarioHex').textContent = club.color_secundario || '#1e3a8a';
+  document.getElementById('clubFormError').classList.add('oculto');
+  document.getElementById('formClub').classList.remove('oculto');
 }
 
 async function guardarClub(e) {
@@ -208,17 +364,24 @@ async function guardarClub(e) {
   const errorEl = document.getElementById('clubFormError');
   errorEl.classList.add('oculto');
 
+  const id = document.getElementById('clubIdEdicion').value;
   const cuerpo = {
     nombre: document.getElementById('clubNombre').value.trim(),
     cuit: document.getElementById('clubCuit').value.trim() || undefined,
     direccion: document.getElementById('clubDireccion').value.trim() || undefined,
     telefono: document.getElementById('clubTelefono').value.trim() || undefined,
     email_contacto: document.getElementById('clubEmail').value.trim() || undefined,
-    logo_url: document.getElementById('clubLogoUrl').value.trim() || undefined
+    logo_url: document.getElementById('clubLogoUrl').value || undefined,
+    color_primario: document.getElementById('clubColorPrimario').value,
+    color_secundario: document.getElementById('clubColorSecundario').value
   };
 
   try {
-    await apiFetch('/liga/clubes', { method: 'POST', body: JSON.stringify(cuerpo) });
+    if (id) {
+      await apiFetch(`/liga/clubes/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/clubes', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
     document.getElementById('formClub').classList.add('oculto');
     cargarClubes();
   } catch (err) {

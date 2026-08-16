@@ -198,7 +198,7 @@ async function onCambioTorneoFichaje() {
       selectCategoria.innerHTML = '<option value="">Sin categorías</option>';
       return;
     }
-    selectCategoria.innerHTML = '<option value="">Sin especificar</option>' +
+    selectCategoria.innerHTML = '<option value="">Elegí una categoría...</option>' +
       data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
     selectCategoria.disabled = false;
   } catch (err) {
@@ -218,8 +218,8 @@ async function enviarSolicitudFichaje(e) {
   const torneoId = document.getElementById('fichajeTorneo').value;
   const categoriaId = document.getElementById('fichajeCategoria').value;
 
-  if (!ligaId || !torneoId) {
-    errorEl.textContent = 'Tenés que elegir una Liga y un Torneo.';
+  if (!ligaId || !torneoId || !categoriaId) {
+    errorEl.textContent = 'Tenés que elegir una Liga, un Torneo y una Categoría.';
     errorEl.classList.remove('oculto');
     return;
   }
@@ -230,7 +230,7 @@ async function enviarSolicitudFichaje(e) {
       body: JSON.stringify({
         liga_id: ligaId,
         torneo_id: torneoId,
-        categoria_id: categoriaId || undefined
+        categoria_id: categoriaId
       })
     });
     okEl.textContent = 'Solicitud de fichaje enviada correctamente. Quedó pendiente de aprobación de la Liga.';
@@ -245,12 +245,12 @@ async function enviarSolicitudFichaje(e) {
 
 async function cargarFichajes() {
   const tbody = document.getElementById('tablaFichajes');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/club/fichajes');
     const fichajes = data.fichajes;
     if (!fichajes.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no pediste ningún fichaje.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Todavía no pediste ningún fichaje.</td></tr>';
       return;
     }
     const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
@@ -269,13 +269,14 @@ async function cargarFichajes() {
           <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</td>
           <td>${escapeHtml(f.liga_nombre)}</td>
           <td>${escapeHtml(f.torneo_nombre || '-')}</td>
+          <td>${escapeHtml(f.categoria_nombre || '-')}</td>
           <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
           <td>${carnetHtml}</td>
         </tr>
       `;
     }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 

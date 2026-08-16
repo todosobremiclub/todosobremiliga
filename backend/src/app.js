@@ -54,6 +54,8 @@ app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), 
 // Se monta en el mismo prefijo que ligaTorneosRoutes: maneja las sub-rutas de
 // equipos inscriptos, fixture, resultados y tabla de posiciones.
 app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFixtureRoutes'));
+// Datos de marca (nombre/logo/colores) de la propia Liga, solo lectura.
+app.use('/liga/perfil', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPerfilRoutes'));
 
 // ===== MÓDULO WEB (público, sin login) =====
 // Lo que consume el sitio web público de cada Liga: info de la liga,

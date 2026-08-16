@@ -13,11 +13,12 @@ router.get('/', async (req, res) => {
   try {
     let sql = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
-             c.nombre AS club_nombre, t.nombre AS torneo_nombre
+             c.nombre AS club_nombre, t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre
       FROM fichajes f
       JOIN jugadores j ON j.id = f.jugador_id
       JOIN clubes c ON c.id = f.club_id
       LEFT JOIN torneos t ON t.id = f.torneo_id
+      LEFT JOIN categorias cat ON cat.id = f.categoria_id
       WHERE f.liga_id = $1
     `;
     const params = [req.ligaId];
