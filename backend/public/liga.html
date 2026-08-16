@@ -29,6 +29,8 @@
       <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
       <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
+      <button class="tab-btn" id="tabBtnFinanzas">Finanzas</button>
+      <button class="tab-btn" id="tabBtnAgenda">Agenda</button>
     </div>
 
     <!-- ===== SECCIÓN CLUBES ===== -->
@@ -347,6 +349,110 @@
             <tr><th>Título</th><th>Destinatario</th><th>Tipo</th><th>Fecha</th></tr>
           </thead>
           <tbody id="tablaNotificaciones"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN FINANZAS (Gastos e Ingresos) ===== -->
+    <div id="seccionFinanzas" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Resumen</h2>
+        </div>
+        <div class="form-grid">
+          <div>
+            <p class="texto-ayuda" style="margin:0;">Total Ingresos</p>
+            <p style="font-size:20px; font-weight:700; color:var(--verde); margin:4px 0;" id="totalIngresos">$0</p>
+          </div>
+          <div>
+            <p class="texto-ayuda" style="margin:0;">Total Gastos</p>
+            <p style="font-size:20px; font-weight:700; color:var(--rojo); margin:4px 0;" id="totalGastos">$0</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Ingresos</h2>
+          <button class="btn" id="btnMostrarFormIngreso">+ Nuevo Ingreso</button>
+        </div>
+        <form id="formIngreso" class="oculto">
+          <div class="form-grid">
+            <div><label for="ingresoConcepto">Concepto *</label><input type="text" id="ingresoConcepto" required></div>
+            <div><label for="ingresoMonto">Monto *</label><input type="number" id="ingresoMonto" step="0.01" required></div>
+            <div><label for="ingresoFecha">Fecha</label><input type="date" id="ingresoFecha"></div>
+            <div>
+              <label for="ingresoClub">Club (opcional)</label>
+              <select id="ingresoClub"><option value="">Sin asociar a un club</option></select>
+            </div>
+            <div><label for="ingresoCategoria">Categoría</label><input type="text" id="ingresoCategoria" placeholder="ej: cuota, sponsor"></div>
+          </div>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormIngreso">Cancelar</button>
+          <p class="mensaje-error oculto" id="ingresoFormError"></p>
+        </form>
+        <table>
+          <thead><tr><th>Concepto</th><th>Club</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaIngresos"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Gastos</h2>
+          <button class="btn" id="btnMostrarFormGasto">+ Nuevo Gasto</button>
+        </div>
+        <form id="formGasto" class="oculto">
+          <div class="form-grid">
+            <div><label for="gastoConcepto">Concepto *</label><input type="text" id="gastoConcepto" required></div>
+            <div><label for="gastoMonto">Monto *</label><input type="number" id="gastoMonto" step="0.01" required></div>
+            <div><label for="gastoFecha">Fecha</label><input type="date" id="gastoFecha"></div>
+            <div><label for="gastoCategoria">Categoría</label><input type="text" id="gastoCategoria" placeholder="ej: arbitrajes, cancha"></div>
+          </div>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormGasto">Cancelar</button>
+          <p class="mensaje-error oculto" id="gastoFormError"></p>
+        </form>
+        <table>
+          <thead><tr><th>Concepto</th><th>Categoría</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaGastos"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN AGENDA ===== -->
+    <div id="seccionAgenda" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Agenda de la Liga</h2>
+          <button class="btn" id="btnMostrarFormEvento">+ Nuevo Evento</button>
+        </div>
+        <form id="formEvento" class="oculto">
+          <div class="form-grid">
+            <div><label for="eventoTitulo">Título *</label><input type="text" id="eventoTitulo" required></div>
+            <div>
+              <label for="eventoTipo">Tipo</label>
+              <select id="eventoTipo">
+                <option value="evento">Evento</option>
+                <option value="reunion">Reunión</option>
+                <option value="capacitacion">Capacitación</option>
+                <option value="partido">Partido</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div><label for="eventoFecha">Fecha *</label><input type="date" id="eventoFecha" required></div>
+            <div><label for="eventoHora">Hora</label><input type="time" id="eventoHora"></div>
+            <div><label for="eventoLugar">Lugar</label><input type="text" id="eventoLugar"></div>
+          </div>
+          <label for="eventoDescripcion">Descripción</label>
+          <textarea id="eventoDescripcion" rows="3" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit; margin-bottom:16px;"></textarea>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormEvento">Cancelar</button>
+          <p class="mensaje-error oculto" id="eventoFormError"></p>
+        </form>
+        <table>
+          <thead><tr><th>Fecha</th><th>Título</th><th>Tipo</th><th>Lugar</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaAgenda"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

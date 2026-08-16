@@ -81,5 +81,10 @@ app.use('/liga/noticias', requireAuth, requireRole('super_admin', 'liga_admin'),
 app.use('/liga/notificaciones', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaNotificacionesRoutes'));
 app.use('/club/notificaciones', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubNotificacionesRoutes'));
 
+// ===== MÓDULO GASTOS / INGRESOS / AGENDA (contabilidad y agenda de la Liga) =====
+app.use('/liga/gastos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaGastosRoutes'));
+app.use('/liga/ingresos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaIngresosRoutes'));
+app.use('/liga/agenda', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaAgendaRoutes'));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API escuchando en ${PORT}`));

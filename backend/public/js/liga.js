@@ -24,6 +24,8 @@ function conectarEventos() {
   document.getElementById('tabBtnTorneos').addEventListener('click', () => cambiarTab('torneos'));
   document.getElementById('tabBtnNoticias').addEventListener('click', () => cambiarTab('noticias'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
+  document.getElementById('tabBtnFinanzas').addEventListener('click', () => cambiarTab('finanzas'));
+  document.getElementById('tabBtnAgenda').addEventListener('click', () => cambiarTab('agenda'));
 
   // ---- Clubes ----
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
@@ -115,16 +117,51 @@ function conectarEventos() {
     document.getElementById('formNotificacion').classList.add('oculto');
   });
   document.getElementById('formNotificacion').addEventListener('submit', enviarNotificacion);
+
+  // ---- Finanzas ----
+  document.getElementById('btnMostrarFormIngreso').addEventListener('click', () => {
+    document.getElementById('formIngreso').reset();
+    document.getElementById('ingresoFormError').classList.add('oculto');
+    poblarSelectClubesIngreso();
+    document.getElementById('formIngreso').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormIngreso').addEventListener('click', () => {
+    document.getElementById('formIngreso').classList.add('oculto');
+  });
+  document.getElementById('formIngreso').addEventListener('submit', guardarIngreso);
+
+  document.getElementById('btnMostrarFormGasto').addEventListener('click', () => {
+    document.getElementById('formGasto').reset();
+    document.getElementById('gastoFormError').classList.add('oculto');
+    document.getElementById('formGasto').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormGasto').addEventListener('click', () => {
+    document.getElementById('formGasto').classList.add('oculto');
+  });
+  document.getElementById('formGasto').addEventListener('submit', guardarGasto);
+
+  // ---- Agenda ----
+  document.getElementById('btnMostrarFormEvento').addEventListener('click', () => {
+    document.getElementById('formEvento').reset();
+    document.getElementById('eventoFormError').classList.add('oculto');
+    document.getElementById('formEvento').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormEvento').addEventListener('click', () => {
+    document.getElementById('formEvento').classList.add('oculto');
+  });
+  document.getElementById('formEvento').addEventListener('submit', guardarEvento);
 }
 
 function cambiarTab(nombre) {
   const secciones = {
     clubes: 'seccionClubes', torneos: 'seccionTorneos',
-    noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones'
+    noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones',
+    finanzas: 'seccionFinanzas', agenda: 'seccionAgenda'
   };
   const botones = {
     clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos',
-    noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones'
+    noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones',
+    finanzas: 'tabBtnFinanzas', agenda: 'tabBtnAgenda'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -135,6 +172,8 @@ function cambiarTab(nombre) {
   }
   if (nombre === 'noticias') cargarNoticias();
   if (nombre === 'notificaciones') cargarNotificaciones();
+  if (nombre === 'finanzas') cargarFinanzas();
+  if (nombre === 'agenda') cargarAgenda();
 }
 
 // ===================== CLUBES (sin cambios) =====================
@@ -656,6 +695,201 @@ async function enviarNotificacion(e) {
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
+  }
+}
+
+// ===================== FINANZAS (Gastos e Ingresos) =====================
+
+function poblarSelectClubesIngreso() {
+  const select = document.getElementById('ingresoClub');
+  const opciones = clubesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  select.innerHTML = '<option value="">Sin asociar a un club</option>' + opciones;
+}
+
+function formatearMonto(monto) {
+  return '$' + Number(monto).toLocaleString('es-AR', { minimumFractionDigits: 2 });
+}
+
+async function cargarFinanzas() {
+  await Promise.all([cargarIngresos(), cargarGastos()]);
+}
+
+async function cargarIngresos() {
+  const tbody = document.getElementById('tablaIngresos');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/ingresos');
+    const ingresos = data.ingresos;
+    const total = ingresos.reduce((acc, i) => acc + Number(i.monto), 0);
+    document.getElementById('totalIngresos').textContent = formatearMonto(total);
+
+    if (!ingresos.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún ingreso.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = ingresos.map((i) => `
+      <tr>
+        <td>${escapeHtml(i.concepto)}</td>
+        <td>${escapeHtml(i.club_nombre || '-')}</td>
+        <td>${formatearMonto(i.monto)}</td>
+        <td>${new Date(i.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
+        <td><button class="btn btn-peligro btn-pequeno" onclick="borrarIngreso('${i.id}')">Borrar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarIngreso(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('ingresoFormError');
+  errorEl.classList.add('oculto');
+
+  const cuerpo = {
+    concepto: document.getElementById('ingresoConcepto').value.trim(),
+    monto: document.getElementById('ingresoMonto').value,
+    fecha: document.getElementById('ingresoFecha').value || undefined,
+    club_id: document.getElementById('ingresoClub').value || undefined,
+    categoria: document.getElementById('ingresoCategoria').value.trim() || undefined
+  };
+
+  try {
+    await apiFetch('/liga/ingresos', { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formIngreso').classList.add('oculto');
+    cargarIngresos();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function borrarIngreso(ingresoId) {
+  if (!confirm('¿Borrar este ingreso?')) return;
+  try {
+    await apiFetch(`/liga/ingresos/${ingresoId}`, { method: 'DELETE' });
+    cargarIngresos();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function cargarGastos() {
+  const tbody = document.getElementById('tablaGastos');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/gastos');
+    const gastos = data.gastos;
+    const total = gastos.reduce((acc, g) => acc + Number(g.monto), 0);
+    document.getElementById('totalGastos').textContent = formatearMonto(total);
+
+    if (!gastos.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún gasto.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = gastos.map((g) => `
+      <tr>
+        <td>${escapeHtml(g.concepto)}</td>
+        <td>${escapeHtml(g.categoria || '-')}</td>
+        <td>${formatearMonto(g.monto)}</td>
+        <td>${new Date(g.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
+        <td><button class="btn btn-peligro btn-pequeno" onclick="borrarGasto('${g.id}')">Borrar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarGasto(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('gastoFormError');
+  errorEl.classList.add('oculto');
+
+  const cuerpo = {
+    concepto: document.getElementById('gastoConcepto').value.trim(),
+    monto: document.getElementById('gastoMonto').value,
+    fecha: document.getElementById('gastoFecha').value || undefined,
+    categoria: document.getElementById('gastoCategoria').value.trim() || undefined
+  };
+
+  try {
+    await apiFetch('/liga/gastos', { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formGasto').classList.add('oculto');
+    cargarGastos();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function borrarGasto(gastoId) {
+  if (!confirm('¿Borrar este gasto?')) return;
+  try {
+    await apiFetch(`/liga/gastos/${gastoId}`, { method: 'DELETE' });
+    cargarGastos();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ===================== AGENDA =====================
+
+async function cargarAgenda() {
+  const tbody = document.getElementById('tablaAgenda');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/agenda');
+    const eventos = data.eventos;
+    if (!eventos.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún evento.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = eventos.map((ev) => `
+      <tr>
+        <td>${new Date(ev.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}${ev.hora ? ' ' + ev.hora.slice(0, 5) : ''}</td>
+        <td>${escapeHtml(ev.titulo)}</td>
+        <td>${escapeHtml(ev.tipo)}</td>
+        <td>${escapeHtml(ev.lugar || '-')}</td>
+        <td><button class="btn btn-peligro btn-pequeno" onclick="borrarEvento('${ev.id}')">Borrar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarEvento(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('eventoFormError');
+  errorEl.classList.add('oculto');
+
+  const cuerpo = {
+    titulo: document.getElementById('eventoTitulo').value.trim(),
+    tipo: document.getElementById('eventoTipo').value,
+    fecha: document.getElementById('eventoFecha').value,
+    hora: document.getElementById('eventoHora').value || undefined,
+    lugar: document.getElementById('eventoLugar').value.trim() || undefined,
+    descripcion: document.getElementById('eventoDescripcion').value.trim() || undefined
+  };
+
+  try {
+    await apiFetch('/liga/agenda', { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formEvento').classList.add('oculto');
+    cargarAgenda();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function borrarEvento(eventoId) {
+  if (!confirm('¿Borrar este evento?')) return;
+  try {
+    await apiFetch(`/liga/agenda/${eventoId}`, { method: 'DELETE' });
+    cargarAgenda();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
