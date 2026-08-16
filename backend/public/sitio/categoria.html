@@ -27,6 +27,8 @@
     <div class="sitio-tabs">
       <button class="tab-btn activo" id="tabBtnTabla">Tabla de posiciones</button>
       <button class="tab-btn" id="tabBtnFixture">Fixture y resultados</button>
+      <button class="tab-btn" id="tabBtnGoleadores">Goleadores</button>
+      <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
     </div>
 
     <div class="panel" id="seccionTabla">
@@ -40,6 +42,20 @@
       <table>
         <thead><tr><th>Jornada</th><th>Local</th><th>Resultado</th><th>Visitante</th><th>Fecha</th></tr></thead>
         <tbody id="tablaFixture"><tr><td colspan="5">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionGoleadores">
+      <table>
+        <thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
+        <tbody id="tablaGoleadoresPublico"><tr><td colspan="3">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionTarjetas">
+      <table>
+        <thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
+        <tbody id="tablaTarjetasPublico"><tr><td colspan="4">Cargando...</td></tr></tbody>
       </table>
     </div>
   </div>

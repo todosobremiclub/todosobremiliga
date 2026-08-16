@@ -29,18 +29,67 @@ function init() {
 
   document.getElementById('tabBtnTabla').addEventListener('click', () => cambiarTab('tabla'));
   document.getElementById('tabBtnFixture').addEventListener('click', () => cambiarTab('fixture'));
+  document.getElementById('tabBtnGoleadores').addEventListener('click', () => cambiarTab('goleadores'));
+  document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTab('tarjetas'));
 
   cargarTabla();
 }
 
 function cambiarTab(nombre) {
-  const secciones = { tabla: 'seccionTabla', fixture: 'seccionFixture' };
-  const botones = { tabla: 'tabBtnTabla', fixture: 'tabBtnFixture' };
+  const secciones = { tabla: 'seccionTabla', fixture: 'seccionFixture', goleadores: 'seccionGoleadores', tarjetas: 'seccionTarjetas' };
+  const botones = { tabla: 'tabBtnTabla', fixture: 'tabBtnFixture', goleadores: 'tabBtnGoleadores', tarjetas: 'tabBtnTarjetas' };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
   if (nombre === 'fixture') cargarFixture();
+  if (nombre === 'goleadores') cargarGoleadoresPublico();
+  if (nombre === 'tarjetas') cargarTarjetasPublico();
+}
+
+async function cargarGoleadoresPublico() {
+  const tbody = document.getElementById('tablaGoleadoresPublico');
+  tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/goleadores`);
+    const data = await res.json();
+    if (!data.ok || !data.goleadores.length) {
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta categoría.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.goleadores.map((g) => `
+      <tr>
+        <td>${escapeHtml(g.apellido)}, ${escapeHtml(g.nombre)}</td>
+        <td>${escapeHtml(g.club_nombre)}</td>
+        <td>${g.goles}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function cargarTarjetasPublico() {
+  const tbody = document.getElementById('tablaTarjetasPublico');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/tarjetas`);
+    const data = await res.json();
+    if (!data.ok || !data.tarjetas.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta categoría.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.tarjetas.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.apellido)}, ${escapeHtml(t.nombre)}</td>
+        <td>${escapeHtml(t.club_nombre)}</td>
+        <td>${t.tarjetas_amarillas}</td>
+        <td>${t.tarjetas_rojas}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
 }
 
 async function cargarTabla() {

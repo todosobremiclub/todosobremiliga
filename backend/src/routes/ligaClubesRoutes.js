@@ -137,6 +137,38 @@ router.patch('/:clubId/activo', async (req, res) => {
   }
 });
 
+// GET /liga/clubes/:clubId/participaciones — todas las combinaciones
+// torneo+categoría en las que ese club tiene un equipo inscripto DENTRO de MI
+// liga. Un mismo club puede tener varios equipos a la vez (ej. Baby Fútbol
+// Sub 10 y Futsal Primera), esto lo muestra todo junto.
+router.get('/:clubId/participaciones', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+
+    const { rows } = await query(
+      `SELECT et.id AS equipo_torneo_id, et.grupo, et.activo,
+              t.id AS torneo_id, t.nombre AS torneo_nombre, t.deporte, t.temporada, t.estado AS torneo_estado,
+              cat.id AS categoria_id, cat.nombre AS categoria_nombre
+       FROM equipos_torneo et
+       JOIN torneos t ON t.id = et.torneo_id
+       JOIN categorias cat ON cat.id = et.categoria_id
+       WHERE et.club_id = $1 AND t.liga_id = $2
+       ORDER BY t.nombre ASC, cat.orden ASC, cat.nombre ASC`,
+      [req.params.clubId, req.ligaId]
+    );
+    res.json({ ok: true, participaciones: rows });
+  } catch (err) {
+    console.error('Error en GET participaciones de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/clubes/:clubId/usuarios — la Liga crea el usuario club_admin
 // que va a administrar ese club (cargar jugadores, pedir fichajes, mostrar
 // carnets el día de partido). El club_admin no queda atado a esta Liga en

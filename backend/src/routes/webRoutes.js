@@ -123,6 +123,57 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
   }
 });
 
+// GET /web/torneos/:torneoId/categorias/:categoriaId/goleadores — tabla pública de goleadores
+router.get('/torneos/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre, SUM(e.goles)::int AS goles
+       FROM partido_estadisticas_jugador e
+       JOIN partidos p ON p.id = e.partido_id
+       JOIN jugadores j ON j.id = e.jugador_id
+       JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
+       JOIN clubes c ON c.id = et.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
+       GROUP BY j.id, j.nombre, j.apellido, c.nombre
+       HAVING SUM(e.goles) > 0
+       ORDER BY goles DESC, j.apellido ASC`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    res.json({ ok: true, goleadores: rows });
+  } catch (err) {
+    console.error('Error en GET goleadores publico:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/torneos/:torneoId/categorias/:categoriaId/tarjetas — tabla pública de tarjetas
+router.get('/torneos/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre,
+              SUM(e.tarjetas_amarillas)::int AS tarjetas_amarillas, SUM(e.tarjetas_rojas)::int AS tarjetas_rojas
+       FROM partido_estadisticas_jugador e
+       JOIN partidos p ON p.id = e.partido_id
+       JOIN jugadores j ON j.id = e.jugador_id
+       JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
+       JOIN clubes c ON c.id = et.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
+       GROUP BY j.id, j.nombre, j.apellido, c.nombre
+       HAVING SUM(e.tarjetas_amarillas) > 0 OR SUM(e.tarjetas_rojas) > 0
+       ORDER BY tarjetas_rojas DESC, tarjetas_amarillas DESC, j.apellido ASC`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    res.json({ ok: true, tarjetas: rows });
+  } catch (err) {
+    console.error('Error en GET tarjetas publico:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/noticias — noticias públicas (publicadas) de una Liga
 router.get('/ligas/:slug/noticias', async (req, res) => {
   try {

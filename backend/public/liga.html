@@ -25,6 +25,12 @@
   #headerLiga img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
   #headerLiga h2 { margin: 0; font-size: 20px; }
   #headerLiga p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+  .bloque-equipo-stats { margin-bottom: 16px; }
+  .bloque-equipo-stats h4 { margin: 0 0 8px; font-size: 13px; color: var(--gris-600); }
+  .fila-jugador-stats { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--gris-100); font-size: 13px; }
+  .fila-jugador-stats .nombre-jugador { flex: 1; }
+  .fila-jugador-stats input[type="number"] { width: 50px; padding: 4px; border: 1px solid var(--gris-300); border-radius: 6px; }
+  .fila-jugador-stats label { font-size: 11px; color: var(--gris-600); margin-right: 2px; }
 </style>
 </head>
 <body>
@@ -147,6 +153,18 @@
         </form>
         <p class="texto-ayuda">Este es el usuario con el que el club va a poder entrar a su propio panel para cargar jugadores y pedir fichajes.</p>
       </div>
+
+      <div class="panel oculto" id="panelParticipacionesClub">
+        <div class="panel-header">
+          <h2 id="tituloParticipacionesClub">Participaciones del Club</h2>
+          <button class="btn btn-secundario" id="btnCerrarParticipacionesClub">Cerrar</button>
+        </div>
+        <p class="texto-ayuda">Un mismo club puede tener un equipo inscripto en varias categorías, en el mismo torneo o en distintos (ej: Baby Fútbol y Futsal a la vez).</p>
+        <table>
+          <thead><tr><th>Torneo</th><th>Deporte</th><th>Categoría</th><th>Grupo</th><th>Estado</th></tr></thead>
+          <tbody id="tablaParticipacionesClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ===== SECCIÓN TORNEOS ===== -->
@@ -259,6 +277,8 @@
           <button class="tab-btn activo" id="tabBtnEquipos">Equipos</button>
           <button class="tab-btn" id="tabBtnFixture">Fixture</button>
           <button class="tab-btn" id="tabBtnTabla">Tabla de posiciones</button>
+          <button class="tab-btn" id="tabBtnGoleadores">Goleadores</button>
+          <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
         </div>
 
         <!-- Equipos -->
@@ -279,8 +299,25 @@
         <div id="subSeccionFixture" class="oculto">
           <div class="panel-header">
             <span></span>
-            <button class="btn" id="btnMostrarFormPartido">+ Programar partido</button>
+            <div>
+              <button class="btn btn-secundario" id="btnGenerarFixture">Generar automático</button>
+              <button class="btn btn-secundario" id="btnVaciarFixture">Vaciar fixture</button>
+              <button class="btn" id="btnMostrarFormPartido">+ Programar partido</button>
+            </div>
           </div>
+          <p class="mensaje-error oculto" id="fixtureAccionError"></p>
+
+          <form id="formGenerarFixture" class="oculto">
+            <div class="form-grid">
+              <div>
+                <label><input type="checkbox" id="fixtureIdaVuelta" style="width:auto; margin-right:6px;">Ida y vuelta</label>
+              </div>
+            </div>
+            <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta categoría, sin que ningún equipo juegue dos veces en la misma jornada.</p>
+            <button type="submit" class="btn">Confirmar generación</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarGenerarFixture">Cancelar</button>
+          </form>
+
           <form id="formPartido" class="oculto">
             <div class="form-grid">
               <div>
@@ -311,8 +348,44 @@
             <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
           </table>
         </div>
+
+        <!-- Goleadores -->
+        <div id="subSeccionGoleadores" class="oculto">
+          <table>
+            <thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
+            <tbody id="tablaGoleadores"><tr><td colspan="3">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- Tarjetas -->
+        <div id="subSeccionTarjetas" class="oculto">
+          <table>
+            <thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
+            <tbody id="tablaTarjetas"><tr><td colspan="4">Cargando...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
+
+    <!-- Modal simple para cargar resultado + goles/tarjetas por jugador -->
+    <div class="panel oculto" id="panelCargarResultado" style="position:fixed; top:5%; left:10%; right:10%; max-height:88vh; overflow:auto; z-index:50; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+      <div class="panel-header">
+        <h2>Cargar resultado</h2>
+        <button class="btn btn-secundario" id="btnCerrarCargarResultado">Cerrar</button>
+      </div>
+      <form id="formResultado">
+        <input type="hidden" id="resultadoPartidoId">
+        <div class="form-grid">
+          <div><label for="resultadoLocalScore" id="labelResultadoLocal">Goles local</label><input type="number" id="resultadoLocalScore" min="0" required></div>
+          <div><label for="resultadoVisitanteScore" id="labelResultadoVisitante">Goles visitante</label><input type="number" id="resultadoVisitanteScore" min="0" required></div>
+        </div>
+        <div id="contenedorEstadisticasJugadores"></div>
+        <button type="submit" class="btn">Guardar resultado</button>
+        <button type="button" class="btn btn-secundario" id="btnCancelarResultado">Cancelar</button>
+        <p class="mensaje-error oculto" id="resultadoFormError"></p>
+      </form>
+    </div>
+    <div class="oculto" id="fondoModalResultado" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:40;"></div>
 
     <!-- ===== SECCIÓN FICHAJES ===== -->
     <div id="seccionFichajes" class="oculto">
