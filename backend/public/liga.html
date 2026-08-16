@@ -54,6 +54,7 @@
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnClubes">Clubes</button>
       <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
+      <button class="tab-btn" id="tabBtnPostulaciones">Postulaciones</button>
       <button class="tab-btn" id="tabBtnFichajes">Fichajes</button>
       <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
@@ -66,8 +67,27 @@
       <div class="panel">
         <div class="panel-header">
           <h2>Clubes participantes</h2>
-          <button class="btn" id="btnMostrarFormClub">+ Nuevo Club</button>
+          <div>
+            <button class="btn btn-secundario" id="btnDescargarPlantillaClubes">Descargar plantilla</button>
+            <button class="btn btn-secundario" id="btnMostrarCargaMasiva">Carga masiva</button>
+            <button class="btn" id="btnMostrarFormClub">+ Nuevo Club</button>
+          </div>
         </div>
+
+        <div class="barra-filtros">
+          <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre o CUIT...">
+        </div>
+
+        <form id="formCargaMasiva" class="oculto">
+          <p class="texto-ayuda">Subí la plantilla de Excel completada (descargala primero con el botón "Descargar plantilla"). Los clubes con nombre repetido dentro de tu Liga se van a omitir.</p>
+          <div class="form-grid una-columna">
+            <div><input type="file" id="cargaMasivaArchivo" accept=".xlsx,.xls"></div>
+          </div>
+          <button type="submit" class="btn">Subir plantilla</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarCargaMasiva">Cancelar</button>
+          <p class="mensaje-error oculto" id="cargaMasivaError"></p>
+          <div id="cargaMasivaResultado"></div>
+        </form>
 
         <form id="formClub" class="oculto">
           <input type="hidden" id="clubIdEdicion">
@@ -83,6 +103,14 @@
             <div>
               <label for="clubDireccion">Dirección</label>
               <input type="text" id="clubDireccion">
+            </div>
+            <div>
+              <label for="clubCiudad">Ciudad</label>
+              <input type="text" id="clubCiudad">
+            </div>
+            <div>
+              <label for="clubProvincia">Provincia</label>
+              <input type="text" id="clubProvincia">
             </div>
             <div>
               <label for="clubTelefono">Teléfono</label>
@@ -129,10 +157,39 @@
 
         <table>
           <thead>
-            <tr><th>Logo</th><th>Nombre</th><th>CUIT</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
+            <tr><th>Logo</th><th>Nombre</th><th>CUIT</th><th>Ciudad</th><th>Provincia</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaClubes"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <tbody id="tablaClubes"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+          <span class="texto-ayuda" id="paginacionClubesInfo"></span>
+          <div>
+            <button class="btn btn-secundario btn-pequeno" id="btnClubesPaginaAnterior">← Anterior</button>
+            <button class="btn btn-secundario btn-pequeno" id="btnClubesPaginaSiguiente">Siguiente →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inscribir un club en un Torneo/Categoría desde el Home de Clubes -->
+      <div class="panel oculto" id="panelInscribirClubTorneo">
+        <div class="panel-header">
+          <h2 id="tituloInscribirClubTorneo">Anotar en Torneo</h2>
+          <button class="btn btn-secundario" id="btnCerrarInscribirClubTorneo">Cerrar</button>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label for="inscribirTorneoSelect">Torneo *</label>
+            <select id="inscribirTorneoSelect"></select>
+          </div>
+          <div>
+            <label for="inscribirCategoriaSelect">Categoría *</label>
+            <select id="inscribirCategoriaSelect" disabled></select>
+          </div>
+        </div>
+        <button class="btn" id="btnConfirmarInscribirClubTorneo">Anotar en esta categoría</button>
+        <p class="mensaje-error oculto" id="inscribirClubTorneoError"></p>
+        <p class="mensaje-ok oculto" id="inscribirClubTorneoOk"></p>
+        <p class="texto-ayuda">Podés repetir esto para anotar al mismo club en varios torneos y categorías (ej. Baby Fútbol y Futsal a la vez).</p>
       </div>
 
       <div class="panel oculto" id="panelUsuariosClub">
@@ -176,6 +233,7 @@
         </div>
 
         <form id="formTorneo" class="oculto">
+          <input type="hidden" id="torneoIdEdicion">
           <div class="form-grid">
             <div>
               <label for="torneoNombre">Nombre *</label>
@@ -386,6 +444,41 @@
       </form>
     </div>
     <div class="oculto" id="fondoModalResultado" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:40;"></div>
+
+    <!-- ===== SECCIÓN POSTULACIONES ===== -->
+    <div id="seccionPostulaciones" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Postulación pública de Clubes</h2>
+        </div>
+        <p class="texto-ayuda">Compartí este link (o el código QR) para que los clubes se postulen a tu Liga. Las postulaciones te van a aparecer acá abajo para Aceptar o Rechazar.</p>
+        <div style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap; margin-bottom:16px;">
+          <div>
+            <input type="text" id="linkPostulacionPublica" readonly style="width:360px; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <button class="btn btn-secundario btn-pequeno" id="btnCopiarLinkPostulacion">Copiar link</button>
+          </div>
+          <div id="qrPostulacionContenedor"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Solicitudes de Clubes</h2>
+        </div>
+        <div class="barra-filtros">
+          <select id="filtroEstadoPostulacion" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="pendiente">Pendientes</option>
+            <option value="aceptada">Aceptadas</option>
+            <option value="rechazada">Rechazadas</option>
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <table>
+          <thead><tr><th>Logo</th><th>Nombre</th><th>Ciudad/Provincia</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaPostulaciones"><tr><td colspan="6">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- ===== SECCIÓN FICHAJES ===== -->
     <div id="seccionFichajes" class="oculto">
@@ -602,6 +695,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/liga.js"></script>
 </body>

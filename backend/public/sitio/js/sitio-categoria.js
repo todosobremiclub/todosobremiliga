@@ -104,7 +104,7 @@ async function cargarTabla() {
     }
     tbody.innerHTML = data.tabla.map((fila) => `
       <tr>
-        <td>${escapeHtml(fila.club_nombre)}</td>
+        <td>${swatch(fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
         <td>${fila.partidos_jugados}</td>
         <td>${fila.ganados}</td>
         <td>${fila.empatados}</td>
@@ -133,15 +133,20 @@ async function cargarFixture() {
     tbody.innerHTML = data.partidos.map((p) => `
       <tr>
         <td>${p.jornada != null ? p.jornada : '-'}</td>
-        <td>${escapeHtml(p.club_local_nombre)}</td>
+        <td>${swatch(p.club_local_color)}${escapeHtml(p.club_local_nombre)}</td>
         <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</td>
-        <td>${escapeHtml(p.club_visitante_nombre)}</td>
+        <td>${swatch(p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}</td>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
       </tr>
     `).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function swatch(color) {
+  if (!color) return '';
+  return `<span class="club-swatch" style="background:${color};"></span>`;
 }
 
 function escapeHtml(texto) {

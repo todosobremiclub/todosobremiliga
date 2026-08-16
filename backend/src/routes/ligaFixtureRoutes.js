@@ -27,7 +27,7 @@ router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const { rows } = await query(
-      `SELECT et.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url
+      `SELECT et.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
        WHERE et.torneo_id = $1 AND et.categoria_id = $2
@@ -85,7 +85,8 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const { rows } = await query(
-      `SELECT p.*, cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre
+      `SELECT p.*, cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
+              cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
        JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
@@ -408,7 +409,7 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const { rows } = await query(
-      `SELECT tp.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url
+      `SELECT tp.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
        FROM tabla_posiciones tp
        JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id

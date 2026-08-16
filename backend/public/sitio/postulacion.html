@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postulate como Club - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .campo-color { display: flex; align-items: center; gap: 8px; }
+  .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
+  .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
+  .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-preview-wrap img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .form-postulacion { max-width: 640px; margin: 0 auto; }
+</style>
+</head>
+<body>
+  <div class="sitio-header">
+    <div class="sitio-header-inner">
+      <div>
+        <h1 id="nombreLiga">Cargando...</h1>
+        <div class="sitio-breadcrumb">Postulate como Club participante</div>
+      </div>
+      <img id="logoLiga" class="sitio-logo oculto" alt="Logo">
+    </div>
+  </div>
+
+  <div class="sitio-contenido">
+    <div class="panel form-postulacion">
+      <h2 style="margin-top:0;">Formulario de postulación</h2>
+      <p class="texto-ayuda">Completá los datos de tu Club. La Liga va a revisar tu postulación y te va a avisar si fue aceptada.</p>
+
+      <form id="formPostulacion" class="oculto">
+        <div class="form-grid">
+          <div>
+            <label for="postNombre">Nombre del Club *</label>
+            <input type="text" id="postNombre" required>
+          </div>
+          <div>
+            <label for="postCuit">CUIT</label>
+            <input type="text" id="postCuit">
+          </div>
+          <div>
+            <label for="postDireccion">Dirección</label>
+            <input type="text" id="postDireccion">
+          </div>
+          <div>
+            <label for="postCiudad">Ciudad</label>
+            <input type="text" id="postCiudad">
+          </div>
+          <div>
+            <label for="postProvincia">Provincia</label>
+            <input type="text" id="postProvincia">
+          </div>
+          <div>
+            <label for="postTelefono">Teléfono *</label>
+            <input type="text" id="postTelefono" required>
+          </div>
+          <div>
+            <label for="postEmail">Email de contacto *</label>
+            <input type="email" id="postEmail" required>
+          </div>
+        </div>
+
+        <div class="form-grid una-columna">
+          <div>
+            <label for="postLogoArchivo">Escudo/Logo del Club</label>
+            <div class="logo-preview-wrap">
+              <img id="postLogoPreview" class="oculto" alt="Logo">
+              <input type="file" id="postLogoArchivo" accept="image/*">
+            </div>
+            <input type="hidden" id="postLogoUrl">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div>
+            <label for="postColorPrimario">Color primario del Club</label>
+            <div class="campo-color">
+              <input type="color" id="postColorPrimario" value="#1d4ed8">
+              <span id="postColorPrimarioHex">#1d4ed8</span>
+            </div>
+          </div>
+          <div>
+            <label for="postColorSecundario">Color secundario</label>
+            <div class="campo-color">
+              <input type="color" id="postColorSecundario" value="#1e3a8a">
+              <span id="postColorSecundarioHex">#1e3a8a</span>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn">Enviar postulación</button>
+        <p class="mensaje-error oculto" id="postFormError"></p>
+      </form>
+
+      <div class="oculto" id="postFormOk">
+        <p class="mensaje-ok">¡Postulación enviada! La Liga la va a revisar y te va a contactar.</p>
+      </div>
+
+      <p class="mensaje-error oculto" id="postLigaNoEncontrada">No se encontró la Liga para postularte. Revisá el link.</p>
+    </div>
+  </div>
+
+  <script src="/sitio/js/sitio-postulacion.js"></script>
+</body>
+</html>

@@ -56,6 +56,8 @@ app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), 
 app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFixtureRoutes'));
 // Datos de marca (nombre/logo/colores) de la propia Liga, solo lectura.
 app.use('/liga/perfil', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPerfilRoutes'));
+// Postulaciones de Clubes recibidas por el formulario público (QR/link), a aceptar o rechazar.
+app.use('/liga/postulaciones', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPostulacionesRoutes'));
 
 // ===== MÓDULO WEB (público, sin login) =====
 // Lo que consume el sitio web público de cada Liga: info de la liga,
