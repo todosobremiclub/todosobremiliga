@@ -90,6 +90,26 @@
           </div>
         </div>
 
+        <h3 style="margin-bottom:4px;">Cancha principal</h3>
+        <p class="texto-ayuda">Datos de la cancha donde el Club juega de local.</p>
+        <div class="form-grid">
+          <div>
+            <label for="postCanchaTecho">Techada o al aire libre</label>
+            <select id="postCanchaTecho">
+              <option value="aire_libre">Aire libre</option>
+              <option value="techada">Techada</option>
+            </select>
+          </div>
+          <div>
+            <label for="postCanchaTamanio">Tamaño de la cancha</label>
+            <input type="text" id="postCanchaTamanio" placeholder="Ej: Reglamentaria (40x20m)">
+          </div>
+          <div>
+            <label for="postCanchaPiso">Piso de la cancha</label>
+            <input type="text" id="postCanchaPiso" placeholder="Ej: Césped sintético">
+          </div>
+        </div>
+
         <button type="submit" class="btn">Enviar postulación</button>
         <p class="mensaje-error oculto" id="postFormError"></p>
       </form>

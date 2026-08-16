@@ -197,7 +197,8 @@ router.get('/ligas/:slug/postulacion', async (req, res) => {
 router.post('/ligas/:slug/postulaciones', async (req, res) => {
   const {
     nombre, cuit, direccion, ciudad, provincia, telefono,
-    email_contacto, logo_url, color_primario, color_secundario
+    email_contacto, logo_url, color_primario, color_secundario,
+    cancha_tipo_techo, cancha_tamanio, cancha_piso
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -213,12 +214,14 @@ router.post('/ligas/:slug/postulaciones', async (req, res) => {
 
     const { rows } = await query(
       `INSERT INTO postulaciones_club
-         (liga_id, nombre, cuit, direccion, ciudad, provincia, telefono, email_contacto, logo_url, color_primario, color_secundario)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         (liga_id, nombre, cuit, direccion, ciudad, provincia, telefono, email_contacto, logo_url, color_primario, color_secundario,
+          cancha_tipo_techo, cancha_tamanio, cancha_piso)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [ligaResult.rows[0].id, nombre.trim(), cuit || null, direccion || null, ciudad || null,
        provincia || null, telefono || null, email_contacto || null, logo_url || null,
-       color_primario || null, color_secundario || null]
+       color_primario || null, color_secundario || null,
+       (cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre'), cancha_tamanio || null, cancha_piso || null]
     );
     res.status(201).json({ ok: true, postulacion: rows[0] });
   } catch (err) {

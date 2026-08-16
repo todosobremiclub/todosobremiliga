@@ -72,6 +72,12 @@ router.patch('/:id/aceptar', async (req, res) => {
     const club = clubResult.rows[0];
     await client.query('INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2)', [req.ligaId, club.id]);
     await client.query(
+      `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, es_principal, orden)
+       VALUES ($1, 'Cancha principal', $2, $3, $4, TRUE, 0)`,
+      [club.id, (postulacion.cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre'),
+       postulacion.cancha_tamanio || null, postulacion.cancha_piso || null]
+    );
+    await client.query(
       `UPDATE postulaciones_club SET estado = 'aceptada', club_id_creado = $1, resuelto_at = NOW() WHERE id = $2`,
       [club.id, req.params.id]
     );

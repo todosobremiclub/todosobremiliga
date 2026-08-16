@@ -150,10 +150,69 @@
             </div>
           </div>
 
+          <h3 style="margin-bottom:4px;">Cancha principal</h3>
+          <div class="form-grid">
+            <div>
+              <label for="clubCanchaTecho">Techada o al aire libre</label>
+              <select id="clubCanchaTecho">
+                <option value="aire_libre">Aire libre</option>
+                <option value="techada">Techada</option>
+              </select>
+            </div>
+            <div>
+              <label for="clubCanchaTamanio">Tamaño de la cancha</label>
+              <input type="text" id="clubCanchaTamanio" placeholder="Ej: Reglamentaria (40x20m)">
+            </div>
+            <div>
+              <label for="clubCanchaPiso">Piso de la cancha</label>
+              <input type="text" id="clubCanchaPiso" placeholder="Ej: Césped sintético">
+            </div>
+          </div>
+
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormClub">Cancelar</button>
+          <button type="button" class="btn btn-secundario oculto" id="btnGestionarCanchas">Gestionar canchas</button>
           <p class="mensaje-error oculto" id="clubFormError"></p>
         </form>
+
+        <!-- Gestión de canchas secundarias de un Club -->
+        <div class="panel oculto" id="panelCanchasClub">
+          <div class="panel-header">
+            <h2 id="tituloCanchasClub">Canchas del Club</h2>
+            <button class="btn btn-secundario" id="btnCerrarCanchasClub">Cerrar</button>
+          </div>
+          <table>
+            <thead><tr><th>Nombre</th><th>Techo</th><th>Tamaño</th><th>Piso</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaCanchasClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          </table>
+          <form id="formCanchaSecundaria" style="margin-top:12px;">
+            <input type="hidden" id="canchaIdEdicion">
+            <div class="form-grid">
+              <div>
+                <label for="canchaNombre">Nombre de la cancha *</label>
+                <input type="text" id="canchaNombre" required placeholder="Ej: Cancha auxiliar">
+              </div>
+              <div>
+                <label for="canchaTecho">Techada o al aire libre</label>
+                <select id="canchaTecho">
+                  <option value="aire_libre">Aire libre</option>
+                  <option value="techada">Techada</option>
+                </select>
+              </div>
+              <div>
+                <label for="canchaTamanio">Tamaño</label>
+                <input type="text" id="canchaTamanio">
+              </div>
+              <div>
+                <label for="canchaPiso">Piso</label>
+                <input type="text" id="canchaPiso">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-pequeno" id="btnGuardarCanchaSecundaria">Agregar cancha</button>
+            <button type="button" class="btn btn-secundario btn-pequeno oculto" id="btnCancelarCanchaSecundaria">Cancelar edición</button>
+            <p class="mensaje-error oculto" id="canchaFormError"></p>
+          </form>
+        </div>
 
         <table>
           <thead>
@@ -211,17 +270,20 @@
         <p class="texto-ayuda">Este es el usuario con el que el club va a poder entrar a su propio panel para cargar jugadores y pedir fichajes.</p>
       </div>
 
-      <div class="panel oculto" id="panelParticipacionesClub">
-        <div class="panel-header">
-          <h2 id="tituloParticipacionesClub">Participaciones del Club</h2>
-          <button class="btn btn-secundario" id="btnCerrarParticipacionesClub">Cerrar</button>
-        </div>
-        <p class="texto-ayuda">Un mismo club puede tener un equipo inscripto en varias categorías, en el mismo torneo o en distintos (ej: Baby Fútbol y Futsal a la vez).</p>
-        <table>
-          <thead><tr><th>Torneo</th><th>Deporte</th><th>Categoría</th><th>Grupo</th><th>Estado</th></tr></thead>
-          <tbody id="tablaParticipacionesClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
-        </table>
+    </div>
+
+    <!-- Popup de Participaciones: elegir varios torneos y varias categorías por club -->
+    <div class="oculto" id="fondoModalParticipaciones" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50;"></div>
+    <div class="oculto" id="modalParticipacionesClub" style="position:fixed; top:5%; left:50%; transform:translateX(-50%); width:min(640px, 92vw); max-height:88vh; overflow-y:auto; background:var(--blanco); border-radius:var(--radio); padding:20px; z-index:51; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+      <div class="panel-header">
+        <h2 id="tituloParticipacionesClub">Participaciones del Club</h2>
+        <button class="btn btn-secundario" id="btnCerrarParticipacionesClub">Cerrar</button>
       </div>
+      <p class="texto-ayuda">Un club puede presentar equipo en varios torneos y en varias categorías dentro de cada uno (ej: Femenino, Masculino, Baby Fútbol). Al tildar un torneo se marcan por defecto todas sus categorías; podés destildar las que no correspondan.</p>
+      <div id="listaParticipacionesTorneos"><p class="texto-ayuda">Cargando...</p></div>
+      <button class="btn" id="btnGuardarParticipaciones" style="margin-top:12px;">Guardar participaciones</button>
+      <p class="mensaje-error oculto" id="participacionesError"></p>
+      <p class="mensaje-ok oculto" id="participacionesOk"></p>
     </div>
 
     <!-- ===== SECCIÓN TORNEOS ===== -->
@@ -456,6 +518,8 @@
           <div>
             <input type="text" id="linkPostulacionPublica" readonly style="width:360px; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
             <button class="btn btn-secundario btn-pequeno" id="btnCopiarLinkPostulacion">Copiar link</button>
+            <button class="btn btn-secundario btn-pequeno" id="btnCompartirPostulacion">Compartir</button>
+            <button class="btn btn-secundario btn-pequeno" id="btnDescargarQrPostulacion">Descargar QR</button>
           </div>
           <div id="qrPostulacionContenedor"></div>
         </div>

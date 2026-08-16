@@ -31,7 +31,7 @@ async function nombreYaExisteEnLiga(nombre, ligaId, excluirClubId) {
 router.get('/', async (req, res) => {
   try {
     const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
-    const porPagina = Math.min(200, Math.max(1, parseInt(req.query.por_pagina, 10) || 50));
+    const porPagina = Math.min(200, Math.max(1, parseInt(req.query.por_pagina, 10) || 25));
     const offset = (pagina - 1) * porPagina;
     const texto = (req.query.q || '').trim();
 
@@ -51,9 +51,11 @@ router.get('/', async (req, res) => {
 
     params.push(porPagina, offset);
     const { rows } = await query(
-      `SELECT c.*, cl.id AS membresia_id, cl.activo AS activo_en_liga, cl.fecha_alta
+      `SELECT c.*, cl.id AS membresia_id, cl.activo AS activo_en_liga, cl.fecha_alta,
+              cc.tipo_techo AS cancha_tipo_techo, cc.tamanio AS cancha_tamanio, cc.piso AS cancha_piso
        FROM club_liga cl
        JOIN clubes c ON c.id = cl.club_id
+       LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
        WHERE cl.liga_id = $1${filtroTexto}
        ORDER BY c.nombre ASC
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -72,11 +74,20 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Crea la cancha "principal" de un club recién creado (siempre existe una).
+async function crearCanchaPrincipal(client, clubId, { tipo_techo, tamanio, piso }) {
+  await client.query(
+    `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, es_principal, orden)
+     VALUES ($1, 'Cancha principal', $2, $3, $4, TRUE, 0)`,
+    [clubId, (tipo_techo === 'techada' ? 'techada' : 'aire_libre'), tamanio || null, piso || null]
+  );
+}
+
 // GET /liga/clubes/plantilla — descarga la plantilla Excel para carga masiva
 router.get('/plantilla', (req, res) => {
   try {
-    const encabezados = ['Nombre', 'CUIT', 'Direccion', 'Telefono', 'Email', 'Ciudad', 'Provincia'];
-    const filaEjemplo = ['Club Deportivo Ejemplo', '30-12345678-9', 'Av. Siempre Viva 123', '011-4444-5555', 'contacto@club.com', 'La Plata', 'Buenos Aires'];
+    const encabezados = ['Nombre', 'CUIT', 'Direccion', 'Telefono', 'Email', 'Ciudad', 'Provincia', 'Cancha Techada o Aire Libre', 'Tamaño Cancha', 'Piso Cancha'];
+    const filaEjemplo = ['Club Deportivo Ejemplo', '30-12345678-9', 'Av. Siempre Viva 123', '011-4444-5555', 'contacto@club.com', 'La Plata', 'Buenos Aires', 'aire_libre', 'Reglamentaria (40x20m)', 'Césped sintético'];
     const hoja = XLSX.utils.aoa_to_sheet([encabezados, filaEjemplo]);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Clubes');
@@ -125,6 +136,10 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
       const email = String(fila.Email || fila.email || '').trim() || null;
       const ciudad = String(fila.Ciudad || fila.ciudad || '').trim() || null;
       const provincia = String(fila.Provincia || fila.provincia || '').trim() || null;
+      const canchaTipoTexto = String(fila['Cancha Techada o Aire Libre'] || fila['Cancha techada o aire libre'] || '').trim().toLowerCase();
+      const canchaTipoTecho = canchaTipoTexto.startsWith('tech') ? 'techada' : 'aire_libre';
+      const canchaTamanio = String(fila['Tamaño Cancha'] || fila['Tamanio Cancha'] || fila['Tamaño cancha'] || '').trim() || null;
+      const canchaPiso = String(fila['Piso Cancha'] || fila['Piso cancha'] || '').trim() || null;
 
       const client = await getClient();
       try {
@@ -137,6 +152,7 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
         );
         const club = clubResult.rows[0];
         await client.query('INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2)', [req.ligaId, club.id]);
+        await crearCanchaPrincipal(client, club.id, { tipo_techo: canchaTipoTecho, tamanio: canchaTamanio, piso: canchaPiso });
         await client.query('COMMIT');
         creados.push(club);
       } catch (err) {
@@ -160,7 +176,8 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia
+    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia,
+    cancha_tipo_techo, cancha_tamanio, cancha_piso
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -190,6 +207,10 @@ router.post('/', async (req, res) => {
       [req.ligaId, club.id]
     );
 
+    await crearCanchaPrincipal(client, club.id, {
+      tipo_techo: cancha_tipo_techo, tamanio: cancha_tamanio, piso: cancha_piso
+    });
+
     await client.query('COMMIT');
     res.status(201).json({
       ok: true,
@@ -214,7 +235,8 @@ router.post('/', async (req, res) => {
 router.put('/:clubId', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia
+    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia,
+    cancha_tipo_techo, cancha_tamanio, cancha_piso
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -247,6 +269,28 @@ router.put('/:clubId', async (req, res) => {
        ciudad || null, provincia || null,
        req.params.clubId]
     );
+
+    // Actualiza (o crea, si es un club viejo que todavía no tenía) la cancha
+    // principal con los datos del formulario.
+    if (cancha_tipo_techo || cancha_tamanio || cancha_piso) {
+      const existente = await query(
+        'SELECT id FROM clubes_canchas WHERE club_id = $1 AND es_principal = TRUE',
+        [req.params.clubId]
+      );
+      if (existente.rows[0]) {
+        await query(
+          `UPDATE clubes_canchas SET tipo_techo = $1, tamanio = $2, piso = $3 WHERE id = $4`,
+          [cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null, existente.rows[0].id]
+        );
+      } else {
+        await query(
+          `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, es_principal, orden)
+           VALUES ($1, 'Cancha principal', $2, $3, $4, TRUE, 0)`,
+          [req.params.clubId, cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null]
+        );
+      }
+    }
+
     res.json({ ok: true, club: rows[0] });
   } catch (err) {
     console.error('Error en PUT /liga/clubes/:clubId:', err);
@@ -302,6 +346,196 @@ router.delete('/:clubId', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Error en DELETE /liga/clubes/:clubId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// ===== CANCHAS =====
+
+// GET /liga/clubes/:clubId/canchas — todas las canchas del club (principal + secundarias)
+router.get('/:clubId/canchas', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      'SELECT * FROM clubes_canchas WHERE club_id = $1 ORDER BY es_principal DESC, orden ASC, creado_at ASC',
+      [req.params.clubId]
+    );
+    res.json({ ok: true, canchas: rows });
+  } catch (err) {
+    console.error('Error en GET canchas de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes/:clubId/canchas — agrega una cancha SECUNDARIA
+router.post('/:clubId/canchas', async (req, res) => {
+  const { nombre, tipo_techo, tamanio, piso } = req.body;
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, es_principal, orden)
+       VALUES ($1, $2, $3, $4, $5, FALSE,
+         (SELECT COALESCE(MAX(orden), 0) + 1 FROM clubes_canchas WHERE club_id = $1))
+       RETURNING *`,
+      [req.params.clubId, nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, piso || null]
+    );
+    res.status(201).json({ ok: true, cancha: rows[0] });
+  } catch (err) {
+    console.error('Error en POST cancha de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/clubes/:clubId/canchas/:canchaId — edita cualquier cancha (principal o secundaria)
+router.put('/:clubId/canchas/:canchaId', async (req, res) => {
+  const { nombre, tipo_techo, tamanio, piso } = req.body;
+  try {
+    const { rows } = await query(
+      `UPDATE clubes_canchas SET nombre = $1, tipo_techo = $2, tamanio = $3, piso = $4
+       WHERE id = $5 AND club_id = $6
+       RETURNING *`,
+      [nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, piso || null,
+       req.params.canchaId, req.params.clubId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Cancha no encontrada' });
+    res.json({ ok: true, cancha: rows[0] });
+  } catch (err) {
+    console.error('Error en PUT cancha de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/clubes/:clubId/canchas/:canchaId — solo canchas SECUNDARIAS
+// (la principal no se borra, se edita).
+router.delete('/:clubId/canchas/:canchaId', async (req, res) => {
+  try {
+    const cancha = await query(
+      'SELECT * FROM clubes_canchas WHERE id = $1 AND club_id = $2',
+      [req.params.canchaId, req.params.clubId]
+    );
+    if (!cancha.rows[0]) return res.status(404).json({ ok: false, error: 'Cancha no encontrada' });
+    if (cancha.rows[0].es_principal) {
+      return res.status(400).json({ ok: false, error: 'La cancha principal no se puede eliminar, solo editar' });
+    }
+    await query('DELETE FROM clubes_canchas WHERE id = $1', [req.params.canchaId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE cancha de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /liga/clubes/:clubId/participaciones-editor — todos los torneos y
+// categorías de MI liga, marcando cuáles ya tiene el club (para el popup de
+// selección múltiple: un club puede jugar Femenino, Masculino, Baby Fútbol, y
+// además solo algunas categorías o todas dentro de cada torneo).
+router.get('/:clubId/participaciones-editor', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+
+    const torneosResult = await query(
+      'SELECT id, nombre, deporte FROM torneos WHERE liga_id = $1 ORDER BY nombre ASC',
+      [req.ligaId]
+    );
+    const categoriasResult = await query(
+      `SELECT c.id, c.nombre, c.torneo_id
+       FROM categorias c JOIN torneos t ON t.id = c.torneo_id
+       WHERE t.liga_id = $1 ORDER BY c.orden ASC, c.nombre ASC`,
+      [req.ligaId]
+    );
+    const inscriptasResult = await query(
+      `SELECT categoria_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
+       WHERE et.club_id = $1 AND t.liga_id = $2`,
+      [req.params.clubId, req.ligaId]
+    );
+    const inscriptas = new Set(inscriptasResult.rows.map((r) => r.categoria_id));
+
+    const torneos = torneosResult.rows.map((t) => ({
+      ...t,
+      categorias: categoriasResult.rows
+        .filter((c) => c.torneo_id === t.id)
+        .map((c) => ({ id: c.id, nombre: c.nombre, inscripta: inscriptas.has(c.id) }))
+    }));
+
+    res.json({ ok: true, torneos });
+  } catch (err) {
+    console.error('Error en GET participaciones-editor:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/clubes/:clubId/participaciones — guarda de una el conjunto
+// completo de categorías en las que debe quedar inscripto el club (viene del
+// popup de selección múltiple). Crea las que faltan y borra las que se
+// destildaron (esto último borra también sus partidos/tabla en esa categoría).
+router.put('/:clubId/participaciones', async (req, res) => {
+  const { categoria_ids } = req.body;
+  if (!Array.isArray(categoria_ids)) {
+    return res.status(400).json({ ok: false, error: 'Falta categoria_ids (array)' });
+  }
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+
+    // Solo se aceptan categorías que efectivamente pertenezcan a torneos de MI liga.
+    const categoriasValidas = await query(
+      `SELECT c.id FROM categorias c JOIN torneos t ON t.id = c.torneo_id
+       WHERE t.liga_id = $1 AND c.id = ANY($2::uuid[])`,
+      [req.ligaId, categoria_ids]
+    );
+    const idsValidos = new Set(categoriasValidas.rows.map((r) => r.id));
+
+    const actualesResult = await query(
+      `SELECT et.categoria_id, et.torneo_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
+       WHERE et.club_id = $1 AND t.liga_id = $2`,
+      [req.params.clubId, req.ligaId]
+    );
+    const actuales = new Set(actualesResult.rows.map((r) => r.categoria_id));
+
+    const aAgregar = [...idsValidos].filter((id) => !actuales.has(id));
+    const aQuitar = actualesResult.rows.filter((r) => !idsValidos.has(r.categoria_id));
+
+    for (const categoriaId of aAgregar) {
+      const torneo = await query('SELECT torneo_id FROM categorias WHERE id = $1', [categoriaId]);
+      await query(
+        `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id)
+         VALUES ($1, $2, $3) ON CONFLICT (torneo_id, categoria_id, club_id) DO NOTHING`,
+        [torneo.rows[0].torneo_id, categoriaId, req.params.clubId]
+      );
+    }
+    for (const r of aQuitar) {
+      await query(
+        'DELETE FROM equipos_torneo WHERE club_id = $1 AND torneo_id = $2 AND categoria_id = $3',
+        [req.params.clubId, r.torneo_id, r.categoria_id]
+      );
+    }
+
+    res.json({ ok: true, agregadas: aAgregar.length, quitadas: aQuitar.length });
+  } catch (err) {
+    console.error('Error en PUT participaciones:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

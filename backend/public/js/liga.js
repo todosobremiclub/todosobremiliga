@@ -9,7 +9,7 @@ let clubLogoBase64Actual = '';
 let ligaSlugActual = null;
 
 let paginaClubesActual = 1;
-const CLUBES_POR_PAGINA = 50;
+const CLUBES_POR_PAGINA = 25;
 let totalClubesActual = 0;
 let clubIdParaInscribir = null;
 
@@ -85,8 +85,25 @@ function conectarEventos() {
   document.getElementById('formUsuarioClub').addEventListener('submit', crearUsuarioClub);
 
   document.getElementById('btnCerrarParticipacionesClub').addEventListener('click', () => {
-    document.getElementById('panelParticipacionesClub').classList.add('oculto');
+    document.getElementById('modalParticipacionesClub').classList.add('oculto');
+    document.getElementById('fondoModalParticipaciones').classList.add('oculto');
   });
+  document.getElementById('fondoModalParticipaciones').addEventListener('click', () => {
+    document.getElementById('modalParticipacionesClub').classList.add('oculto');
+    document.getElementById('fondoModalParticipaciones').classList.add('oculto');
+  });
+  document.getElementById('btnGuardarParticipaciones').addEventListener('click', guardarParticipaciones);
+
+  // ---- Canchas del club ----
+  document.getElementById('btnGestionarCanchas').addEventListener('click', () => {
+    const clubId = document.getElementById('clubIdEdicion').value;
+    if (clubId) abrirCanchasClub(clubId);
+  });
+  document.getElementById('btnCerrarCanchasClub').addEventListener('click', () => {
+    document.getElementById('panelCanchasClub').classList.add('oculto');
+  });
+  document.getElementById('formCanchaSecundaria').addEventListener('submit', guardarCanchaSecundaria);
+  document.getElementById('btnCancelarCanchaSecundaria').addEventListener('click', limpiarFormCanchaSecundaria);
 
   document.getElementById('buscadorClubes').addEventListener('input', () => {
     paginaClubesActual = 1;
@@ -123,6 +140,8 @@ function conectarEventos() {
     navigator.clipboard && navigator.clipboard.writeText(input.value);
   });
   document.getElementById('filtroEstadoPostulacion').addEventListener('change', cargarPostulaciones);
+  document.getElementById('btnCompartirPostulacion').addEventListener('click', compartirLinkPostulacion);
+  document.getElementById('btnDescargarQrPostulacion').addEventListener('click', descargarQrPostulacion);
 
   // ---- Torneos ----
   document.getElementById('btnMostrarFormTorneo').addEventListener('click', () => {
@@ -489,7 +508,12 @@ function limpiarFormClub() {
   document.getElementById('clubColorPrimarioHex').textContent = '#1d4ed8';
   document.getElementById('clubColorSecundario').value = '#1e3a8a';
   document.getElementById('clubColorSecundarioHex').textContent = '#1e3a8a';
+  document.getElementById('clubCanchaTecho').value = 'aire_libre';
+  document.getElementById('clubCanchaTamanio').value = '';
+  document.getElementById('clubCanchaPiso').value = '';
   document.getElementById('clubFormError').classList.add('oculto');
+  document.getElementById('btnGestionarCanchas').classList.add('oculto');
+  document.getElementById('panelCanchasClub').classList.add('oculto');
 }
 
 function editarClub(clubId) {
@@ -517,8 +541,13 @@ function editarClub(clubId) {
   document.getElementById('clubColorPrimarioHex').textContent = club.color_primario || '#1d4ed8';
   document.getElementById('clubColorSecundario').value = club.color_secundario || '#1e3a8a';
   document.getElementById('clubColorSecundarioHex').textContent = club.color_secundario || '#1e3a8a';
+  document.getElementById('clubCanchaTecho').value = club.cancha_tipo_techo || 'aire_libre';
+  document.getElementById('clubCanchaTamanio').value = club.cancha_tamanio || '';
+  document.getElementById('clubCanchaPiso').value = club.cancha_piso || '';
   document.getElementById('clubFormError').classList.add('oculto');
   document.getElementById('formClub').classList.remove('oculto');
+  document.getElementById('btnGestionarCanchas').classList.remove('oculto');
+  document.getElementById('panelCanchasClub').classList.add('oculto');
 }
 
 async function guardarClub(e) {
@@ -537,7 +566,10 @@ async function guardarClub(e) {
     email_contacto: document.getElementById('clubEmail').value.trim() || undefined,
     logo_url: document.getElementById('clubLogoUrl').value || undefined,
     color_primario: document.getElementById('clubColorPrimario').value,
-    color_secundario: document.getElementById('clubColorSecundario').value
+    color_secundario: document.getElementById('clubColorSecundario').value,
+    cancha_tipo_techo: document.getElementById('clubCanchaTecho').value,
+    cancha_tamanio: document.getElementById('clubCanchaTamanio').value.trim() || undefined,
+    cancha_piso: document.getElementById('clubCanchaPiso').value.trim() || undefined
   };
 
   try {
@@ -602,29 +634,177 @@ async function crearUsuarioClub(e) {
   }
 }
 
+let clubIdParticipacionesActual = null;
+
 async function verParticipacionesClub(clubId, nombreClub) {
-  document.getElementById('panelParticipacionesClub').classList.remove('oculto');
+  clubIdParticipacionesActual = clubId;
+  document.getElementById('modalParticipacionesClub').classList.remove('oculto');
+  document.getElementById('fondoModalParticipaciones').classList.remove('oculto');
   document.getElementById('tituloParticipacionesClub').textContent = `Participaciones de "${nombreClub}"`;
-  const tbody = document.getElementById('tablaParticipacionesClub');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  document.getElementById('participacionesError').classList.add('oculto');
+  document.getElementById('participacionesOk').classList.add('oculto');
+  const cont = document.getElementById('listaParticipacionesTorneos');
+  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   try {
-    const data = await apiFetch(`/liga/clubes/${clubId}/participaciones`);
-    const participaciones = data.participaciones;
-    if (!participaciones.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Este club todavía no está inscripto en ninguna categoría.</td></tr>';
+    const data = await apiFetch(`/liga/clubes/${clubId}/participaciones-editor`);
+    const torneos = data.torneos;
+    if (!torneos.length) {
+      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay torneos creados en tu Liga.</p>';
       return;
     }
-    tbody.innerHTML = participaciones.map((p) => `
+    cont.innerHTML = torneos.map((t) => `
+      <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">
+          <input type="checkbox" class="chk-torneo-participacion" data-torneo-id="${t.id}"
+            ${t.categorias.some((c) => c.inscripta) ? 'checked' : ''}
+            ${!t.categorias.length ? 'disabled' : ''}>
+          ${escapeHtml(t.nombre)} <span class="texto-ayuda" style="margin:0;">(${escapeHtml(t.deporte)})</span>
+        </label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; margin-left:24px;">
+          ${t.categorias.length ? t.categorias.map((c) => `
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
+              <input type="checkbox" class="chk-categoria-participacion" data-torneo-id="${t.id}" value="${c.id}" ${c.inscripta ? 'checked' : ''}>
+              ${escapeHtml(c.nombre)}
+            </label>
+          `).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
+        </div>
+      </div>
+    `).join('');
+
+    // Tildar/destildar el torneo marca (o desmarca) todas sus categorías por defecto.
+    cont.querySelectorAll('.chk-torneo-participacion').forEach((chkTorneo) => {
+      chkTorneo.addEventListener('change', () => {
+        const torneoId = chkTorneo.dataset.torneoId;
+        cont.querySelectorAll(`.chk-categoria-participacion[data-torneo-id="${torneoId}"]`).forEach((chkCat) => {
+          chkCat.checked = chkTorneo.checked;
+        });
+      });
+    });
+  } catch (err) {
+    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function guardarParticipaciones() {
+  const errorEl = document.getElementById('participacionesError');
+  const okEl = document.getElementById('participacionesOk');
+  errorEl.classList.add('oculto');
+  okEl.classList.add('oculto');
+  if (!clubIdParticipacionesActual) return;
+
+  const categoriaIds = Array.from(
+    document.querySelectorAll('#listaParticipacionesTorneos .chk-categoria-participacion:checked')
+  ).map((el) => el.value);
+
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubIdParticipacionesActual}/participaciones`, {
+      method: 'PUT',
+      body: JSON.stringify({ categoria_ids: categoriaIds })
+    });
+    okEl.textContent = `Guardado: ${data.agregadas} agregada(s), ${data.quitadas} quitada(s).`;
+    okEl.classList.remove('oculto');
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Canchas del club -----
+
+let clubIdCanchasActual = null;
+
+async function abrirCanchasClub(clubId) {
+  clubIdCanchasActual = clubId;
+  document.getElementById('panelCanchasClub').classList.remove('oculto');
+  limpiarFormCanchaSecundaria();
+  await cargarCanchasClub();
+}
+
+async function cargarCanchasClub() {
+  const tbody = document.getElementById('tablaCanchasClub');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubIdCanchasActual}/canchas`);
+    const canchas = data.canchas;
+    if (!canchas.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Este club todavía no tiene canchas cargadas.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = canchas.map((c) => `
       <tr>
-        <td>${escapeHtml(p.torneo_nombre)}</td>
-        <td>${escapeHtml(p.deporte)}</td>
-        <td>${escapeHtml(p.categoria_nombre)}</td>
-        <td>${escapeHtml(p.grupo || '-')}</td>
-        <td><span class="badge ${p.activo ? 'badge-activo' : 'badge-inactivo'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
+        <td>${escapeHtml(c.nombre || '-')}${c.es_principal ? ' <span class="badge badge-activo">Principal</span>' : ''}</td>
+        <td>${c.tipo_techo === 'techada' ? 'Techada' : 'Aire libre'}</td>
+        <td>${escapeHtml(c.tamanio || '-')}</td>
+        <td>${escapeHtml(c.piso || '-')}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno" onclick="editarCanchaSecundaria('${c.id}')">Editar</button>
+          ${!c.es_principal ? `<button class="btn btn-peligro btn-pequeno" onclick="eliminarCanchaSecundaria('${c.id}')">Eliminar</button>` : ''}
+        </td>
       </tr>
     `).join('');
+    window.canchasClubCache = canchas;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function limpiarFormCanchaSecundaria() {
+  document.getElementById('canchaIdEdicion').value = '';
+  document.getElementById('canchaNombre').value = '';
+  document.getElementById('canchaTecho').value = 'aire_libre';
+  document.getElementById('canchaTamanio').value = '';
+  document.getElementById('canchaPiso').value = '';
+  document.getElementById('canchaFormError').classList.add('oculto');
+  document.getElementById('btnGuardarCanchaSecundaria').textContent = 'Agregar cancha';
+  document.getElementById('btnCancelarCanchaSecundaria').classList.add('oculto');
+}
+
+function editarCanchaSecundaria(canchaId) {
+  const cancha = (window.canchasClubCache || []).find((c) => c.id === canchaId);
+  if (!cancha) return;
+  document.getElementById('canchaIdEdicion').value = cancha.id;
+  document.getElementById('canchaNombre').value = cancha.nombre || '';
+  document.getElementById('canchaTecho').value = cancha.tipo_techo || 'aire_libre';
+  document.getElementById('canchaTamanio').value = cancha.tamanio || '';
+  document.getElementById('canchaPiso').value = cancha.piso || '';
+  document.getElementById('btnGuardarCanchaSecundaria').textContent = 'Guardar cambios';
+  document.getElementById('btnCancelarCanchaSecundaria').classList.remove('oculto');
+}
+
+async function guardarCanchaSecundaria(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('canchaFormError');
+  errorEl.classList.add('oculto');
+
+  const id = document.getElementById('canchaIdEdicion').value;
+  const cuerpo = {
+    nombre: document.getElementById('canchaNombre').value.trim(),
+    tipo_techo: document.getElementById('canchaTecho').value,
+    tamanio: document.getElementById('canchaTamanio').value.trim() || undefined,
+    piso: document.getElementById('canchaPiso').value.trim() || undefined
+  };
+
+  try {
+    if (id) {
+      await apiFetch(`/liga/clubes/${clubIdCanchasActual}/canchas/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch(`/liga/clubes/${clubIdCanchasActual}/canchas`, { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    limpiarFormCanchaSecundaria();
+    await cargarCanchasClub();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function eliminarCanchaSecundaria(canchaId) {
+  if (!confirm('¿Eliminar esta cancha?')) return;
+  try {
+    await apiFetch(`/liga/clubes/${clubIdCanchasActual}/canchas/${canchaId}`, { method: 'DELETE' });
+    await cargarCanchasClub();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
@@ -717,6 +897,33 @@ function pintarLinkYQrPostulacion() {
     // eslint-disable-next-line no-new
     new QRCode(contenedor, { text: url, width: 120, height: 120 });
   }
+}
+
+async function compartirLinkPostulacion() {
+  const url = document.getElementById('linkPostulacionPublica').value;
+  if (!url) return;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Postulate como Club', url });
+    } catch (err) {
+      // el usuario canceló el share nativo, no hacemos nada
+    }
+  } else if (navigator.clipboard) {
+    await navigator.clipboard.writeText(url);
+    alert('Link copiado al portapapeles.');
+  }
+}
+
+function descargarQrPostulacion() {
+  const contenedor = document.getElementById('qrPostulacionContenedor');
+  const canvas = contenedor.querySelector('canvas');
+  const img = contenedor.querySelector('img');
+  const dataUrl = canvas ? canvas.toDataURL('image/png') : (img ? img.src : null);
+  if (!dataUrl) return;
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = `qr-postulacion-${ligaSlugActual || 'liga'}.png`;
+  link.click();
 }
 
 async function cargarPostulaciones() {

@@ -72,7 +72,10 @@ async function enviarPostulacion(e) {
     email_contacto: document.getElementById('postEmail').value.trim(),
     logo_url: document.getElementById('postLogoUrl').value || undefined,
     color_primario: document.getElementById('postColorPrimario').value,
-    color_secundario: document.getElementById('postColorSecundario').value
+    color_secundario: document.getElementById('postColorSecundario').value,
+    cancha_tipo_techo: document.getElementById('postCanchaTecho').value,
+    cancha_tamanio: document.getElementById('postCanchaTamanio').value.trim() || undefined,
+    cancha_piso: document.getElementById('postCanchaPiso').value.trim() || undefined
   };
 
   try {
