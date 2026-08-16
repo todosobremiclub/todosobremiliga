@@ -8,8 +8,10 @@ const { query } = require('./db');
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+// Límite subido a 8mb para poder aceptar logos convertidos a base64 desde el
+// navegador (Panel Super Admin) sin depender de un servicio externo de archivos.
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 
 // Sirve el frontend estático (admin / liga / web / app se irán agregando acá)
 app.use(express.static(path.join(__dirname, '..', 'public')));

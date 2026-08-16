@@ -7,15 +7,31 @@ const { slugify } = require('../utils/slugify');
 // Todas las rutas de este archivo ya están protegidas con requireAuth +
 // requireRole('super_admin') desde donde se montan en app.js.
 
-// GET /admin/ligas — listado completo (incluye inactivas, para que el Super
-// Admin pueda reactivarlas si hace falta)
-router.get('/', async (_req, res) => {
+const TIPOS_VALIDOS = ['productiva', 'demo'];
+const ESTADOS_DEMO_VALIDOS = ['avanzado', 'pendiente', 'sin_respuesta', 'baja'];
+
+// GET /admin/ligas?tipo=productiva|demo&q=texto — listado con filtros y
+// cantidad de clubes cargados en cada Liga.
+router.get('/', async (req, res) => {
+  const { tipo, q } = req.query;
+
+  if (tipo && !TIPOS_VALIDOS.includes(tipo)) {
+    return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_VALIDOS.join(', ')}` });
+  }
+
   try {
     const { rows } = await query(
-      `SELECT id, nombre, slug, logo_url, direccion, telefono, email_contacto,
-              color_primario, color_secundario, activo, creado_at
-       FROM ligas
-       ORDER BY nombre ASC`
+      `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.telefono, l.email_contacto,
+              l.color_primario, l.color_secundario, l.color_acento, l.activo, l.tipo, l.estado_demo,
+              l.creado_at,
+              COUNT(cl.club_id) AS cantidad_clubes
+       FROM ligas l
+       LEFT JOIN club_liga cl ON cl.liga_id = l.id
+       WHERE ($1::varchar IS NULL OR l.tipo = $1)
+         AND ($2::text IS NULL OR l.nombre ILIKE '%' || $2 || '%')
+       GROUP BY l.id
+       ORDER BY l.nombre ASC`,
+      [tipo || null, q || null]
     );
     res.json({ ok: true, ligas: rows });
   } catch (err) {
@@ -24,10 +40,17 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// GET /admin/ligas/:id — detalle de una liga
+// GET /admin/ligas/:id — detalle de una Liga (para la vista de solo lectura)
 router.get('/:id', async (req, res) => {
   try {
-    const { rows } = await query('SELECT * FROM ligas WHERE id = $1', [req.params.id]);
+    const { rows } = await query(
+      `SELECT l.*, COUNT(cl.club_id) AS cantidad_clubes
+       FROM ligas l
+       LEFT JOIN club_liga cl ON cl.liga_id = l.id
+       WHERE l.id = $1
+       GROUP BY l.id`,
+      [req.params.id]
+    );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Liga no encontrada' });
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {
@@ -37,73 +60,108 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /admin/ligas — alta de una nueva Liga
+// El slug SIEMPRE se genera automáticamente a partir del nombre (no se le
+// pide al Super Admin que lo piense).
 router.post('/', async (req, res) => {
   const {
-    nombre, slug, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario
+    nombre, logo_url, direccion, telefono, email_contacto,
+    color_primario, color_secundario, color_acento, tipo, estado_demo
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
     return res.status(400).json({ ok: false, error: 'El nombre de la Liga es obligatorio' });
   }
+  if (tipo && !TIPOS_VALIDOS.includes(tipo)) {
+    return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_VALIDOS.join(', ')}` });
+  }
+  if (estado_demo && !ESTADOS_DEMO_VALIDOS.includes(estado_demo)) {
+    return res.status(400).json({ ok: false, error: `Estado DEMO inválido. Válidos: ${ESTADOS_DEMO_VALIDOS.join(', ')}` });
+  }
 
-  const slugFinal = (slug && slug.trim()) ? slugify(slug) : slugify(nombre);
+  const slugBase = slugify(nombre);
 
   try {
+    // El slug es único: si ya existe, le agregamos un sufijo numérico.
+    let slugFinal = slugBase;
+    let intento = 1;
+    while (true) {
+      const existe = await query('SELECT 1 FROM ligas WHERE slug = $1', [slugFinal]);
+      if (!existe.rows[0]) break;
+      intento += 1;
+      slugFinal = `${slugBase}-${intento}`;
+    }
+
     const { rows } = await query(
-      `INSERT INTO ligas (nombre, slug, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO ligas (nombre, slug, logo_url, direccion, telefono, email_contacto,
+                           color_primario, color_secundario, color_acento, tipo, estado_demo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, 'productiva'), $11)
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null]
+       email_contacto || null, color_primario || null, color_secundario || null,
+       color_acento || null, tipo || null, estado_demo || null]
     );
     res.status(201).json({ ok: true, liga: rows[0] });
   } catch (err) {
-    if (err.code === '23505') { // unique_violation (slug repetido)
-      return res.status(409).json({ ok: false, error: `Ya existe una Liga con el slug "${slugFinal}"` });
-    }
     console.error('Error en POST /admin/ligas:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
 
 // PUT /admin/ligas/:id — edición de una Liga existente
+// El slug se recalcula solo si cambió el nombre.
 router.put('/:id', async (req, res) => {
   const {
-    nombre, slug, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario
+    nombre, logo_url, direccion, telefono, email_contacto,
+    color_primario, color_secundario, color_acento, tipo, estado_demo
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
     return res.status(400).json({ ok: false, error: 'El nombre de la Liga es obligatorio' });
   }
-
-  const slugFinal = (slug && slug.trim()) ? slugify(slug) : slugify(nombre);
+  if (tipo && !TIPOS_VALIDOS.includes(tipo)) {
+    return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_VALIDOS.join(', ')}` });
+  }
+  if (estado_demo && !ESTADOS_DEMO_VALIDOS.includes(estado_demo)) {
+    return res.status(400).json({ ok: false, error: `Estado DEMO inválido. Válidos: ${ESTADOS_DEMO_VALIDOS.join(', ')}` });
+  }
 
   try {
+    const actual = await query('SELECT nombre, slug FROM ligas WHERE id = $1', [req.params.id]);
+    if (!actual.rows[0]) return res.status(404).json({ ok: false, error: 'Liga no encontrada' });
+
+    let slugFinal = actual.rows[0].slug;
+    if (nombre.trim() !== actual.rows[0].nombre) {
+      const slugBase = slugify(nombre);
+      slugFinal = slugBase;
+      let intento = 1;
+      while (true) {
+        const existe = await query('SELECT 1 FROM ligas WHERE slug = $1 AND id != $2', [slugFinal, req.params.id]);
+        if (!existe.rows[0]) break;
+        intento += 1;
+        slugFinal = `${slugBase}-${intento}`;
+      }
+    }
+
     const { rows } = await query(
       `UPDATE ligas SET
          nombre = $1, slug = $2, logo_url = $3, direccion = $4, telefono = $5,
-         email_contacto = $6, color_primario = $7, color_secundario = $8,
+         email_contacto = $6, color_primario = $7, color_secundario = $8, color_acento = $9,
+         tipo = COALESCE($10, tipo), estado_demo = $11,
          actualizado_at = NOW()
-       WHERE id = $9
+       WHERE id = $12
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null, req.params.id]
+       email_contacto || null, color_primario || null, color_secundario || null, color_acento || null,
+       tipo || null, estado_demo || null, req.params.id]
     );
-    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Liga no encontrada' });
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: `Ya existe una Liga con el slug "${slugFinal}"` });
-    }
     console.error('Error en PUT /admin/ligas/:id:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
 
 // PATCH /admin/ligas/:id/activo — activar o desactivar una Liga
-// (no se borra nunca una Liga de la base, solo se desactiva)
 router.patch('/:id/activo', async (req, res) => {
   const { activo } = req.body;
   if (typeof activo !== 'boolean') {
@@ -118,6 +176,41 @@ router.patch('/:id/activo', async (req, res) => {
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {
     console.error('Error en PATCH /admin/ligas/:id/activo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /admin/ligas/:id/estado-demo — cambiar el estado de una Liga DEMO
+router.patch('/:id/estado-demo', async (req, res) => {
+  const { estado_demo } = req.body;
+  if (!estado_demo || !ESTADOS_DEMO_VALIDOS.includes(estado_demo)) {
+    return res.status(400).json({ ok: false, error: `Estado inválido. Válidos: ${ESTADOS_DEMO_VALIDOS.join(', ')}` });
+  }
+  try {
+    const { rows } = await query(
+      `UPDATE ligas SET estado_demo = $1, actualizado_at = NOW()
+       WHERE id = $2 AND tipo = 'demo'
+       RETURNING *`,
+      [estado_demo, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Liga DEMO no encontrada' });
+    res.json({ ok: true, liga: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH /admin/ligas/:id/estado-demo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /admin/ligas/:id — elimina la Liga y todo lo que cuelga de ella
+// (clubes NO se borran: son una entidad global, solo se borra su relación
+// con esta Liga vía la cascada de club_liga).
+router.delete('/:id', async (req, res) => {
+  try {
+    const { rows } = await query('DELETE FROM ligas WHERE id = $1 RETURNING id', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Liga no encontrada' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /admin/ligas/:id:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

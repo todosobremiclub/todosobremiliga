@@ -12,7 +12,7 @@ router.get('/ligas', async (_req, res) => {
   try {
     const { rows } = await query(
       `SELECT id, nombre, slug, logo_url, direccion, color_primario, color_secundario
-       FROM ligas WHERE activo = TRUE ORDER BY nombre ASC`
+       FROM ligas WHERE activo = TRUE AND tipo = 'productiva' ORDER BY nombre ASC`
     );
     res.json({ ok: true, ligas: rows });
   } catch (err) {
@@ -26,7 +26,7 @@ router.get('/ligas/:slug', async (req, res) => {
   try {
     const { rows } = await query(
       `SELECT id, nombre, slug, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario
-       FROM ligas WHERE slug = $1 AND activo = TRUE`,
+       FROM ligas WHERE slug = $1 AND activo = TRUE AND tipo = 'productiva'`,
       [req.params.slug]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Liga no encontrada' });
@@ -44,7 +44,7 @@ router.get('/ligas/:slug/torneos', async (req, res) => {
       `SELECT t.id, t.nombre, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
-       WHERE l.slug = $1 AND l.activo = TRUE
+       WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY t.creado_at DESC`,
       [req.params.slug]
     );
@@ -63,7 +63,7 @@ router.get('/torneos/:torneoId/categorias', async (req, res) => {
        FROM categorias c
        JOIN torneos t ON t.id = c.torneo_id
        JOIN ligas l ON l.id = t.liga_id
-       WHERE c.torneo_id = $1 AND l.activo = TRUE
+       WHERE c.torneo_id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY c.orden ASC, c.nombre ASC`,
       [req.params.torneoId]
     );
@@ -86,7 +86,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/tabla', async (req, res) 
        JOIN clubes c ON c.id = et.club_id
        JOIN torneos t ON t.id = tp.torneo_id
        JOIN ligas l ON l.id = t.liga_id
-       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND l.activo = TRUE
+       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY tp.puntos DESC, tp.diferencia DESC, tp.a_favor DESC`,
       [req.params.torneoId, req.params.categoriaId]
     );
@@ -112,7 +112,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
        JOIN clubes cv ON cv.id = ev.club_id
        JOIN torneos t ON t.id = p.torneo_id
        JOIN ligas l ON l.id = t.liga_id
-       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND l.activo = TRUE
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId]
     );
@@ -130,7 +130,7 @@ router.get('/ligas/:slug/noticias', async (req, res) => {
       `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
        FROM noticias n
        JOIN ligas l ON l.id = n.liga_id
-       WHERE l.slug = $1 AND l.activo = TRUE AND n.estado = 'publicada'
+       WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'
        ORDER BY n.destacada DESC, n.publicado_at DESC`,
       [req.params.slug]
     );

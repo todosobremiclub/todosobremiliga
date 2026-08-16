@@ -5,6 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Super Admin - Todo Sobre mi Liga</title>
 <link rel="stylesheet" href="/css/style.css">
+<style>
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab-btn {
+    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
+  }
+  .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+  .barra-filtros { display: flex; gap: 10px; margin-bottom: 16px; }
+  .barra-filtros input[type="text"] {
+    flex: 1; padding: 8px 12px; border: 1px solid var(--gris-300); border-radius: var(--radio); font-size: 13px;
+  }
+  .logo-miniatura {
+    width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100);
+    border: 1px solid var(--gris-300);
+  }
+  .campo-color { display: flex; align-items: center; gap: 8px; }
+  .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
+  .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
+  .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .badge-demo-avanzado { background: #dcfce7; color: var(--verde); }
+  .badge-demo-pendiente { background: #fef9c3; color: #854d0e; }
+  .badge-demo-sin_respuesta { background: #fee2e2; color: var(--rojo); }
+  .badge-demo-baja { background: var(--gris-300); color: var(--gris-600); }
+  select.select-estado-demo { padding: 4px 8px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 12px; }
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -17,10 +43,19 @@
 
   <div class="contenido">
 
+    <div class="tabs">
+      <button class="tab-btn activo" id="tabBtnProductivas">Productivas</button>
+      <button class="tab-btn" id="tabBtnDemo">DEMO</button>
+    </div>
+
     <div class="panel">
       <div class="panel-header">
         <h2>Ligas</h2>
         <button class="btn" id="btnMostrarFormLiga">+ Nueva Liga</button>
+      </div>
+
+      <div class="barra-filtros">
+        <input type="text" id="buscadorLigas" placeholder="Buscar Liga por nombre...">
       </div>
 
       <form id="formLiga" class="oculto">
@@ -31,8 +66,20 @@
             <input type="text" id="ligaNombre" required>
           </div>
           <div>
-            <label for="ligaSlug">Slug (opcional, se genera solo)</label>
-            <input type="text" id="ligaSlug" placeholder="ej: liga-regional-sur">
+            <label for="ligaTipo">Tipo *</label>
+            <select id="ligaTipo">
+              <option value="productiva">Productiva</option>
+              <option value="demo">DEMO</option>
+            </select>
+          </div>
+          <div id="grupoEstadoDemo" class="oculto">
+            <label for="ligaEstadoDemo">Estado DEMO</label>
+            <select id="ligaEstadoDemo">
+              <option value="pendiente">Pendiente</option>
+              <option value="avanzado">Avanzado</option>
+              <option value="sin_respuesta">Sin Respuesta</option>
+              <option value="baja">Baja</option>
+            </select>
           </div>
           <div>
             <label for="ligaDireccion">Dirección</label>
@@ -46,19 +93,43 @@
             <label for="ligaEmail">Email de contacto</label>
             <input type="email" id="ligaEmail">
           </div>
+        </div>
+
+        <div class="form-grid una-columna">
           <div>
-            <label for="ligaLogoUrl">URL del logo</label>
-            <input type="text" id="ligaLogoUrl">
+            <label for="ligaLogoArchivo">Logo (elegir desde la computadora)</label>
+            <div class="logo-preview-wrap">
+              <img id="logoPreview" class="oculto" alt="Logo">
+              <input type="file" id="ligaLogoArchivo" accept="image/*">
+            </div>
+            <input type="hidden" id="ligaLogoUrl">
           </div>
+        </div>
+
+        <div class="form-grid">
           <div>
             <label for="ligaColorPrimario">Color primario</label>
-            <input type="text" id="ligaColorPrimario" placeholder="#1d4ed8">
+            <div class="campo-color">
+              <input type="color" id="ligaColorPrimario" value="#1d4ed8">
+              <span id="ligaColorPrimarioHex">#1d4ed8</span>
+            </div>
           </div>
           <div>
             <label for="ligaColorSecundario">Color secundario</label>
-            <input type="text" id="ligaColorSecundario" placeholder="#1e3a8a">
+            <div class="campo-color">
+              <input type="color" id="ligaColorSecundario" value="#1e3a8a">
+              <span id="ligaColorSecundarioHex">#1e3a8a</span>
+            </div>
+          </div>
+          <div>
+            <label for="ligaColorAcento">Color de acento (app Android)</label>
+            <div class="campo-color">
+              <input type="color" id="ligaColorAcento" value="#f59e0b">
+              <span id="ligaColorAcentoHex">#f59e0b</span>
+            </div>
           </div>
         </div>
+
         <button type="submit" class="btn">Guardar</button>
         <button type="button" class="btn btn-secundario" id="btnCancelarFormLiga">Cancelar</button>
         <p class="mensaje-error oculto" id="ligaFormError"></p>
@@ -67,16 +138,26 @@
       <table>
         <thead>
           <tr>
+            <th>Logo</th>
             <th>Nombre</th>
-            <th>Slug</th>
+            <th>Clubes</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="tablaLigas">
-          <tr><td colspan="4">Cargando...</td></tr>
+          <tr><td colspan="5">Cargando...</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Ver Liga (solo lectura) -->
+    <div class="panel oculto" id="panelVerLiga">
+      <div class="panel-header">
+        <h2 id="tituloVerLiga">Liga</h2>
+        <button class="btn btn-secundario" id="btnCerrarVerLiga">Cerrar</button>
+      </div>
+      <div id="contenidoVerLiga"></div>
     </div>
 
     <div class="panel oculto" id="panelUsuarios">
