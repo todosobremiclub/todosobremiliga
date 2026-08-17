@@ -28,24 +28,55 @@ async function nombreYaExisteEnLiga(nombre, ligaId, excluirClubId) {
 
 // GET /liga/clubes — clubes que participan en MI liga, con búsqueda y
 // paginación (50 por página por defecto).
+const COLUMNAS_ORDEN_CLUBES = {
+  nombre: 'c.nombre',
+  ciudad: 'c.ciudad',
+  provincia: 'c.provincia'
+};
+
 router.get('/', async (req, res) => {
   try {
     const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
     const porPagina = Math.min(200, Math.max(1, parseInt(req.query.por_pagina, 10) || 25));
     const offset = (pagina - 1) * porPagina;
     const texto = (req.query.q || '').trim();
+    const ciudad = (req.query.ciudad || '').trim();
+    const provincia = (req.query.provincia || '').trim();
+    const canchaTecho = (req.query.cancha_techo || '').trim();
+    const incluirInactivos = req.query.incluir_inactivos === 'true';
+
+    const columnaOrden = COLUMNAS_ORDEN_CLUBES[req.query.orden_campo] || 'c.nombre';
+    const direccionOrden = (req.query.orden_direccion || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
 
     const params = [req.ligaId];
-    let filtroTexto = '';
+    let filtros = '';
     if (texto) {
       params.push(`%${texto}%`);
-      filtroTexto = ` AND c.nombre ILIKE $${params.length}`;
+      filtros += ` AND c.nombre ILIKE $${params.length}`;
+    }
+    if (ciudad) {
+      params.push(`%${ciudad}%`);
+      filtros += ` AND c.ciudad ILIKE $${params.length}`;
+    }
+    if (provincia) {
+      params.push(`%${provincia}%`);
+      filtros += ` AND c.provincia ILIKE $${params.length}`;
+    }
+    if (!incluirInactivos) {
+      filtros += ` AND cl.activo = TRUE`;
+    }
+    let filtroCancha = '';
+    if (canchaTecho === 'aire_libre' || canchaTecho === 'techada') {
+      params.push(canchaTecho);
+      filtroCancha = ` AND cc.tipo_techo = $${params.length}`;
     }
 
     const totalResult = await query(
       `SELECT COUNT(*)::int AS total
-       FROM club_liga cl JOIN clubes c ON c.id = cl.club_id
-       WHERE cl.liga_id = $1${filtroTexto}`,
+       FROM club_liga cl
+       JOIN clubes c ON c.id = cl.club_id
+       LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
+       WHERE cl.liga_id = $1${filtros}${filtroCancha}`,
       params
     );
 
@@ -56,8 +87,8 @@ router.get('/', async (req, res) => {
        FROM club_liga cl
        JOIN clubes c ON c.id = cl.club_id
        LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
-       WHERE cl.liga_id = $1${filtroTexto}
-       ORDER BY c.nombre ASC
+       WHERE cl.liga_id = $1${filtros}${filtroCancha}
+       ORDER BY ${columnaOrden} ${direccionOrden} NULLS LAST
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
