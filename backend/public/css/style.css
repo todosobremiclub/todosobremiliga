@@ -79,6 +79,41 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   mask-image: linear-gradient(180deg, transparent, #000 70%);
 }
 
+/* ===== Fondo "cancha de noche" para el resto del Panel Liga (mismo estilo
+   que el login: reflectores + líneas de cancha tenues), pero con los colores
+   propios de CADA Liga en vez de los azul/verde fijos. Los colores reales se
+   escriben desde JS (cargarPerfilLiga en liga.js) apenas se conoce la Liga;
+   estos valores de acá son solo el fallback mientras carga. ===== */
+body.liga-fondo-cancha {
+  min-height: 100vh;
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(29,78,216,0.30), transparent 55%),
+    radial-gradient(circle at 15% 90%, rgba(29,78,216,0.16), transparent 45%),
+    radial-gradient(circle at 85% 90%, rgba(29,78,216,0.16), transparent 45%),
+    linear-gradient(180deg, #0a0e17 0%, #0d1220 55%, #0a0e17 100%);
+}
+
+body.liga-fondo-cancha::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  height: auto;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0, rgba(255,255,255,0.045) 1px, transparent 1px, transparent 64px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: radial-gradient(circle at 50% 100%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(circle at 50% 100%, #000 0%, transparent 70%);
+}
+
+body.liga-fondo-cancha .topbar,
+body.liga-fondo-cancha .contenido {
+  position: relative;
+  z-index: 1;
+}
+
 .login-marca {
   position: relative;
   z-index: 1;

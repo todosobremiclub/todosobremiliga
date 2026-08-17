@@ -40,6 +40,17 @@ function init() {
 // Trae los datos de marca (nombre/logo/colores) de la propia Liga y pinta el
 // header con un degradé usando sus colores reales — look moderno pedido para
 // el Panel Liga.
+// Convierte un color hex (#rrggbb) a "r, g, b" para poder armar un rgba()
+// con la opacidad que necesitemos en los degradés de fondo.
+function hexARgb(hex) {
+  const limpio = (hex || '').replace('#', '');
+  const valido = /^[0-9a-fA-F]{6}$/.test(limpio) ? limpio : '1d4ed8';
+  const r = parseInt(valido.substring(0, 2), 16);
+  const g = parseInt(valido.substring(2, 4), 16);
+  const b = parseInt(valido.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
 async function cargarPerfilLiga() {
   try {
     const data = await apiFetch('/liga/perfil');
@@ -58,8 +69,19 @@ async function cargarPerfilLiga() {
     } else {
       logo.classList.add('oculto');
     }
+
+    // Fondo "cancha de noche" (mismo estilo que el login) pero con los
+    // colores propios de esta Liga en vez de los azul/verde por defecto.
+    const rgbPrimario = hexARgb(primario);
+    const rgbSecundario = hexARgb(secundario);
+    document.body.style.background = `
+      radial-gradient(circle at 50% 0%, rgba(${rgbPrimario}, 0.32), transparent 55%),
+      radial-gradient(circle at 15% 90%, rgba(${rgbSecundario}, 0.18), transparent 45%),
+      radial-gradient(circle at 85% 90%, rgba(${rgbPrimario}, 0.18), transparent 45%),
+      linear-gradient(180deg, #0a0e17 0%, #0d1220 55%, #0a0e17 100%)
+    `;
   } catch (err) {
-    // Si falla, seguimos sin header de marca (no bloquea el resto del panel).
+    // Si falla, seguimos con el fondo por defecto (azul/verde) del CSS.
   }
 }
 
