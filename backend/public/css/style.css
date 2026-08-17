@@ -45,67 +45,163 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   border: 1px solid rgba(0,0,0,0.15);
 }
 
-/* ===== Login ===== */
+/* ===== Login — estilo "cancha de noche": fondo oscuro con reflectores y
+   líneas de cancha, tarjeta tipo vestuario/tablero, tipografía condensada en
+   mayúsculas igual que el resto de la plataforma. ===== */
 .login-body {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--azul-oscuro), var(--azul));
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(29,78,216,0.35), transparent 55%),
+    radial-gradient(circle at 15% 85%, rgba(22,163,74,0.18), transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(29,78,216,0.18), transparent 45%),
+    linear-gradient(180deg, #0a0e17 0%, #0d1220 55%, #0a0e17 100%);
+}
+
+/* Líneas de cancha muy tenues cerca del piso, como si se viera la mitad de
+   una cancha desde la tribuna. */
+.login-body::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 45%;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 64px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 70%);
+  mask-image: linear-gradient(180deg, transparent, #000 70%);
+}
+
+.login-marca {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.login-marca img {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.06), 0 14px 34px rgba(0,0,0,0.55);
+}
+
+.login-marca p {
+  margin: 14px 0 0;
+  color: var(--gris-300);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
 }
 
 .login-card {
-  background: var(--blanco);
-  padding: 40px;
-  border-radius: var(--radio);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, #161c2b, #10141f);
+  border: 1px solid rgba(255,255,255,0.07);
+  padding: 36px 32px 32px;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
+}
+
+.login-card::before {
+  content: "";
+  display: block;
+  height: 4px;
+  margin: -36px -32px 26px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(90deg, var(--azul), var(--verde));
 }
 
 .login-card h1 {
-  font-size: 20px;
-  margin: 0 0 24px;
+  font-size: 24px;
+  margin: 0 0 4px;
   text-align: center;
-  color: var(--azul-oscuro);
+  color: var(--blanco);
+}
+
+.login-card .login-tagline {
+  text-align: center;
+  color: var(--gris-600);
+  font-size: 12.5px;
+  margin: 0 0 26px;
+  font-family: 'Inter', sans-serif;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .login-card label {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin: 14px 0 4px;
-  color: var(--gris-600);
+  font-size: 11px;
+  font-weight: 700;
+  margin: 16px 0 6px;
+  color: var(--gris-300);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .login-card input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--gris-300);
-  border-radius: var(--radio);
+  padding: 11px 13px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--blanco);
+  border-radius: 8px;
   font-size: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.login-card input::placeholder { color: rgba(255,255,255,0.35); }
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--azul);
+  background: rgba(255,255,255,0.07);
 }
 
 .login-card button {
   width: 100%;
-  margin-top: 20px;
-  padding: 11px;
-  background: var(--azul);
+  margin-top: 24px;
+  padding: 13px;
+  background: linear-gradient(90deg, var(--azul), #1552c9);
   color: var(--blanco);
   border: none;
-  border-radius: var(--radio);
-  font-size: 15px;
-  font-weight: 600;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, background 0.15s;
+  box-shadow: 0 8px 20px rgba(29,78,216,0.35);
 }
 
-.login-card button:hover { background: var(--azul-oscuro); }
+.login-card button:hover {
+  background: linear-gradient(90deg, var(--azul-oscuro), var(--azul));
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(29,78,216,0.45);
+}
+
+.login-card button:active { transform: translateY(0); }
 
 .error-msg {
-  color: var(--rojo);
+  color: #f87171;
   font-size: 13px;
-  margin-top: 12px;
+  margin-top: 14px;
   min-height: 16px;
+  text-align: center;
 }
 
 /* ===== Layout de panel (admin / liga / club) ===== */
