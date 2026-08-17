@@ -491,18 +491,41 @@ router.get('/:clubId/participaciones-editor', async (req, res) => {
        WHERE t.liga_id = $1 ORDER BY c.orden ASC, c.nombre ASC`,
       [req.ligaId]
     );
+    const subcategoriasResult = await query(
+      `SELECT cs.id, cs.nombre, cs.categoria_id
+       FROM categoria_subcategorias cs
+       JOIN categorias c ON c.id = cs.categoria_id
+       JOIN torneos t ON t.id = c.torneo_id
+       WHERE t.liga_id = $1 ORDER BY cs.orden ASC, cs.nombre ASC`,
+      [req.ligaId]
+    );
+    // Un equipo puede estar inscripto a nivel categoría (subcategoria_id NULL)
+    // o a nivel subcategoría — según si esa categoría tiene subcategorías.
     const inscriptasResult = await query(
-      `SELECT categoria_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
+      `SELECT categoria_id, subcategoria_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
        WHERE et.club_id = $1 AND t.liga_id = $2`,
       [req.params.clubId, req.ligaId]
     );
-    const inscriptas = new Set(inscriptasResult.rows.map((r) => r.categoria_id));
+    const categoriasInscriptas = new Set(inscriptasResult.rows.filter((r) => !r.subcategoria_id).map((r) => r.categoria_id));
+    const subcategoriasInscriptas = new Set(inscriptasResult.rows.filter((r) => r.subcategoria_id).map((r) => r.subcategoria_id));
 
     const torneos = torneosResult.rows.map((t) => ({
       ...t,
       categorias: categoriasResult.rows
         .filter((c) => c.torneo_id === t.id)
-        .map((c) => ({ id: c.id, nombre: c.nombre, inscripta: inscriptas.has(c.id) }))
+        .map((c) => {
+          const subcategorias = subcategoriasResult.rows
+            .filter((s) => s.categoria_id === c.id)
+            .map((s) => ({ id: s.id, nombre: s.nombre, inscripta: subcategoriasInscriptas.has(s.id) }));
+          return {
+            id: c.id,
+            nombre: c.nombre,
+            subcategorias,
+            // Solo tiene sentido cuando la categoría NO tiene subcategorías —
+            // si las tiene, la inscripción se hace por subcategoría (ver arriba).
+            inscripta: subcategorias.length ? false : categoriasInscriptas.has(c.id)
+          };
+        })
     }));
 
     res.json({ ok: true, torneos });
@@ -513,13 +536,16 @@ router.get('/:clubId/participaciones-editor', async (req, res) => {
 });
 
 // PUT /liga/clubes/:clubId/participaciones — guarda de una el conjunto
-// completo de categorías en las que debe quedar inscripto el club (viene del
-// popup de selección múltiple). Crea las que faltan y borra las que se
-// destildaron (esto último borra también sus partidos/tabla en esa categoría).
+// completo de categorías/subcategorías en las que debe quedar inscripto el
+// club (viene del popup de selección múltiple). Crea las que faltan y borra
+// las que se destildaron (esto último borra también sus partidos/tabla en esa
+// categoría/subcategoría). "selecciones" es un array de
+// { categoria_id, subcategoria_id } — subcategoria_id va en null cuando esa
+// categoría no tiene subcategorías cargadas.
 router.put('/:clubId/participaciones', async (req, res) => {
-  const { categoria_ids } = req.body;
-  if (!Array.isArray(categoria_ids)) {
-    return res.status(400).json({ ok: false, error: 'Falta categoria_ids (array)' });
+  const { selecciones } = req.body;
+  if (!Array.isArray(selecciones)) {
+    return res.status(400).json({ ok: false, error: 'Falta selecciones (array)' });
   }
   try {
     const pertenece = await query(
@@ -530,36 +556,68 @@ router.put('/:clubId/participaciones', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
     }
 
-    // Solo se aceptan categorías que efectivamente pertenezcan a torneos de MI liga.
-    const categoriasValidas = await query(
-      `SELECT c.id FROM categorias c JOIN torneos t ON t.id = c.torneo_id
+    // Solo se aceptan categorías que efectivamente pertenezcan a torneos de MI liga,
+    // y (cuando corresponde) subcategorías que pertenezcan a esa misma categoría.
+    const categoriaIds = [...new Set(selecciones.map((s) => s.categoria_id).filter(Boolean))];
+    const categoriasValidasResult = await query(
+      `SELECT c.id, c.torneo_id,
+              (SELECT COUNT(*)::int FROM categoria_subcategorias cs WHERE cs.categoria_id = c.id) AS cant_subcategorias
+       FROM categorias c JOIN torneos t ON t.id = c.torneo_id
        WHERE t.liga_id = $1 AND c.id = ANY($2::uuid[])`,
-      [req.ligaId, categoria_ids]
+      [req.ligaId, categoriaIds]
     );
-    const idsValidos = new Set(categoriasValidas.rows.map((r) => r.id));
+    const categoriasValidas = new Map(categoriasValidasResult.rows.map((c) => [c.id, c]));
+
+    const subcategoriaIds = [...new Set(selecciones.map((s) => s.subcategoria_id).filter(Boolean))];
+    const subcategoriasValidasResult = subcategoriaIds.length
+      ? await query(
+          `SELECT cs.id, cs.categoria_id FROM categoria_subcategorias cs
+           JOIN categorias c ON c.id = cs.categoria_id
+           JOIN torneos t ON t.id = c.torneo_id
+           WHERE t.liga_id = $1 AND cs.id = ANY($2::uuid[])`,
+          [req.ligaId, subcategoriaIds]
+        )
+      : { rows: [] };
+    const subcategoriasValidas = new Map(subcategoriasValidasResult.rows.map((s) => [s.id, s]));
+
+    // Normaliza y valida cada selección recibida.
+    const deseadas = [];
+    for (const sel of selecciones) {
+      const categoria = categoriasValidas.get(sel.categoria_id);
+      if (!categoria) continue; // categoría inexistente o de otra liga: se ignora
+      if (categoria.cant_subcategorias > 0) {
+        const subcategoria = sel.subcategoria_id ? subcategoriasValidas.get(sel.subcategoria_id) : null;
+        if (!subcategoria || subcategoria.categoria_id !== categoria.id) continue; // esta categoría exige subcategoría
+        deseadas.push({ torneo_id: categoria.torneo_id, categoria_id: categoria.id, subcategoria_id: subcategoria.id });
+      } else {
+        deseadas.push({ torneo_id: categoria.torneo_id, categoria_id: categoria.id, subcategoria_id: null });
+      }
+    }
 
     const actualesResult = await query(
-      `SELECT et.categoria_id, et.torneo_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
+      `SELECT et.categoria_id, et.subcategoria_id, et.torneo_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
        WHERE et.club_id = $1 AND t.liga_id = $2`,
       [req.params.clubId, req.ligaId]
     );
-    const actuales = new Set(actualesResult.rows.map((r) => r.categoria_id));
+    const clave = (categoriaId, subcategoriaId) => `${categoriaId}::${subcategoriaId || ''}`;
+    const deseadasClaves = new Set(deseadas.map((d) => clave(d.categoria_id, d.subcategoria_id)));
+    const actualesClaves = new Set(actualesResult.rows.map((r) => clave(r.categoria_id, r.subcategoria_id)));
 
-    const aAgregar = [...idsValidos].filter((id) => !actuales.has(id));
-    const aQuitar = actualesResult.rows.filter((r) => !idsValidos.has(r.categoria_id));
+    const aAgregar = deseadas.filter((d) => !actualesClaves.has(clave(d.categoria_id, d.subcategoria_id)));
+    const aQuitar = actualesResult.rows.filter((r) => !deseadasClaves.has(clave(r.categoria_id, r.subcategoria_id)));
 
-    for (const categoriaId of aAgregar) {
-      const torneo = await query('SELECT torneo_id FROM categorias WHERE id = $1', [categoriaId]);
+    for (const d of aAgregar) {
       await query(
-        `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id)
-         VALUES ($1, $2, $3) ON CONFLICT (torneo_id, categoria_id, club_id) DO NOTHING`,
-        [torneo.rows[0].torneo_id, categoriaId, req.params.clubId]
+        `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (torneo_id, categoria_id, club_id, subcategoria_clave) DO NOTHING`,
+        [d.torneo_id, d.categoria_id, req.params.clubId, d.subcategoria_id]
       );
     }
     for (const r of aQuitar) {
       await query(
-        'DELETE FROM equipos_torneo WHERE club_id = $1 AND torneo_id = $2 AND categoria_id = $3',
-        [req.params.clubId, r.torneo_id, r.categoria_id]
+        `DELETE FROM equipos_torneo WHERE club_id = $1 AND torneo_id = $2 AND categoria_id = $3
+         AND (subcategoria_id = $4 OR (subcategoria_id IS NULL AND $4::uuid IS NULL))`,
+        [req.params.clubId, r.torneo_id, r.categoria_id, r.subcategoria_id]
       );
     }
 
@@ -571,9 +629,9 @@ router.put('/:clubId/participaciones', async (req, res) => {
 });
 
 // GET /liga/clubes/:clubId/participaciones — todas las combinaciones
-// torneo+categoría en las que ese club tiene un equipo inscripto DENTRO de MI
-// liga. Un mismo club puede tener varios equipos a la vez (ej. Baby Fútbol
-// Sub 10 y Futsal Primera), esto lo muestra todo junto.
+// torneo+categoría(+subcategoría) en las que ese club tiene un equipo
+// inscripto DENTRO de MI liga. Un mismo club puede tener varios equipos a la
+// vez (ej. Baby Fútbol Sub 10 y Futsal Primera), esto lo muestra todo junto.
 router.get('/:clubId/participaciones', async (req, res) => {
   try {
     const pertenece = await query(
@@ -587,12 +645,14 @@ router.get('/:clubId/participaciones', async (req, res) => {
     const { rows } = await query(
       `SELECT et.id AS equipo_torneo_id, et.grupo, et.activo,
               t.id AS torneo_id, t.nombre AS torneo_nombre, t.deporte, t.temporada, t.estado AS torneo_estado,
-              cat.id AS categoria_id, cat.nombre AS categoria_nombre
+              cat.id AS categoria_id, cat.nombre AS categoria_nombre,
+              sub.id AS subcategoria_id, sub.nombre AS subcategoria_nombre
        FROM equipos_torneo et
        JOIN torneos t ON t.id = et.torneo_id
        JOIN categorias cat ON cat.id = et.categoria_id
+       LEFT JOIN categoria_subcategorias sub ON sub.id = et.subcategoria_id
        WHERE et.club_id = $1 AND t.liga_id = $2
-       ORDER BY t.nombre ASC, cat.orden ASC, cat.nombre ASC`,
+       ORDER BY t.nombre ASC, cat.orden ASC, cat.nombre ASC, sub.orden ASC, sub.nombre ASC`,
       [req.params.clubId, req.ligaId]
     );
     res.json({ ok: true, participaciones: rows });
@@ -603,11 +663,12 @@ router.get('/:clubId/participaciones', async (req, res) => {
 });
 
 // POST /liga/clubes/:clubId/inscribir — desde el Home de Clubes: anota este
-// club en una categoría puntual de un torneo de MI liga (mismo efecto que
-// inscribirlo desde la pantalla de Torneos, pero más cómodo si lo que tenés
-// a mano es el Club y querés sumarlo a varios torneos/categorías seguidos).
+// club en una categoría (o subcategoría, si esa categoría tiene) puntual de
+// un torneo de MI liga (mismo efecto que inscribirlo desde la pantalla de
+// Torneos, pero más cómodo si lo que tenés a mano es el Club y querés
+// sumarlo a varios torneos/categorías seguidos).
 router.post('/:clubId/inscribir', async (req, res) => {
-  const { torneo_id, categoria_id, grupo } = req.body;
+  const { torneo_id, categoria_id, subcategoria_id, grupo } = req.body;
   if (!torneo_id || !categoria_id) {
     return res.status(400).json({ ok: false, error: 'Faltan torneo_id y/o categoria_id' });
   }
@@ -621,19 +682,32 @@ router.post('/:clubId/inscribir', async (req, res) => {
     }
 
     const contexto = await query(
-      `SELECT 1 FROM torneos t JOIN categorias c ON c.torneo_id = t.id
+      `SELECT (SELECT COUNT(*)::int FROM categoria_subcategorias cs WHERE cs.categoria_id = c.id) AS cant_subcategorias
+       FROM torneos t JOIN categorias c ON c.torneo_id = t.id
        WHERE t.id = $1 AND c.id = $2 AND t.liga_id = $3`,
       [torneo_id, categoria_id, req.ligaId]
     );
     if (!contexto.rows[0]) {
       return res.status(404).json({ ok: false, error: 'Esa categoría no pertenece a un torneo de tu Liga' });
     }
+    if (contexto.rows[0].cant_subcategorias > 0) {
+      if (!subcategoria_id) {
+        return res.status(400).json({ ok: false, error: 'Esta categoría tiene subcategorías: elegí una para inscribir al club' });
+      }
+      const subOk = await query(
+        'SELECT 1 FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
+        [subcategoria_id, categoria_id]
+      );
+      if (!subOk.rows[0]) {
+        return res.status(400).json({ ok: false, error: 'Esa subcategoría no pertenece a esta categoría' });
+      }
+    }
 
     const { rows } = await query(
-      `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, grupo)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id, grupo)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [torneo_id, categoria_id, req.params.clubId, grupo || null]
+      [torneo_id, categoria_id, req.params.clubId, contexto.rows[0].cant_subcategorias > 0 ? subcategoria_id : null, grupo || null]
     );
     res.status(201).json({ ok: true, equipo: rows[0] });
   } catch (err) {

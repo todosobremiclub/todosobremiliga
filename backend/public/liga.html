@@ -14,11 +14,6 @@
   .check-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--gris-600); white-space: nowrap; }
   .th-orden { cursor: pointer; user-select: none; }
   .th-orden:hover { text-decoration: underline; }
-  .btn-whatsapp {
-    display: inline-flex; align-items: center; gap: 4px; background: #16a34a; color: #fff;
-    border-radius: 6px; padding: 4px 8px; font-size: 12px; text-decoration: none; white-space: nowrap;
-  }
-  .btn-whatsapp:hover { background: #15803d; }
   .tab-btn {
     background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
     padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
@@ -53,8 +48,20 @@
     position: fixed; top: 5%; left: 50%; transform: translateX(-50%);
     width: min(700px, 94vw); max-height: 88vh; overflow-y: auto;
     z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    background: var(--blanco); border-radius: var(--radio); padding: 20px;
   }
   .popup-modal-ancho { width: min(980px, 96vw); }
+  .btn-icono {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0; line-height: 0;
+  }
+  .btn-icono svg { width: 15px; height: 15px; }
+  .btn-whatsapp-icono {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; background: #25D366;
+    vertical-align: middle; margin-left: 6px;
+  }
+  .btn-whatsapp-icono svg { width: 15px; height: 15px; fill: #fff; }
 </style>
 </head>
 <body class="liga-fondo-cancha">
@@ -452,18 +459,15 @@
                 <option value="mixto">Mixto</option>
               </select>
             </div>
-            <div>
-              <label for="categoriaSubcategoria">Subcategoría (opcional)</label>
-              <input type="text" id="categoriaSubcategoria" placeholder="ej: A, B, Desarrollo...">
-            </div>
           </div>
+          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, entrando a "Ver detalle" de la categoría ya creada.</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
           <p class="mensaje-error oculto" id="categoriaFormError"></p>
         </form>
 
         <table>
-          <thead><tr><th>Nombre</th><th>Género</th><th>Subcategoría</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Género</th><th>Subcategorías</th><th>Acciones</th></tr></thead>
           <tbody id="tablaCategorias"><tr><td colspan="4">Cargando...</td></tr></tbody>
         </table>
       </div>
@@ -473,6 +477,29 @@
         <div class="panel-header">
           <h2 id="tituloDetalleCategoria">Categoría</h2>
           <button class="btn btn-secundario" id="btnCerrarDetalleCategoria">Cerrar</button>
+        </div>
+
+        <!-- Subcategorías de esta categoría (opcional): un nivel extra atado
+             a la categoría principal (ej: Primera / Reserva). Si tiene
+             subcategorías cargadas, los clubes se inscriben en una de ellas,
+             no en la categoría "pelada". -->
+        <div class="panel" style="background:var(--gris-100); margin-bottom:16px;">
+          <div class="panel-header"><h2 style="margin:0;">Subcategorías</h2></div>
+          <p class="texto-ayuda">Opcional. Si cargás alguna, los clubes se van a inscribir en una subcategoría puntual (ej: "Primera" o "Reserva"), no directamente en esta categoría.</p>
+          <table>
+            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaSubcategorias"><tr><td colspan="2">Cargando...</td></tr></tbody>
+          </table>
+          <form id="formSubcategoria" style="margin-top:10px; display:flex; gap:8px; align-items:flex-end;">
+            <input type="hidden" id="subcategoriaIdEdicion">
+            <div style="flex:1;">
+              <label for="subcategoriaNombre">Nueva subcategoría</label>
+              <input type="text" id="subcategoriaNombre" placeholder="ej: Primera" required>
+            </div>
+            <button type="submit" class="btn btn-pequeno">Agregar</button>
+            <button type="button" class="btn btn-secundario btn-pequeno oculto" id="btnCancelarSubcategoria">Cancelar edición</button>
+          </form>
+          <p class="mensaje-error oculto" id="subcategoriaFormError"></p>
         </div>
 
         <div class="tabs">
@@ -488,12 +515,13 @@
           <label for="selectClubInscribir">Inscribir club</label>
           <div style="display:flex; gap:8px; margin-bottom:16px;">
             <select id="selectClubInscribir" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
+            <select id="selectSubcategoriaInscribir" class="oculto" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
             <button class="btn" id="btnInscribirClub">Inscribir</button>
           </div>
           <p class="mensaje-error oculto" id="equipoFormError"></p>
           <table>
-            <thead><tr><th>Club</th></tr></thead>
-            <tbody id="tablaEquipos"><tr><td>Cargando...</td></tr></tbody>
+            <thead><tr><th>Club</th><th>Subcategoría</th></tr></thead>
+            <tbody id="tablaEquipos"><tr><td colspan="2">Cargando...</td></tr></tbody>
           </table>
         </div>
 

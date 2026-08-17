@@ -14,6 +14,14 @@ let totalClubesActual = 0;
 let ordenClubesCampo = 'nombre';
 let ordenClubesDireccion = 'asc';
 
+// ----- Íconos SVG reutilizados en botones de acciones (evitan depender de
+// librerías externas de íconos y quedan livianos). -----
+const ICONO_LAPIZ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const ICONO_PERSONA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+const ICONO_BASURA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const ICONO_COPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a1 1 0 0 0-1 1 5 5 0 0 0 4 5"/><path d="M17 5h3a1 1 0 0 1 1 1 5 5 0 0 1-4 5"/></svg>';
+const ICONO_WHATSAPP = '<svg viewBox="0 0 32 32"><path fill="#fff" d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.23.6 4.36 1.75 6.24L4 29l7.94-1.7a12.9 12.9 0 0 0 4.08.65h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3Zm0 21.98h-.01a10 10 0 0 1-3.5-.62l-.5-.18-4.71 1.01 1.03-4.58-.2-.53a9.9 9.9 0 0 1-1.6-5.06c0-5.5 4.48-9.98 9.99-9.98 5.5 0 9.98 4.48 9.98 9.98s-4.48 9.96-9.98 9.96Zm5.47-7.47c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg>';
+
 let torneoActualId = null;
 let torneoActualNombre = '';
 let categoriaActualId = null;
@@ -271,6 +279,8 @@ function conectarEventos() {
   document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTabDetalle('tarjetas'));
 
   document.getElementById('btnInscribirClub').addEventListener('click', inscribirClub);
+  document.getElementById('formSubcategoria').addEventListener('submit', guardarSubcategoria);
+  document.getElementById('btnCancelarSubcategoria').addEventListener('click', limpiarFormSubcategoria);
 
   document.getElementById('btnMostrarFormPartido').addEventListener('click', () => {
     document.getElementById('formPartido').reset();
@@ -520,15 +530,15 @@ async function cargarClubes() {
         <td>${escapeHtml(club.provincia || '-')}</td>
         <td>
           ${club.telefono ? escapeHtml(club.telefono) : '-'}
-          ${wa ? `<a class="btn-whatsapp" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          ${wa ? `<a class="btn-whatsapp-icono" href="${wa}" target="_blank" rel="noopener" title="Enviar WhatsApp">${ICONO_WHATSAPP}</a>` : ''}
         </td>
         <td>${club.email_contacto ? `<a href="mailto:${escapeHtml(club.email_contacto)}">${escapeHtml(club.email_contacto)}</a>` : '-'}</td>
         <td><span class="badge ${club.activo_en_liga ? 'badge-activo' : 'badge-inactivo'}">${club.activo_en_liga ? 'Activo' : 'Inactivo'}</span></td>
         <td>
-          <button class="btn btn-secundario btn-pequeno" onclick="editarClub('${club.id}')">Editar</button>
-          <button class="btn btn-secundario btn-pequeno" onclick="verParticipacionesClub('${club.id}', '${escapeHtml(club.nombre)}')">Participaciones</button>
-          <button class="btn btn-secundario btn-pequeno" onclick="verUsuariosClub('${club.id}', '${escapeHtml(club.nombre)}')">Usuarios</button>
-          <button class="btn btn-peligro btn-pequeno" onclick="eliminarClub('${club.id}', '${escapeHtml(club.nombre)}')">Eliminar</button>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarClub('${club.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Participaciones" onclick="verParticipacionesClub('${club.id}', '${escapeHtml(club.nombre)}')">${ICONO_COPA}</button>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Usuarios" onclick="verUsuariosClub('${club.id}', '${escapeHtml(club.nombre)}')">${ICONO_PERSONA}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarClub('${club.id}', '${escapeHtml(club.nombre)}')">${ICONO_BASURA}</button>
         </td>
       </tr>
     `;
@@ -940,21 +950,43 @@ async function verParticipacionesClub(clubId, nombreClub) {
       cont.innerHTML = '<p class="texto-ayuda">Todavía no hay torneos creados en tu Liga.</p>';
       return;
     }
+    // Para categorías CON subcategorías, la inscripción es a nivel
+    // subcategoría (el club no puede quedar en la categoría "pelada"): se
+    // muestra un checkbox por subcategoría en vez de uno por categoría.
     cont.innerHTML = torneos.map((t) => `
       <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
         <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">
           <input type="checkbox" class="chk-torneo-participacion" data-torneo-id="${t.id}"
-            ${t.categorias.some((c) => c.inscripta) ? 'checked' : ''}
+            ${t.categorias.some((c) => c.inscripta || c.subcategorias.some((s) => s.inscripta)) ? 'checked' : ''}
             ${!t.categorias.length ? 'disabled' : ''}>
           ${escapeHtml(t.nombre)} <span class="texto-ayuda" style="margin:0;">(${escapeHtml(t.deporte)})</span>
         </label>
-        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; margin-left:24px;">
-          ${t.categorias.length ? t.categorias.map((c) => `
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
-              <input type="checkbox" class="chk-categoria-participacion" data-torneo-id="${t.id}" value="${c.id}" ${c.inscripta ? 'checked' : ''}>
-              ${escapeHtml(c.nombre)}
-            </label>
-          `).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; margin-left:24px;">
+          ${t.categorias.length ? t.categorias.map((c) => {
+            if (c.subcategorias.length) {
+              return `
+                <div>
+                  <span style="font-size:13px; font-weight:600;">${escapeHtml(c.nombre)}</span>
+                  <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; margin-left:14px;">
+                    ${c.subcategorias.map((s) => `
+                      <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
+                        <input type="checkbox" class="chk-categoria-participacion" data-torneo-id="${t.id}"
+                          data-categoria-id="${c.id}" data-subcategoria-id="${s.id}" ${s.inscripta ? 'checked' : ''}>
+                        ${escapeHtml(s.nombre)}
+                      </label>
+                    `).join('')}
+                  </div>
+                </div>
+              `;
+            }
+            return `
+              <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
+                <input type="checkbox" class="chk-categoria-participacion" data-torneo-id="${t.id}"
+                  data-categoria-id="${c.id}" ${c.inscripta ? 'checked' : ''}>
+                ${escapeHtml(c.nombre)}
+              </label>
+            `;
+          }).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
         </div>
       </div>
     `).join('');
@@ -980,14 +1012,17 @@ async function guardarParticipaciones() {
   okEl.classList.add('oculto');
   if (!clubIdParticipacionesActual) return;
 
-  const categoriaIds = Array.from(
+  const selecciones = Array.from(
     document.querySelectorAll('#listaParticipacionesTorneos .chk-categoria-participacion:checked')
-  ).map((el) => el.value);
+  ).map((el) => ({
+    categoria_id: el.dataset.categoriaId,
+    subcategoria_id: el.dataset.subcategoriaId || null
+  }));
 
   try {
     const data = await apiFetch(`/liga/clubes/${clubIdParticipacionesActual}/participaciones`, {
       method: 'PUT',
-      body: JSON.stringify({ categoria_ids: categoriaIds })
+      body: JSON.stringify({ selecciones })
     });
     okEl.textContent = `Guardado: ${data.agregadas} agregada(s), ${data.quitadas} quitada(s).`;
     okEl.classList.remove('oculto');
@@ -1320,7 +1355,7 @@ async function cargarCategorias(torneoId) {
       <tr>
         <td>${escapeHtml(c.nombre)}</td>
         <td>${escapeHtml(c.genero || '-')}</td>
-        <td>${escapeHtml(c.subcategoria || '-')}</td>
+        <td>${c.subcategorias && c.subcategorias.length ? escapeHtml(c.subcategorias.map((s) => s.nombre).join(', ')) : '-'}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno" onclick="verDetalleCategoria('${c.id}', '${escapeHtml(c.nombre)}')">Ver detalle</button>
         </td>
@@ -1338,8 +1373,7 @@ async function guardarCategoria(e) {
 
   const cuerpo = {
     nombre: document.getElementById('categoriaNombre').value.trim(),
-    genero: document.getElementById('categoriaGenero').value || undefined,
-    subcategoria: document.getElementById('categoriaSubcategoria').value.trim() || undefined
+    genero: document.getElementById('categoriaGenero').value || undefined
   };
 
   try {
@@ -1349,6 +1383,104 @@ async function guardarCategoria(e) {
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
+  }
+}
+
+// ===================== SUBCATEGORÍAS (dentro de Detalle de Categoría) =====================
+// Nivel extra y opcional atado a la categoría principal (ej: "Primera" y
+// "Reserva" dentro de la categoría "Fútbol Femenino"). Cuando una categoría
+// tiene subcategorías cargadas, el club se inscribe en una de ellas, no en la
+// categoría "pelada" (ver cargarEquipos/inscribirClub más abajo).
+
+function categoriaActualTieneSubcategorias() {
+  const cat = categoriasCache.find((c) => c.id === categoriaActualId);
+  return !!(cat && cat.subcategorias && cat.subcategorias.length);
+}
+
+function subcategoriasDeCategoriaActual() {
+  const cat = categoriasCache.find((c) => c.id === categoriaActualId);
+  return (cat && cat.subcategorias) || [];
+}
+
+async function cargarSubcategorias() {
+  const tbody = document.getElementById('tablaSubcategorias');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    // Refresca categoriasCache para tener las subcategorías al día.
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias`);
+    categoriasCache = data.categorias;
+    const subcategorias = subcategoriasDeCategoriaActual();
+    if (!subcategorias.length) {
+      tbody.innerHTML = '<tr><td colspan="2">Todavía no cargaste subcategorías.</td></tr>';
+    } else {
+      tbody.innerHTML = subcategorias.map((s) => `
+        <tr>
+          <td>${escapeHtml(s.nombre)}</td>
+          <td>
+            <button class="btn btn-secundario btn-pequeno" onclick="editarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">Editar</button>
+            <button class="btn btn-peligro btn-pequeno" onclick="eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">Eliminar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarSubcategoria(subcategoriaId, nombre) {
+  document.getElementById('subcategoriaIdEdicion').value = subcategoriaId;
+  document.getElementById('subcategoriaNombre').value = nombre;
+  document.getElementById('btnCancelarSubcategoria').classList.remove('oculto');
+  document.getElementById('subcategoriaNombre').focus();
+}
+
+function limpiarFormSubcategoria() {
+  document.getElementById('subcategoriaIdEdicion').value = '';
+  document.getElementById('subcategoriaNombre').value = '';
+  document.getElementById('btnCancelarSubcategoria').classList.add('oculto');
+  document.getElementById('subcategoriaFormError').classList.add('oculto');
+}
+
+async function guardarSubcategoria(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('subcategoriaFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('subcategoriaIdEdicion').value;
+  const nombre = document.getElementById('subcategoriaNombre').value.trim();
+  if (!nombre) return;
+
+  try {
+    if (id) {
+      await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ nombre })
+      });
+    } else {
+      await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias`, {
+        method: 'POST',
+        body: JSON.stringify({ nombre })
+      });
+    }
+    limpiarFormSubcategoria();
+    await cargarSubcategorias();
+    cargarEquipos();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function eliminarSubcategoria(subcategoriaId, nombre) {
+  if (!confirm(`¿Eliminar la subcategoría "${nombre}"? Se borran también los equipos (partidos y tabla) que estuvieran inscriptos puntualmente en ella.`)) {
+    return;
+  }
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias/${subcategoriaId}`, { method: 'DELETE' });
+    await cargarSubcategorias();
+    cargarEquipos();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
@@ -1363,6 +1495,8 @@ function verDetalleCategoria(categoriaId, nombreCategoria) {
   document.getElementById('formGenerarFixture').classList.add('oculto');
   document.getElementById('formPartido').classList.add('oculto');
   document.getElementById('fixtureIdaVuelta').checked = false;
+  limpiarFormSubcategoria();
+  cargarSubcategorias();
   cambiarTabDetalle('equipos');
 }
 
@@ -1389,26 +1523,44 @@ function cambiarTabDetalle(nombre) {
 async function cargarEquipos() {
   const tbody = document.getElementById('tablaEquipos');
   const select = document.getElementById('selectClubInscribir');
-  tbody.innerHTML = '<tr><td>Cargando...</td></tr>';
+  const selectSub = document.getElementById('selectSubcategoriaInscribir');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
   try {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/equipos`);
     equiposCache = data.equipos;
 
     if (!equiposCache.length) {
-      tbody.innerHTML = '<tr><td>Todavía no hay clubes inscriptos en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="2">Todavía no hay clubes inscriptos en esta categoría.</td></tr>';
     } else {
-      tbody.innerHTML = equiposCache.map((eq) => `<tr><td>${swatch(eq.club_color_primario)}${escapeHtml(eq.club_nombre)}</td></tr>`).join('');
+      tbody.innerHTML = equiposCache.map((eq) => `
+        <tr>
+          <td>${swatch(eq.club_color_primario)}${escapeHtml(eq.club_nombre)}</td>
+          <td>${eq.subcategoria_nombre ? escapeHtml(eq.subcategoria_nombre) : '-'}</td>
+        </tr>
+      `).join('');
     }
 
-    const idsInscriptos = new Set(equiposCache.map((eq) => eq.club_id));
-    const disponibles = clubesCache.filter((c) => !idsInscriptos.has(c.id));
-    if (!disponibles.length) {
-      select.innerHTML = '<option value="">No hay clubes disponibles para inscribir</option>';
+    const subcategorias = subcategoriasDeCategoriaActual();
+    if (subcategorias.length) {
+      // Con subcategorías, un mismo club puede tener equipo en más de una
+      // (ej: Primera y Reserva) — no lo sacamos de la lista de clubes, el
+      // backend rechaza si ya está en la MISMA subcategoría elegida.
+      selectSub.classList.remove('oculto');
+      selectSub.innerHTML = subcategorias.map((s) => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('');
+      select.innerHTML = clubesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
     } else {
-      select.innerHTML = disponibles.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+      selectSub.classList.add('oculto');
+      selectSub.innerHTML = '';
+      const idsInscriptos = new Set(equiposCache.map((eq) => eq.club_id));
+      const disponibles = clubesCache.filter((c) => !idsInscriptos.has(c.id));
+      if (!disponibles.length) {
+        select.innerHTML = '<option value="">No hay clubes disponibles para inscribir</option>';
+      } else {
+        select.innerHTML = disponibles.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+      }
     }
   } catch (err) {
-    tbody.innerHTML = `<tr><td>Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -1416,16 +1568,23 @@ async function inscribirClub() {
   const errorEl = document.getElementById('equipoFormError');
   errorEl.classList.add('oculto');
   const select = document.getElementById('selectClubInscribir');
+  const selectSub = document.getElementById('selectSubcategoriaInscribir');
   const clubId = select.value;
   if (!clubId) {
     errorEl.textContent = 'No hay ningún club seleccionado para inscribir.';
     errorEl.classList.remove('oculto');
     return;
   }
+  const tieneSubcategorias = categoriaActualTieneSubcategorias();
+  if (tieneSubcategorias && !selectSub.value) {
+    errorEl.textContent = 'Esta categoría tiene subcategorías: elegí en cuál inscribir al club.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
   try {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/equipos`, {
       method: 'POST',
-      body: JSON.stringify({ club_id: clubId })
+      body: JSON.stringify({ club_id: clubId, subcategoria_id: tieneSubcategorias ? selectSub.value : undefined })
     });
     cargarEquipos();
   } catch (err) {

@@ -27,9 +27,11 @@ router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const { rows } = await query(
-      `SELECT et.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
+      `SELECT et.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
+              sub.nombre AS subcategoria_nombre
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
+       LEFT JOIN categoria_subcategorias sub ON sub.id = et.subcategoria_id
        WHERE et.torneo_id = $1 AND et.categoria_id = $2
        ORDER BY c.nombre ASC`,
       [req.params.torneoId, req.params.categoriaId]
@@ -42,9 +44,11 @@ router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
 });
 
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/equipos — inscribir un club
-// (el club_id tiene que ser uno de los clubes ya cargados en MI liga)
+// (el club_id tiene que ser uno de los clubes ya cargados en MI liga). Si la
+// categoría tiene subcategorías cargadas, es obligatorio indicar a cuál de
+// ellas se inscribe (el club NO puede quedar en la categoría "pelada").
 router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
-  const { club_id, grupo } = req.body;
+  const { club_id, subcategoria_id, grupo } = req.body;
   if (!club_id) {
     return res.status(400).json({ ok: false, error: 'Falta club_id' });
   }
@@ -60,16 +64,28 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Ese club no participa en tu Liga' });
     }
 
+    const subcategorias = await query(
+      'SELECT id FROM categoria_subcategorias WHERE categoria_id = $1',
+      [req.params.categoriaId]
+    );
+    let subcategoriaIdFinal = null;
+    if (subcategorias.rows.length) {
+      if (!subcategoria_id || !subcategorias.rows.some((s) => s.id === subcategoria_id)) {
+        return res.status(400).json({ ok: false, error: 'Esta categoría tiene subcategorías: elegí una para inscribir al club' });
+      }
+      subcategoriaIdFinal = subcategoria_id;
+    }
+
     const { rows } = await query(
-      `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, grupo)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id, grupo)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [req.params.torneoId, req.params.categoriaId, club_id, grupo || null]
+      [req.params.torneoId, req.params.categoriaId, club_id, subcategoriaIdFinal, grupo || null]
     );
     res.status(201).json({ ok: true, equipo: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esta categoría' });
+      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esta categoría/subcategoría' });
     }
     console.error('Error en POST equipos:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });

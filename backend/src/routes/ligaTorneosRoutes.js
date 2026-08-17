@@ -15,6 +15,19 @@ async function buscarTorneoDeMiLiga(torneoId, ligaId) {
   return rows[0] || null;
 }
 
+// Chequea si ya existe otro torneo con el mismo nombre (comparación
+// insensible a mayúsculas/espacios) DENTRO de mi Liga.
+async function nombreTorneoYaExisteEnLiga(nombre, ligaId, excluirTorneoId) {
+  const { rows } = await query(
+    `SELECT 1 FROM torneos
+     WHERE liga_id = $1 AND LOWER(TRIM(nombre)) = LOWER(TRIM($2))
+       AND ($3::uuid IS NULL OR id != $3::uuid)
+     LIMIT 1`,
+    [ligaId, nombre, excluirTorneoId || null]
+  );
+  return !!rows[0];
+}
+
 // ===== TORNEOS =====
 
 // GET /liga/torneos — listado de torneos de mi liga
@@ -66,6 +79,9 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    if (await nombreTorneoYaExisteEnLiga(nombre, req.ligaId)) {
+      return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
+    }
     const { rows } = await query(
       `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin)
        VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9)
@@ -92,6 +108,10 @@ router.put('/:torneoId', async (req, res) => {
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
+
+    if (nombre && await nombreTorneoYaExisteEnLiga(nombre, req.ligaId, req.params.torneoId)) {
+      return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
+    }
 
     const { rows } = await query(
       `UPDATE torneos SET
@@ -141,17 +161,29 @@ router.patch('/:torneoId/estado', async (req, res) => {
 
 // ===== CATEGORÍAS (anidadas dentro de un torneo) =====
 
-// GET /liga/torneos/:torneoId/categorias
+// GET /liga/torneos/:torneoId/categorias — incluye, para cada categoría, sus
+// subcategorías (si tiene). El front usa esto para saber si una categoría se
+// gestiona "pelada" o a través de sus subcategorías.
 router.get('/:torneoId/categorias', async (req, res) => {
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
 
-    const { rows } = await query(
+    const categoriasResult = await query(
       'SELECT * FROM categorias WHERE torneo_id = $1 ORDER BY orden ASC, nombre ASC',
       [req.params.torneoId]
     );
-    res.json({ ok: true, categorias: rows });
+    const subcategoriasResult = await query(
+      `SELECT cs.* FROM categoria_subcategorias cs
+       JOIN categorias c ON c.id = cs.categoria_id
+       WHERE c.torneo_id = $1 ORDER BY cs.orden ASC, cs.nombre ASC`,
+      [req.params.torneoId]
+    );
+    const categorias = categoriasResult.rows.map((c) => ({
+      ...c,
+      subcategorias: subcategoriasResult.rows.filter((s) => s.categoria_id === c.id)
+    }));
+    res.json({ ok: true, categorias });
   } catch (err) {
     console.error('Error en GET /liga/torneos/:torneoId/categorias:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -160,7 +192,7 @@ router.get('/:torneoId/categorias', async (req, res) => {
 
 // POST /liga/torneos/:torneoId/categorias — alta de una categoría
 router.post('/:torneoId/categorias', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, subcategoria } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden } = req.body;
   const generosValidos = ['masculino', 'femenino', 'mixto'];
 
   if (!nombre || !nombre.trim()) {
@@ -175,12 +207,12 @@ router.post('/:torneoId/categorias', async (req, res) => {
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
 
     const { rows } = await query(
-      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, subcategoria)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7)
+      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0))
        RETURNING *`,
-      [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null, subcategoria || null]
+      [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null]
     );
-    res.status(201).json({ ok: true, categoria: rows[0] });
+    res.status(201).json({ ok: true, categoria: { ...rows[0], subcategorias: [] } });
   } catch (err) {
     console.error('Error en POST /liga/torneos/:torneoId/categorias:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -189,7 +221,7 @@ router.post('/:torneoId/categorias', async (req, res) => {
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId — edición
 router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, subcategoria } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden } = req.body;
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
@@ -200,17 +232,106 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
          genero = COALESCE($2, genero),
          edad_minima = COALESCE($3, edad_minima),
          edad_maxima = COALESCE($4, edad_maxima),
-         orden = COALESCE($5, orden),
-         subcategoria = $6
-       WHERE id = $7 AND torneo_id = $8
+         orden = COALESCE($5, orden)
+       WHERE id = $6 AND torneo_id = $7
        RETURNING *`,
       [nombre || null, genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
-       subcategoria || null, req.params.categoriaId, req.params.torneoId]
+       req.params.categoriaId, req.params.torneoId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
     res.json({ ok: true, categoria: rows[0] });
   } catch (err) {
     console.error('Error en PUT /liga/torneos/:torneoId/categorias/:categoriaId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// Chequea que una categoría exista y pertenezca a un torneo de mi liga.
+async function buscarCategoriaDeMiLiga(categoriaId, torneoId, ligaId) {
+  const { rows } = await query(
+    `SELECT c.* FROM categorias c
+     JOIN torneos t ON t.id = c.torneo_id
+     WHERE c.id = $1 AND c.torneo_id = $2 AND t.liga_id = $3`,
+    [categoriaId, torneoId, ligaId]
+  );
+  return rows[0] || null;
+}
+
+// ===== SUBCATEGORÍAS (anidadas dentro de una categoría) =====
+// Nivel extra y opcional de clasificación. Ej: la categoría "Fútbol Femenino"
+// del torneo "Copa Lamba" puede tener las subcategorías "Primera" y "Reserva".
+// Cuando una categoría tiene subcategorías cargadas, el club se inscribe a
+// nivel subcategoría (no directamente a la categoría) — ver
+// ligaClubesRoutes.js (participaciones).
+
+// POST /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias
+router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res) => {
+  const { nombre, orden } = req.body;
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ ok: false, error: 'El nombre de la subcategoría es obligatorio' });
+  }
+  try {
+    const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
+    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+
+    const { rows } = await query(
+      `INSERT INTO categoria_subcategorias (categoria_id, nombre, orden)
+       VALUES ($1, $2, COALESCE($3, 0))
+       RETURNING *`,
+      [req.params.categoriaId, nombre.trim(), orden ?? null]
+    );
+    res.status(201).json({ ok: true, subcategoria: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ ok: false, error: 'Ya existe una subcategoría con ese nombre en esta categoría' });
+    }
+    console.error('Error en POST subcategorias:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId
+router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', async (req, res) => {
+  const { nombre, orden } = req.body;
+  try {
+    const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
+    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+
+    const { rows } = await query(
+      `UPDATE categoria_subcategorias SET
+         nombre = COALESCE($1, nombre),
+         orden = COALESCE($2, orden)
+       WHERE id = $3 AND categoria_id = $4
+       RETURNING *`,
+      [nombre && nombre.trim() ? nombre.trim() : null, orden ?? null, req.params.subcategoriaId, req.params.categoriaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Subcategoría no encontrada en esa categoría' });
+    res.json({ ok: true, subcategoria: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ ok: false, error: 'Ya existe una subcategoría con ese nombre en esta categoría' });
+    }
+    console.error('Error en PUT subcategorias:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId
+// Borrar una subcategoría borra en cascada los equipos (y sus partidos/tabla)
+// que estuvieran inscriptos puntualmente en ella.
+router.delete('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', async (req, res) => {
+  try {
+    const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
+    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+
+    const { rowCount } = await query(
+      'DELETE FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
+      [req.params.subcategoriaId, req.params.categoriaId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Subcategoría no encontrada en esa categoría' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE subcategorias:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
