@@ -31,6 +31,18 @@
   .fila-jugador-stats .nombre-jugador { flex: 1; }
   .fila-jugador-stats input[type="number"] { width: 50px; padding: 4px; border: 1px solid var(--gris-300); border-radius: 6px; }
   .fila-jugador-stats label { font-size: 11px; color: var(--gris-600); margin-right: 2px; }
+  /* Popups reutilizados: todas las pantallas de edición/detalle de Clubes y
+     Torneos se abren como ventana modal centrada, con un único fondo oscuro
+     compartido (#fondoModalGenerico), en vez de paneles embebidos en la página. */
+  .fondo-modal-generico {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 55;
+  }
+  .popup-modal {
+    position: fixed; top: 5%; left: 50%; transform: translateX(-50%);
+    width: min(700px, 94vw); max-height: 88vh; overflow-y: auto;
+    z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  }
+  .popup-modal-ancho { width: min(980px, 96vw); }
 </style>
 </head>
 <body>
@@ -75,7 +87,7 @@
         </div>
 
         <div class="barra-filtros">
-          <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre o CUIT...">
+          <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre...">
         </div>
 
         <form id="formCargaMasiva" class="oculto">
@@ -89,16 +101,12 @@
           <div id="cargaMasivaResultado"></div>
         </form>
 
-        <form id="formClub" class="oculto">
+        <form id="formClub" class="oculto popup-modal">
           <input type="hidden" id="clubIdEdicion">
           <div class="form-grid">
             <div>
               <label for="clubNombre">Nombre *</label>
               <input type="text" id="clubNombre" required>
-            </div>
-            <div>
-              <label for="clubCuit">CUIT</label>
-              <input type="text" id="clubCuit">
             </div>
             <div>
               <label for="clubDireccion">Dirección</label>
@@ -176,7 +184,7 @@
         </form>
 
         <!-- Gestión de canchas secundarias de un Club -->
-        <div class="panel oculto" id="panelCanchasClub">
+        <div class="panel oculto popup-modal" id="panelCanchasClub">
           <div class="panel-header">
             <h2 id="tituloCanchasClub">Canchas del Club</h2>
             <button class="btn btn-secundario" id="btnCerrarCanchasClub">Cerrar</button>
@@ -216,7 +224,7 @@
 
         <table>
           <thead>
-            <tr><th>Logo</th><th>Nombre</th><th>CUIT</th><th>Ciudad</th><th>Provincia</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
+            <tr><th>Logo</th><th>Nombre</th><th>Ciudad</th><th>Provincia</th><th>Estado en tu Liga</th><th>Acciones</th></tr>
           </thead>
           <tbody id="tablaClubes"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
@@ -229,29 +237,7 @@
         </div>
       </div>
 
-      <!-- Inscribir un club en un Torneo/Categoría desde el Home de Clubes -->
-      <div class="panel oculto" id="panelInscribirClubTorneo">
-        <div class="panel-header">
-          <h2 id="tituloInscribirClubTorneo">Anotar en Torneo</h2>
-          <button class="btn btn-secundario" id="btnCerrarInscribirClubTorneo">Cerrar</button>
-        </div>
-        <div class="form-grid">
-          <div>
-            <label for="inscribirTorneoSelect">Torneo *</label>
-            <select id="inscribirTorneoSelect"></select>
-          </div>
-          <div>
-            <label for="inscribirCategoriaSelect">Categoría *</label>
-            <select id="inscribirCategoriaSelect" disabled></select>
-          </div>
-        </div>
-        <button class="btn" id="btnConfirmarInscribirClubTorneo">Anotar en esta categoría</button>
-        <p class="mensaje-error oculto" id="inscribirClubTorneoError"></p>
-        <p class="mensaje-ok oculto" id="inscribirClubTorneoOk"></p>
-        <p class="texto-ayuda">Podés repetir esto para anotar al mismo club en varios torneos y categorías (ej. Baby Fútbol y Futsal a la vez).</p>
-      </div>
-
-      <div class="panel oculto" id="panelUsuariosClub">
+      <div class="panel oculto popup-modal" id="panelUsuariosClub">
         <div class="panel-header">
           <h2 id="tituloUsuariosClub">Usuarios del Club</h2>
           <button class="btn btn-secundario" id="btnCerrarUsuariosClub">Cerrar</button>
@@ -270,11 +256,59 @@
         <p class="texto-ayuda">Este es el usuario con el que el club va a poder entrar a su propio panel para cargar jugadores y pedir fichajes.</p>
       </div>
 
+      <!-- Documentos del Club (los puede subir la Liga o el propio Club) -->
+      <div class="panel oculto popup-modal" id="panelDocumentosClub">
+        <div class="panel-header">
+          <h2 id="tituloDocumentosClub">Documentos del Club</h2>
+          <button class="btn btn-secundario" id="btnCerrarDocumentosClub">Cerrar</button>
+        </div>
+        <table>
+          <thead><tr><th>Nombre</th><th>Subido por</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaDocumentosClub"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+        <form id="formDocumentoClub" style="margin-top:12px;">
+          <div class="form-grid">
+            <div>
+              <label for="documentoNombre">Nombre del documento *</label>
+              <input type="text" id="documentoNombre" required placeholder="Ej: Estatuto, Seguro, Habilitación">
+            </div>
+            <div>
+              <label for="documentoArchivo">Archivo *</label>
+              <input type="file" id="documentoArchivo" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-pequeno">Subir documento</button>
+          <p class="mensaje-error oculto" id="documentoFormError"></p>
+        </form>
+      </div>
+
+      <!-- Comentarios internos de la Liga sobre el Club (el Club nunca los ve) -->
+      <div class="panel oculto popup-modal" id="panelComentariosClub">
+        <div class="panel-header">
+          <h2 id="tituloComentariosClub">Notas internas del Club</h2>
+          <button class="btn btn-secundario" id="btnCerrarComentariosClub">Cerrar</button>
+        </div>
+        <p class="texto-ayuda">Estas notas son privadas de tu Liga — el Club nunca las ve.</p>
+        <div id="listaComentariosClub"><p class="texto-ayuda">Cargando...</p></div>
+        <form id="formComentarioClub" style="margin-top:12px;">
+          <div class="form-grid una-columna">
+            <div>
+              <label for="comentarioTexto">Nueva nota</label>
+              <input type="text" id="comentarioTexto" required placeholder="Ej: Debe la cuota de marzo">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-pequeno">Agregar nota</button>
+          <p class="mensaje-error oculto" id="comentarioFormError"></p>
+        </form>
+      </div>
+
     </div>
 
+    <!-- Fondo compartido por TODOS los popups del Panel Liga (Clubes, Torneos, Categorías, Participaciones) -->
+    <div class="oculto fondo-modal-generico" id="fondoModalGenerico"></div>
+
     <!-- Popup de Participaciones: elegir varios torneos y varias categorías por club -->
-    <div class="oculto" id="fondoModalParticipaciones" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:50;"></div>
-    <div class="oculto" id="modalParticipacionesClub" style="position:fixed; top:5%; left:50%; transform:translateX(-50%); width:min(640px, 92vw); max-height:88vh; overflow-y:auto; background:var(--blanco); border-radius:var(--radio); padding:20px; z-index:51; box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+    <div class="oculto panel popup-modal" id="modalParticipacionesClub">
       <div class="panel-header">
         <h2 id="tituloParticipacionesClub">Participaciones del Club</h2>
         <button class="btn btn-secundario" id="btnCerrarParticipacionesClub">Cerrar</button>
@@ -294,7 +328,7 @@
           <button class="btn" id="btnMostrarFormTorneo">+ Nuevo Torneo</button>
         </div>
 
-        <form id="formTorneo" class="oculto">
+        <form id="formTorneo" class="oculto popup-modal">
           <input type="hidden" id="torneoIdEdicion">
           <div class="form-grid">
             <div>
@@ -349,7 +383,7 @@
       </div>
 
       <!-- Detalle de un torneo: sus categorías -->
-      <div class="panel oculto" id="panelCategorias">
+      <div class="panel oculto popup-modal" id="panelCategorias">
         <div class="panel-header">
           <h2 id="tituloCategorias">Categorías</h2>
           <div>
@@ -374,6 +408,10 @@
                 <option value="mixto">Mixto</option>
               </select>
             </div>
+            <div>
+              <label for="categoriaSubcategoria">Subcategoría (opcional)</label>
+              <input type="text" id="categoriaSubcategoria" placeholder="ej: A, B, Desarrollo...">
+            </div>
           </div>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
@@ -381,13 +419,13 @@
         </form>
 
         <table>
-          <thead><tr><th>Nombre</th><th>Género</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaCategorias"><tr><td colspan="3">Cargando...</td></tr></tbody>
+          <thead><tr><th>Nombre</th><th>Género</th><th>Subcategoría</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaCategorias"><tr><td colspan="4">Cargando...</td></tr></tbody>
         </table>
       </div>
 
       <!-- Detalle de una categoría: equipos / fixture / tabla -->
-      <div class="panel oculto" id="panelDetalleCategoria">
+      <div class="panel oculto popup-modal popup-modal-ancho" id="panelDetalleCategoria">
         <div class="panel-header">
           <h2 id="tituloDetalleCategoria">Categoría</h2>
           <button class="btn btn-secundario" id="btnCerrarDetalleCategoria">Cerrar</button>

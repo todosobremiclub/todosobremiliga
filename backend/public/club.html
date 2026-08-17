@@ -30,6 +30,7 @@
       <button class="tab-btn activo" id="tabBtnJugadores">Jugadores</button>
       <button class="tab-btn" id="tabBtnFichajes">Fichajes y Carnets</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
+      <button class="tab-btn" id="tabBtnDocumentos">Documentos</button>
     </div>
 
     <!-- ===== SECCIÓN JUGADORES ===== -->
@@ -137,6 +138,32 @@
           </thead>
           <tbody id="tablaNotificacionesClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN DOCUMENTOS ===== -->
+    <div id="seccionDocumentos" class="oculto">
+      <div class="panel">
+        <h2>Documentos de tu Club</h2>
+        <p class="texto-ayuda">Estos documentos los pueden ver y subir tanto tu Club como las Ligas en las que participás.</p>
+        <table>
+          <thead><tr><th>Nombre</th><th>Subido por</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaDocumentosClub"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+        <form id="formDocumentoClub" style="margin-top:12px;">
+          <div class="form-grid">
+            <div>
+              <label for="documentoNombre">Nombre del documento *</label>
+              <input type="text" id="documentoNombre" required placeholder="Ej: Estatuto, Seguro, Habilitación">
+            </div>
+            <div>
+              <label for="documentoArchivo">Archivo *</label>
+              <input type="file" id="documentoArchivo" required>
+            </div>
+          </div>
+          <button type="submit" class="btn">Subir documento</button>
+          <p class="mensaje-error oculto" id="documentoFormError"></p>
+        </form>
       </div>
     </div>
   </div>

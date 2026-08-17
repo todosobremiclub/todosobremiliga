@@ -11,12 +11,22 @@ let ligaSlugActual = null;
 let paginaClubesActual = 1;
 const CLUBES_POR_PAGINA = 25;
 let totalClubesActual = 0;
-let clubIdParaInscribir = null;
 
 let torneoActualId = null;
 let torneoActualNombre = '';
 let categoriaActualId = null;
 let categoriaActualNombre = '';
+
+// ----- Popups: todas las pantallas de edición/detalle (Club, Usuarios,
+// Canchas, Documentos, Notas, Torneo, Categorías, Detalle de categoría,
+// Participaciones) se muestran como ventana modal centrada, compartiendo un
+// único fondo oscuro (#fondoModalGenerico). -----
+function mostrarFondoModal() {
+  document.getElementById('fondoModalGenerico').classList.remove('oculto');
+}
+function ocultarFondoModal() {
+  document.getElementById('fondoModalGenerico').classList.add('oculto');
+}
 
 function init() {
   const usuario = requerirRol(['liga_admin', 'super_admin']);
@@ -67,9 +77,11 @@ function conectarEventos() {
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
     limpiarFormClub();
     document.getElementById('formClub').classList.remove('oculto');
+    mostrarFondoModal();
   });
   document.getElementById('btnCancelarFormClub').addEventListener('click', () => {
     document.getElementById('formClub').classList.add('oculto');
+    ocultarFondoModal();
   });
   document.getElementById('formClub').addEventListener('submit', guardarClub);
   document.getElementById('clubLogoArchivo').addEventListener('change', onElegirLogoClub);
@@ -81,16 +93,34 @@ function conectarEventos() {
 
   document.getElementById('btnCerrarUsuariosClub').addEventListener('click', () => {
     document.getElementById('panelUsuariosClub').classList.add('oculto');
+    ocultarFondoModal();
   });
   document.getElementById('formUsuarioClub').addEventListener('submit', crearUsuarioClub);
 
+  document.getElementById('btnCerrarDocumentosClub').addEventListener('click', () => {
+    document.getElementById('panelDocumentosClub').classList.add('oculto');
+    ocultarFondoModal();
+  });
+  document.getElementById('formDocumentoClub').addEventListener('submit', subirDocumentoClub);
+
+  document.getElementById('btnCerrarComentariosClub').addEventListener('click', () => {
+    document.getElementById('panelComentariosClub').classList.add('oculto');
+    ocultarFondoModal();
+  });
+  document.getElementById('formComentarioClub').addEventListener('submit', agregarComentarioClub);
+
   document.getElementById('btnCerrarParticipacionesClub').addEventListener('click', () => {
     document.getElementById('modalParticipacionesClub').classList.add('oculto');
-    document.getElementById('fondoModalParticipaciones').classList.add('oculto');
+    ocultarFondoModal();
   });
-  document.getElementById('fondoModalParticipaciones').addEventListener('click', () => {
-    document.getElementById('modalParticipacionesClub').classList.add('oculto');
-    document.getElementById('fondoModalParticipaciones').classList.add('oculto');
+  document.getElementById('fondoModalGenerico').addEventListener('click', () => {
+    // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
+    ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
+     'modalParticipacionesClub', 'formTorneo', 'panelCategorias', 'panelDetalleCategoria'
+    ].forEach((id) => document.getElementById(id).classList.add('oculto'));
+    ocultarFondoModal();
+    torneoActualId = null;
+    categoriaActualId = null;
   });
   document.getElementById('btnGuardarParticipaciones').addEventListener('click', guardarParticipaciones);
 
@@ -101,6 +131,7 @@ function conectarEventos() {
   });
   document.getElementById('btnCerrarCanchasClub').addEventListener('click', () => {
     document.getElementById('panelCanchasClub').classList.add('oculto');
+    document.getElementById('formClub').classList.remove('oculto');
   });
   document.getElementById('formCanchaSecundaria').addEventListener('submit', guardarCanchaSecundaria);
   document.getElementById('btnCancelarCanchaSecundaria').addEventListener('click', limpiarFormCanchaSecundaria);
@@ -127,12 +158,6 @@ function conectarEventos() {
   });
   document.getElementById('formCargaMasiva').addEventListener('submit', subirCargaMasivaClubes);
 
-  document.getElementById('btnCerrarInscribirClubTorneo').addEventListener('click', () => {
-    document.getElementById('panelInscribirClubTorneo').classList.add('oculto');
-  });
-  document.getElementById('inscribirTorneoSelect').addEventListener('change', onCambioTorneoInscribir);
-  document.getElementById('btnConfirmarInscribirClubTorneo').addEventListener('click', confirmarInscribirClubTorneo);
-
   // ---- Postulaciones ----
   document.getElementById('btnCopiarLinkPostulacion').addEventListener('click', () => {
     const input = document.getElementById('linkPostulacionPublica');
@@ -151,9 +176,11 @@ function conectarEventos() {
     document.getElementById('torneoPtsEmpate').value = 1;
     document.getElementById('torneoFormError').classList.add('oculto');
     document.getElementById('formTorneo').classList.remove('oculto');
+    mostrarFondoModal();
   });
   document.getElementById('btnCancelarFormTorneo').addEventListener('click', () => {
     document.getElementById('formTorneo').classList.add('oculto');
+    ocultarFondoModal();
   });
   document.getElementById('formTorneo').addEventListener('submit', guardarTorneo);
 
@@ -162,6 +189,7 @@ function conectarEventos() {
     document.getElementById('panelCategorias').classList.add('oculto');
     document.getElementById('panelDetalleCategoria').classList.add('oculto');
     torneoActualId = null;
+    ocultarFondoModal();
   });
   document.getElementById('btnMostrarFormCategoria').addEventListener('click', () => {
     document.getElementById('formCategoria').reset();
@@ -177,6 +205,7 @@ function conectarEventos() {
   // ---- Detalle de categoría ----
   document.getElementById('btnCerrarDetalleCategoria').addEventListener('click', () => {
     document.getElementById('panelDetalleCategoria').classList.add('oculto');
+    document.getElementById('panelCategorias').classList.remove('oculto');
     categoriaActualId = null;
   });
   document.getElementById('tabBtnEquipos').addEventListener('click', () => cambiarTabDetalle('equipos'));
@@ -363,7 +392,7 @@ async function rechazarFichaje(fichajeId) {
 
 async function cargarClubes() {
   const tbody = document.getElementById('tablaClubes');
-  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   const texto = document.getElementById('buscadorClubes').value.trim();
   try {
     const params = new URLSearchParams({ pagina: paginaClubesActual, por_pagina: CLUBES_POR_PAGINA });
@@ -379,29 +408,29 @@ async function cargarClubes() {
     document.getElementById('btnClubesPaginaSiguiente').disabled = paginaClubesActual * CLUBES_POR_PAGINA >= totalClubesActual;
 
     if (!clubesCache.length) {
-      tbody.innerHTML = '<tr><td colspan="7">No se encontraron clubes.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">No se encontraron clubes.</td></tr>';
       return;
     }
     tbody.innerHTML = clubesCache.map((club) => `
       <tr style="border-left: 4px solid ${club.color_primario || 'transparent'};">
         <td>${club.logo_url ? `<img class="logo-miniatura" src="${club.logo_url}" alt="">` : '<span class="logo-miniatura"></span>'}</td>
         <td>${escapeHtml(club.nombre)}</td>
-        <td>${escapeHtml(club.cuit || '-')}</td>
         <td>${escapeHtml(club.ciudad || '-')}</td>
         <td>${escapeHtml(club.provincia || '-')}</td>
         <td><span class="badge ${club.activo_en_liga ? 'badge-activo' : 'badge-inactivo'}">${club.activo_en_liga ? 'Activo' : 'Inactivo'}</span></td>
         <td>
           <button class="btn btn-secundario btn-pequeno" onclick="editarClub('${club.id}')">Editar</button>
-          <button class="btn btn-secundario btn-pequeno" onclick="abrirInscribirClubTorneo('${club.id}', '${escapeHtml(club.nombre)}')">Torneos</button>
           <button class="btn btn-secundario btn-pequeno" onclick="verParticipacionesClub('${club.id}', '${escapeHtml(club.nombre)}')">Participaciones</button>
           <button class="btn btn-secundario btn-pequeno" onclick="verUsuariosClub('${club.id}', '${escapeHtml(club.nombre)}')">Usuarios</button>
+          <button class="btn btn-secundario btn-pequeno" onclick="abrirDocumentosClub('${club.id}', '${escapeHtml(club.nombre)}')">Documentos</button>
+          <button class="btn btn-secundario btn-pequeno" onclick="abrirComentariosClub('${club.id}', '${escapeHtml(club.nombre)}')">Notas</button>
           <button class="btn ${club.activo_en_liga ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoClub('${club.id}', ${!club.activo_en_liga})">${club.activo_en_liga ? 'Desactivar' : 'Activar'}</button>
           <button class="btn btn-peligro btn-pequeno" onclick="eliminarClub('${club.id}', '${escapeHtml(club.nombre)}')">Eliminar</button>
         </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -494,7 +523,6 @@ function onElegirLogoClub(e) {
 function limpiarFormClub() {
   document.getElementById('clubIdEdicion').value = '';
   document.getElementById('clubNombre').value = '';
-  document.getElementById('clubCuit').value = '';
   document.getElementById('clubDireccion').value = '';
   document.getElementById('clubCiudad').value = '';
   document.getElementById('clubProvincia').value = '';
@@ -521,7 +549,6 @@ function editarClub(clubId) {
   if (!club) return;
   document.getElementById('clubIdEdicion').value = club.id;
   document.getElementById('clubNombre').value = club.nombre || '';
-  document.getElementById('clubCuit').value = club.cuit || '';
   document.getElementById('clubDireccion').value = club.direccion || '';
   document.getElementById('clubCiudad').value = club.ciudad || '';
   document.getElementById('clubProvincia').value = club.provincia || '';
@@ -548,6 +575,7 @@ function editarClub(clubId) {
   document.getElementById('formClub').classList.remove('oculto');
   document.getElementById('btnGestionarCanchas').classList.remove('oculto');
   document.getElementById('panelCanchasClub').classList.add('oculto');
+  mostrarFondoModal();
 }
 
 async function guardarClub(e) {
@@ -558,7 +586,6 @@ async function guardarClub(e) {
   const id = document.getElementById('clubIdEdicion').value;
   const cuerpo = {
     nombre: document.getElementById('clubNombre').value.trim(),
-    cuit: document.getElementById('clubCuit').value.trim() || undefined,
     direccion: document.getElementById('clubDireccion').value.trim() || undefined,
     ciudad: document.getElementById('clubCiudad').value.trim() || undefined,
     provincia: document.getElementById('clubProvincia').value.trim() || undefined,
@@ -579,6 +606,7 @@ async function guardarClub(e) {
       await apiFetch('/liga/clubes', { method: 'POST', body: JSON.stringify(cuerpo) });
     }
     document.getElementById('formClub').classList.add('oculto');
+    ocultarFondoModal();
     cargarClubes();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -600,6 +628,7 @@ async function toggleActivoClub(clubId, nuevoValor) {
 
 function verUsuariosClub(clubId, nombreClub) {
   document.getElementById('panelUsuariosClub').classList.remove('oculto');
+  mostrarFondoModal();
   document.getElementById('tituloUsuariosClub').textContent = `Usuarios de "${nombreClub}"`;
   document.getElementById('usuarioClubId').value = clubId;
   document.getElementById('usuarioClubFormError').classList.add('oculto');
@@ -634,12 +663,157 @@ async function crearUsuarioClub(e) {
   }
 }
 
+// ----- Documentos del club (los puede subir la Liga o el propio Club) -----
+
+let clubIdDocumentosActual = null;
+let documentoArchivoBase64Actual = '';
+
+function abrirDocumentosClub(clubId, nombreClub) {
+  clubIdDocumentosActual = clubId;
+  document.getElementById('panelDocumentosClub').classList.remove('oculto');
+  mostrarFondoModal();
+  document.getElementById('tituloDocumentosClub').textContent = `Documentos de "${nombreClub}"`;
+  document.getElementById('formDocumentoClub').reset();
+  document.getElementById('documentoFormError').classList.add('oculto');
+  documentoArchivoBase64Actual = '';
+  cargarDocumentosClub();
+}
+
+async function cargarDocumentosClub() {
+  const tbody = document.getElementById('tablaDocumentosClub');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubIdDocumentosActual}/documentos`);
+    const documentos = data.documentos;
+    if (!documentos.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Este club todavía no tiene documentos cargados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = documentos.map((d) => `
+      <tr>
+        <td><a href="${d.archivo_url}" download="${escapeHtml(d.nombre)}" target="_blank">${escapeHtml(d.nombre)}</a></td>
+        <td>${d.subido_por_rol === 'club' ? 'El Club' : 'La Liga'}</td>
+        <td>${new Date(d.creado_at).toLocaleDateString('es-AR')}</td>
+        <td><button class="btn btn-peligro btn-pequeno" onclick="eliminarDocumentoClub('${d.id}')">Eliminar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function subirDocumentoClub(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('documentoFormError');
+  errorEl.classList.add('oculto');
+
+  const nombre = document.getElementById('documentoNombre').value.trim();
+  const archivo = document.getElementById('documentoArchivo').files[0];
+  if (!archivo) {
+    errorEl.textContent = 'Elegí un archivo.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+
+  const lector = new FileReader();
+  lector.onload = async () => {
+    try {
+      await apiFetch(`/liga/clubes/${clubIdDocumentosActual}/documentos`, {
+        method: 'POST',
+        body: JSON.stringify({ nombre, archivo_url: lector.result })
+      });
+      document.getElementById('formDocumentoClub').reset();
+      cargarDocumentosClub();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('oculto');
+    }
+  };
+  lector.readAsDataURL(archivo);
+}
+
+async function eliminarDocumentoClub(documentoId) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  try {
+    await apiFetch(`/liga/clubes/${clubIdDocumentosActual}/documentos/${documentoId}`, { method: 'DELETE' });
+    cargarDocumentosClub();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ----- Notas internas de la Liga sobre el club (el Club nunca las ve) -----
+
+let clubIdComentariosActual = null;
+
+function abrirComentariosClub(clubId, nombreClub) {
+  clubIdComentariosActual = clubId;
+  document.getElementById('panelComentariosClub').classList.remove('oculto');
+  mostrarFondoModal();
+  document.getElementById('tituloComentariosClub').textContent = `Notas internas de "${nombreClub}"`;
+  document.getElementById('formComentarioClub').reset();
+  document.getElementById('comentarioFormError').classList.add('oculto');
+  cargarComentariosClub();
+}
+
+async function cargarComentariosClub() {
+  const cont = document.getElementById('listaComentariosClub');
+  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubIdComentariosActual}/comentarios`);
+    const comentarios = data.comentarios;
+    if (!comentarios.length) {
+      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay notas para este club.</p>';
+      return;
+    }
+    cont.innerHTML = comentarios.map((c) => `
+      <div style="border-bottom:1px solid var(--gris-100); padding:8px 0;">
+        <p style="margin:0; font-size:13px;">${escapeHtml(c.comentario)}</p>
+        <p class="texto-ayuda" style="margin:2px 0 0;">
+          ${escapeHtml(c.autor_nombre || 'Liga')} — ${new Date(c.creado_at).toLocaleString('es-AR')}
+          <button class="btn btn-peligro btn-pequeno" style="margin-left:8px;" onclick="eliminarComentarioClub('${c.id}')">Eliminar</button>
+        </p>
+      </div>
+    `).join('');
+  } catch (err) {
+    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function agregarComentarioClub(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('comentarioFormError');
+  errorEl.classList.add('oculto');
+  const comentario = document.getElementById('comentarioTexto').value.trim();
+  try {
+    await apiFetch(`/liga/clubes/${clubIdComentariosActual}/comentarios`, {
+      method: 'POST',
+      body: JSON.stringify({ comentario })
+    });
+    document.getElementById('formComentarioClub').reset();
+    cargarComentariosClub();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function eliminarComentarioClub(comentarioId) {
+  if (!confirm('¿Eliminar esta nota?')) return;
+  try {
+    await apiFetch(`/liga/clubes/${clubIdComentariosActual}/comentarios/${comentarioId}`, { method: 'DELETE' });
+    cargarComentariosClub();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
 let clubIdParticipacionesActual = null;
 
 async function verParticipacionesClub(clubId, nombreClub) {
   clubIdParticipacionesActual = clubId;
   document.getElementById('modalParticipacionesClub').classList.remove('oculto');
-  document.getElementById('fondoModalParticipaciones').classList.remove('oculto');
+  mostrarFondoModal();
   document.getElementById('tituloParticipacionesClub').textContent = `Participaciones de "${nombreClub}"`;
   document.getElementById('participacionesError').classList.add('oculto');
   document.getElementById('participacionesOk').classList.add('oculto');
@@ -715,6 +889,7 @@ let clubIdCanchasActual = null;
 
 async function abrirCanchasClub(clubId) {
   clubIdCanchasActual = clubId;
+  document.getElementById('formClub').classList.add('oculto');
   document.getElementById('panelCanchasClub').classList.remove('oculto');
   limpiarFormCanchaSecundaria();
   await cargarCanchasClub();
@@ -805,83 +980,6 @@ async function eliminarCanchaSecundaria(canchaId) {
     await cargarCanchasClub();
   } catch (err) {
     alert('Error: ' + err.message);
-  }
-}
-
-// ----- Anotar un club en Torneo/Categoría desde el Home de Clubes -----
-
-async function abrirInscribirClubTorneo(clubId, nombreClub) {
-  clubIdParaInscribir = clubId;
-  document.getElementById('tituloInscribirClubTorneo').textContent = `Anotar a "${nombreClub}" en un Torneo`;
-  document.getElementById('inscribirClubTorneoError').classList.add('oculto');
-  document.getElementById('inscribirClubTorneoOk').classList.add('oculto');
-  document.getElementById('panelInscribirClubTorneo').classList.remove('oculto');
-
-  const selectTorneo = document.getElementById('inscribirTorneoSelect');
-  const selectCategoria = document.getElementById('inscribirCategoriaSelect');
-  selectTorneo.innerHTML = '<option value="">Cargando...</option>';
-  selectCategoria.innerHTML = '';
-  selectCategoria.disabled = true;
-
-  try {
-    const data = await apiFetch('/liga/torneos');
-    if (!data.torneos.length) {
-      selectTorneo.innerHTML = '<option value="">Todavía no cargaste ningún torneo</option>';
-      return;
-    }
-    selectTorneo.innerHTML = '<option value="">Elegí un torneo...</option>' +
-      data.torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)} (${escapeHtml(t.deporte)})</option>`).join('');
-  } catch (err) {
-    selectTorneo.innerHTML = '<option value="">Error cargando torneos</option>';
-  }
-}
-
-async function onCambioTorneoInscribir() {
-  const torneoId = document.getElementById('inscribirTorneoSelect').value;
-  const selectCategoria = document.getElementById('inscribirCategoriaSelect');
-  selectCategoria.innerHTML = '';
-  selectCategoria.disabled = true;
-  if (!torneoId) return;
-
-  selectCategoria.innerHTML = '<option value="">Cargando...</option>';
-  try {
-    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
-    if (!data.categorias.length) {
-      selectCategoria.innerHTML = '<option value="">Este torneo todavía no tiene categorías</option>';
-      return;
-    }
-    selectCategoria.innerHTML = '<option value="">Elegí una categoría...</option>' +
-      data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-    selectCategoria.disabled = false;
-  } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Error cargando categorías</option>';
-  }
-}
-
-async function confirmarInscribirClubTorneo() {
-  const errorEl = document.getElementById('inscribirClubTorneoError');
-  const okEl = document.getElementById('inscribirClubTorneoOk');
-  errorEl.classList.add('oculto');
-  okEl.classList.add('oculto');
-
-  const torneoId = document.getElementById('inscribirTorneoSelect').value;
-  const categoriaId = document.getElementById('inscribirCategoriaSelect').value;
-  if (!torneoId || !categoriaId) {
-    errorEl.textContent = 'Elegí un Torneo y una Categoría.';
-    errorEl.classList.remove('oculto');
-    return;
-  }
-
-  try {
-    await apiFetch(`/liga/clubes/${clubIdParaInscribir}/inscribir`, {
-      method: 'POST',
-      body: JSON.stringify({ torneo_id: torneoId, categoria_id: categoriaId })
-    });
-    okEl.textContent = 'Club anotado correctamente en esa categoría.';
-    okEl.classList.remove('oculto');
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove('oculto');
   }
 }
 
@@ -1026,6 +1124,7 @@ function editarTorneo(torneoId) {
   document.getElementById('torneoPtsEmpate').value = sp.empate != null ? sp.empate : 1;
   document.getElementById('torneoFormError').classList.add('oculto');
   document.getElementById('formTorneo').classList.remove('oculto');
+  mostrarFondoModal();
 }
 
 async function guardarTorneo(e) {
@@ -1056,6 +1155,7 @@ async function guardarTorneo(e) {
       await apiFetch('/liga/torneos', { method: 'POST', body: JSON.stringify(cuerpo) });
     }
     document.getElementById('formTorneo').classList.add('oculto');
+    ocultarFondoModal();
     cargarTorneos();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -1067,6 +1167,7 @@ async function guardarTorneo(e) {
 
 function verCategorias(torneoId, nombreTorneo) {
   torneoActualId = torneoId;
+  mostrarFondoModal();
   torneoActualNombre = nombreTorneo;
   document.getElementById('panelCategorias').classList.remove('oculto');
   document.getElementById('panelDetalleCategoria').classList.add('oculto');
@@ -1077,25 +1178,26 @@ function verCategorias(torneoId, nombreTorneo) {
 
 async function cargarCategorias(torneoId) {
   const tbody = document.getElementById('tablaCategorias');
-  tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
   try {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
     categoriasCache = data.categorias;
     if (!categoriasCache.length) {
-      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay categorías en este torneo.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay categorías en este torneo.</td></tr>';
       return;
     }
     tbody.innerHTML = categoriasCache.map((c) => `
       <tr>
         <td>${escapeHtml(c.nombre)}</td>
         <td>${escapeHtml(c.genero || '-')}</td>
+        <td>${escapeHtml(c.subcategoria || '-')}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno" onclick="verDetalleCategoria('${c.id}', '${escapeHtml(c.nombre)}')">Ver detalle</button>
         </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -1106,7 +1208,8 @@ async function guardarCategoria(e) {
 
   const cuerpo = {
     nombre: document.getElementById('categoriaNombre').value.trim(),
-    genero: document.getElementById('categoriaGenero').value || undefined
+    genero: document.getElementById('categoriaGenero').value || undefined,
+    subcategoria: document.getElementById('categoriaSubcategoria').value.trim() || undefined
   };
 
   try {
@@ -1124,6 +1227,7 @@ async function guardarCategoria(e) {
 function verDetalleCategoria(categoriaId, nombreCategoria) {
   categoriaActualId = categoriaId;
   categoriaActualNombre = nombreCategoria;
+  document.getElementById('panelCategorias').classList.add('oculto');
   document.getElementById('panelDetalleCategoria').classList.remove('oculto');
   document.getElementById('tituloDetalleCategoria').textContent = `${nombreCategoria} — ${torneoActualNombre}`;
   document.getElementById('formGenerarFixture').classList.add('oculto');

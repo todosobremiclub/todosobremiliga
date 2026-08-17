@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
     let filtroTexto = '';
     if (texto) {
       params.push(`%${texto}%`);
-      filtroTexto = ` AND (c.nombre ILIKE $${params.length} OR c.cuit ILIKE $${params.length})`;
+      filtroTexto = ` AND c.nombre ILIKE $${params.length}`;
     }
 
     const totalResult = await query(
@@ -86,8 +86,8 @@ async function crearCanchaPrincipal(client, clubId, { tipo_techo, tamanio, piso 
 // GET /liga/clubes/plantilla — descarga la plantilla Excel para carga masiva
 router.get('/plantilla', (req, res) => {
   try {
-    const encabezados = ['Nombre', 'CUIT', 'Direccion', 'Telefono', 'Email', 'Ciudad', 'Provincia', 'Cancha Techada o Aire Libre', 'Tamaño Cancha', 'Piso Cancha'];
-    const filaEjemplo = ['Club Deportivo Ejemplo', '30-12345678-9', 'Av. Siempre Viva 123', '011-4444-5555', 'contacto@club.com', 'La Plata', 'Buenos Aires', 'aire_libre', 'Reglamentaria (40x20m)', 'Césped sintético'];
+    const encabezados = ['Nombre', 'Direccion', 'Telefono', 'Email', 'Ciudad', 'Provincia', 'Cancha Techada o Aire Libre', 'Tamaño Cancha', 'Piso Cancha'];
+    const filaEjemplo = ['Club Deportivo Ejemplo', 'Av. Siempre Viva 123', '011-4444-5555', 'contacto@club.com', 'La Plata', 'Buenos Aires', 'aire_libre', 'Reglamentaria (40x20m)', 'Césped sintético'];
     const hoja = XLSX.utils.aoa_to_sheet([encabezados, filaEjemplo]);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Clubes');
@@ -130,7 +130,6 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
         continue;
       }
 
-      const cuit = String(fila.CUIT || fila.Cuit || fila.cuit || '').trim() || null;
       const direccion = String(fila.Direccion || fila.Dirección || fila.direccion || '').trim() || null;
       const telefono = String(fila.Telefono || fila.Teléfono || fila.telefono || '').trim() || null;
       const email = String(fila.Email || fila.email || '').trim() || null;
@@ -145,10 +144,10 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
       try {
         await client.query('BEGIN');
         const clubResult = await client.query(
-          `INSERT INTO clubes (nombre, direccion, telefono, email_contacto, cuit, ciudad, provincia)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `INSERT INTO clubes (nombre, direccion, telefono, email_contacto, ciudad, provincia)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [nombre, direccion, telefono, email, cuit, ciudad, provincia]
+          [nombre, direccion, telefono, email, ciudad, provincia]
         );
         const club = clubResult.rows[0];
         await client.query('INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2)', [req.ligaId, club.id]);
@@ -176,7 +175,7 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia,
+    email_contacto, color_primario, color_secundario, ciudad, provincia,
     cancha_tipo_techo, cancha_tamanio, cancha_piso
   } = req.body;
 
@@ -193,11 +192,11 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
 
     const clubResult = await client.query(
-      `INSERT INTO clubes (nombre, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario, cuit, ciudad, provincia)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO clubes (nombre, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario, ciudad, provincia)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [nombre.trim(), logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null, cuit || null,
+       email_contacto || null, color_primario || null, color_secundario || null,
        ciudad || null, provincia || null]
     );
     const club = clubResult.rows[0];
@@ -235,7 +234,7 @@ router.post('/', async (req, res) => {
 router.put('/:clubId', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
-    email_contacto, color_primario, color_secundario, cuit, ciudad, provincia,
+    email_contacto, color_primario, color_secundario, ciudad, provincia,
     cancha_tipo_techo, cancha_tamanio, cancha_piso
   } = req.body;
 
@@ -259,13 +258,13 @@ router.put('/:clubId', async (req, res) => {
     const { rows } = await query(
       `UPDATE clubes SET
          nombre = $1, logo_url = $2, direccion = $3, telefono = $4,
-         email_contacto = $5, color_primario = $6, color_secundario = $7, cuit = $8,
-         ciudad = $9, provincia = $10,
+         email_contacto = $5, color_primario = $6, color_secundario = $7,
+         ciudad = $8, provincia = $9,
          actualizado_at = NOW()
-       WHERE id = $11
+       WHERE id = $10
        RETURNING *`,
       [nombre.trim(), logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null, cuit || null,
+       email_contacto || null, color_primario || null, color_secundario || null,
        ciudad || null, provincia || null,
        req.params.clubId]
     );
@@ -648,6 +647,143 @@ router.post('/:clubId/usuarios', async (req, res) => {
       return res.status(409).json({ ok: false, error: `Ya existe un usuario con el email "${email}"` });
     }
     console.error('Error en POST /liga/clubes/:clubId/usuarios:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// ===== DOCUMENTOS DEL CLUB (los puede subir la Liga o el propio Club) =====
+
+// GET /liga/clubes/:clubId/documentos
+router.get('/:clubId/documentos', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      'SELECT * FROM club_documentos WHERE club_id = $1 ORDER BY creado_at DESC',
+      [req.params.clubId]
+    );
+    res.json({ ok: true, documentos: rows });
+  } catch (err) {
+    console.error('Error en GET documentos de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes/:clubId/documentos — la Liga sube un documento del club
+router.post('/:clubId/documentos', async (req, res) => {
+  const { nombre, archivo_url } = req.body;
+  if (!nombre || !nombre.trim() || !archivo_url) {
+    return res.status(400).json({ ok: false, error: 'Faltan nombre y/o archivo' });
+  }
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      `INSERT INTO club_documentos (club_id, nombre, archivo_url, subido_por_rol, subido_por_id)
+       VALUES ($1, $2, $3, 'liga', $4)
+       RETURNING *`,
+      [req.params.clubId, nombre.trim(), archivo_url, req.usuario.id]
+    );
+    res.status(201).json({ ok: true, documento: rows[0] });
+  } catch (err) {
+    console.error('Error en POST documento de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/clubes/:clubId/documentos/:documentoId — la Liga puede borrar cualquier documento del club
+router.delete('/:clubId/documentos/:documentoId', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rowCount } = await query(
+      'DELETE FROM club_documentos WHERE id = $1 AND club_id = $2',
+      [req.params.documentoId, req.params.clubId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Documento no encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE documento de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// ===== COMENTARIOS INTERNOS DE LA LIGA SOBRE EL CLUB (el Club nunca los ve) =====
+
+// GET /liga/clubes/:clubId/comentarios
+router.get('/:clubId/comentarios', async (req, res) => {
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      'SELECT * FROM club_comentarios WHERE club_id = $1 AND liga_id = $2 ORDER BY creado_at DESC',
+      [req.params.clubId, req.ligaId]
+    );
+    res.json({ ok: true, comentarios: rows });
+  } catch (err) {
+    console.error('Error en GET comentarios de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes/:clubId/comentarios
+router.post('/:clubId/comentarios', async (req, res) => {
+  const { comentario } = req.body;
+  if (!comentario || !comentario.trim()) {
+    return res.status(400).json({ ok: false, error: 'El comentario no puede estar vacío' });
+  }
+  try {
+    const pertenece = await query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [req.params.clubId, req.ligaId]
+    );
+    if (!pertenece.rows[0]) {
+      return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+    }
+    const { rows } = await query(
+      `INSERT INTO club_comentarios (club_id, liga_id, autor_nombre, comentario)
+       VALUES ($1, $2, (SELECT nombre FROM usuarios WHERE id = $3), $4)
+       RETURNING *`,
+      [req.params.clubId, req.ligaId, req.usuario.id, comentario.trim()]
+    );
+    res.status(201).json({ ok: true, comentario: rows[0] });
+  } catch (err) {
+    console.error('Error en POST comentario de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/clubes/:clubId/comentarios/:comentarioId
+router.delete('/:clubId/comentarios/:comentarioId', async (req, res) => {
+  try {
+    const { rowCount } = await query(
+      'DELETE FROM club_comentarios WHERE id = $1 AND club_id = $2 AND liga_id = $3',
+      [req.params.comentarioId, req.params.clubId, req.ligaId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Comentario no encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE comentario de club:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

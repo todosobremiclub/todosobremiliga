@@ -160,7 +160,7 @@ router.get('/:torneoId/categorias', async (req, res) => {
 
 // POST /liga/torneos/:torneoId/categorias — alta de una categoría
 router.post('/:torneoId/categorias', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, subcategoria } = req.body;
   const generosValidos = ['masculino', 'femenino', 'mixto'];
 
   if (!nombre || !nombre.trim()) {
@@ -175,10 +175,10 @@ router.post('/:torneoId/categorias', async (req, res) => {
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
 
     const { rows } = await query(
-      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0))
+      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, subcategoria)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7)
        RETURNING *`,
-      [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null]
+      [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null, subcategoria || null]
     );
     res.status(201).json({ ok: true, categoria: rows[0] });
   } catch (err) {
@@ -189,7 +189,7 @@ router.post('/:torneoId/categorias', async (req, res) => {
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId — edición
 router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, subcategoria } = req.body;
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
@@ -200,11 +200,12 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
          genero = COALESCE($2, genero),
          edad_minima = COALESCE($3, edad_minima),
          edad_maxima = COALESCE($4, edad_maxima),
-         orden = COALESCE($5, orden)
-       WHERE id = $6 AND torneo_id = $7
+         orden = COALESCE($5, orden),
+         subcategoria = $6
+       WHERE id = $7 AND torneo_id = $8
        RETURNING *`,
       [nombre || null, genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
-       req.params.categoriaId, req.params.torneoId]
+       subcategoria || null, req.params.categoriaId, req.params.torneoId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
     res.json({ ok: true, categoria: rows[0] });

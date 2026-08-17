@@ -64,7 +64,6 @@ async function enviarPostulacion(e) {
   const slug = getSlugDeUrl();
   const cuerpo = {
     nombre: document.getElementById('postNombre').value.trim(),
-    cuit: document.getElementById('postCuit').value.trim() || undefined,
     direccion: document.getElementById('postDireccion').value.trim() || undefined,
     ciudad: document.getElementById('postCiudad').value.trim() || undefined,
     provincia: document.getElementById('postProvincia').value.trim() || undefined,

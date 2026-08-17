@@ -15,6 +15,8 @@ function conectarEventos() {
   document.getElementById('tabBtnJugadores').addEventListener('click', () => cambiarTab('jugadores'));
   document.getElementById('tabBtnFichajes').addEventListener('click', () => cambiarTab('fichajes'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
+  document.getElementById('tabBtnDocumentos').addEventListener('click', () => cambiarTab('documentos'));
+  document.getElementById('formDocumentoClub').addEventListener('submit', subirDocumentoClub);
 
   document.getElementById('btnMostrarFormJugador').addEventListener('click', () => {
     document.getElementById('formJugador').reset();
@@ -35,14 +37,86 @@ function conectarEventos() {
 }
 
 function cambiarTab(nombre) {
-  const secciones = { jugadores: 'seccionJugadores', fichajes: 'seccionFichajes', notificaciones: 'seccionNotificaciones' };
-  const botones = { jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes', notificaciones: 'tabBtnNotificaciones' };
+  const secciones = {
+    jugadores: 'seccionJugadores', fichajes: 'seccionFichajes',
+    notificaciones: 'seccionNotificaciones', documentos: 'seccionDocumentos'
+  };
+  const botones = {
+    jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes',
+    notificaciones: 'tabBtnNotificaciones', documentos: 'tabBtnDocumentos'
+  };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
   if (nombre === 'fichajes') cargarFichajes();
   if (nombre === 'notificaciones') cargarNotificacionesClub();
+  if (nombre === 'documentos') cargarDocumentosClub();
+}
+
+// ===================== DOCUMENTOS =====================
+
+async function cargarDocumentosClub() {
+  const tbody = document.getElementById('tablaDocumentosClub');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/club/documentos');
+    const documentos = data.documentos;
+    if (!documentos.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay documentos cargados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = documentos.map((d) => `
+      <tr>
+        <td><a href="${d.archivo_url}" download="${escapeHtml(d.nombre)}" target="_blank">${escapeHtml(d.nombre)}</a></td>
+        <td>${d.subido_por_rol === 'club' ? 'Tu Club' : 'La Liga'}</td>
+        <td>${new Date(d.creado_at).toLocaleDateString('es-AR')}</td>
+        <td>${d.subido_por_rol === 'club' ? `<button class="btn btn-peligro btn-pequeno" onclick="eliminarDocumentoClub('${d.id}')">Eliminar</button>` : '-'}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function subirDocumentoClub(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('documentoFormError');
+  errorEl.classList.add('oculto');
+
+  const nombre = document.getElementById('documentoNombre').value.trim();
+  const archivo = document.getElementById('documentoArchivo').files[0];
+  if (!archivo) {
+    errorEl.textContent = 'Elegí un archivo.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+
+  const lector = new FileReader();
+  lector.onload = async () => {
+    try {
+      await apiFetch('/club/documentos', {
+        method: 'POST',
+        body: JSON.stringify({ nombre, archivo_url: lector.result })
+      });
+      document.getElementById('formDocumentoClub').reset();
+      cargarDocumentosClub();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('oculto');
+    }
+  };
+  lector.readAsDataURL(archivo);
+}
+
+async function eliminarDocumentoClub(documentoId) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  try {
+    await apiFetch(`/club/documentos/${documentoId}`, { method: 'DELETE' });
+    cargarDocumentosClub();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
 }
 
 // ===================== JUGADORES =====================
