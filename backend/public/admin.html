@@ -30,6 +30,18 @@
   .badge-demo-sin_respuesta { background: #fee2e2; color: var(--rojo); }
   .badge-demo-baja { background: var(--gris-300); color: var(--gris-600); }
   select.select-estado-demo { padding: 4px 8px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 12px; }
+  .fondo-modal-generico { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 55; }
+  .popup-modal {
+    position: fixed; top: 5%; left: 50%; transform: translateX(-50%);
+    width: min(700px, 94vw); max-height: 88vh; overflow-y: auto;
+    z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    background: var(--blanco); border-radius: var(--radio); padding: 20px;
+  }
+  .btn-icono {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; padding: 0; line-height: 0;
+  }
+  .btn-icono svg { width: 15px; height: 15px; }
 </style>
 </head>
 <body>
@@ -58,7 +70,7 @@
         <input type="text" id="buscadorLigas" placeholder="Buscar Liga por nombre...">
       </div>
 
-      <form id="formLiga" class="oculto">
+      <form id="formLiga" class="oculto popup-modal">
         <input type="hidden" id="ligaIdEdicion">
         <div class="form-grid">
           <div>
@@ -149,10 +161,19 @@
           <tr><td colspan="5">Cargando...</td></tr>
         </tbody>
       </table>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+        <span class="texto-ayuda" id="paginacionLigasInfo"></span>
+        <div>
+          <button class="btn btn-secundario btn-pequeno" id="btnLigasPaginaAnterior">← Anterior</button>
+          <button class="btn btn-secundario btn-pequeno" id="btnLigasPaginaSiguiente">Siguiente →</button>
+        </div>
+      </div>
     </div>
 
+    <div class="oculto fondo-modal-generico" id="fondoModalGenerico"></div>
+
     <!-- Ver Liga (solo lectura) -->
-    <div class="panel oculto" id="panelVerLiga">
+    <div class="panel oculto popup-modal" id="panelVerLiga">
       <div class="panel-header">
         <h2 id="tituloVerLiga">Liga</h2>
         <button class="btn btn-secundario" id="btnCerrarVerLiga">Cerrar</button>
@@ -160,12 +181,28 @@
       <div id="contenidoVerLiga"></div>
     </div>
 
-    <div class="panel oculto" id="panelUsuarios">
+    <div class="panel oculto popup-modal" id="panelUsuarios">
       <div class="panel-header">
         <h2 id="tituloUsuarios">Usuarios de la Liga</h2>
         <button class="btn btn-secundario" id="btnCerrarUsuarios">Cerrar</button>
       </div>
 
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaUsuarios">
+          <tr><td colspan="5">Seleccioná una Liga para ver sus usuarios.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:16px;">Nuevo usuario liga_admin</h3>
       <form id="formUsuario">
         <input type="hidden" id="usuarioLigaId">
         <div class="form-grid">
@@ -186,20 +223,6 @@
         <p class="mensaje-error oculto" id="usuarioFormError"></p>
         <p class="mensaje-ok oculto" id="usuarioFormOk"></p>
       </form>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody id="tablaUsuarios">
-          <tr><td colspan="4">Seleccioná una Liga para ver sus usuarios.</td></tr>
-        </tbody>
-      </table>
     </div>
 
   </div>

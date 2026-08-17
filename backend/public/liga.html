@@ -62,6 +62,18 @@
     vertical-align: middle; margin-left: 6px;
   }
   .btn-whatsapp-icono svg { width: 15px; height: 15px; fill: #fff; }
+  .badge-pendientes {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+    background: var(--rojo, #dc2626); color: #fff; border-radius: 999px;
+    font-size: 11px; font-weight: 700; vertical-align: middle;
+  }
+  select.select-multiple-filtro { min-width: 160px; padding: 4px; font-size: 12px; }
+  .barra-acciones-masivas {
+    display: none; align-items: center; gap: 10px; background: var(--gris-100);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
+  }
+  .barra-acciones-masivas.visible { display: flex; }
 </style>
 </head>
 <body class="liga-fondo-cancha">
@@ -85,7 +97,7 @@
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnClubes">Clubes</button>
       <button class="tab-btn" id="tabBtnTorneos">Torneos</button>
-      <button class="tab-btn" id="tabBtnPostulaciones">Postulaciones</button>
+      <button class="tab-btn" id="tabBtnPostulaciones">Postulaciones <span class="badge-pendientes oculto" id="badgePostulacionesPendientes">0</span></button>
       <button class="tab-btn" id="tabBtnFichajes">Fichajes</button>
       <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
@@ -107,8 +119,14 @@
 
         <div class="barra-filtros">
           <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre...">
-          <input type="text" id="filtroClubesCiudad" placeholder="Filtrar por Ciudad...">
-          <input type="text" id="filtroClubesProvincia" placeholder="Filtrar por Provincia...">
+          <div>
+            <label class="texto-ayuda" style="display:block;">Ciudad</label>
+            <select id="filtroClubesCiudad" class="select-multiple-filtro" multiple size="3"></select>
+          </div>
+          <div>
+            <label class="texto-ayuda" style="display:block;">Provincia</label>
+            <select id="filtroClubesProvincia" class="select-multiple-filtro" multiple size="3"></select>
+          </div>
           <select id="filtroClubesCancha">
             <option value="">Todas las canchas</option>
             <option value="aire_libre">Aire libre</option>
@@ -117,6 +135,15 @@
           <label class="check-inline">
             <input type="checkbox" id="filtroClubesInactivos"> Ver inactivos
           </label>
+          <label class="check-inline">
+            <input type="checkbox" id="filtroClubesReglamentaria"> Solo cancha reglamentaria (40x20)
+          </label>
+        </div>
+
+        <div class="barra-acciones-masivas" id="barraAccionesMasivasClubes">
+          <span id="cantidadClubesSeleccionados">0 clubes seleccionados</span>
+          <button class="btn btn-secundario btn-pequeno" id="btnAsignarCategoriaMasivo">Asignar a categoría</button>
+          <button class="btn btn-secundario btn-pequeno" id="btnLimpiarSeleccionClubes">Limpiar selección</button>
         </div>
 
         <form id="formCargaMasiva" class="oculto">
@@ -205,6 +232,9 @@
               <input type="text" id="clubCanchaPiso" placeholder="Ej: Césped sintético">
             </div>
           </div>
+          <label class="check-inline" style="margin-bottom:10px;">
+            <input type="checkbox" id="clubCanchaReglamentaria"> Cancha reglamentaria (40x20)
+          </label>
 
           <div class="oculto" id="bloqueEstadoClub" style="margin:10px 0;">
             <label class="check-inline">
@@ -262,6 +292,7 @@
         <table>
           <thead>
             <tr>
+              <th><input type="checkbox" id="chkSeleccionarTodosClubes"></th>
               <th>Logo</th>
               <th class="th-orden" onclick="ordenarClubesPor('nombre')">Nombre <span id="flechaOrdenNombre"></span></th>
               <th>Dirección</th>
@@ -273,7 +304,7 @@
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tablaClubes"><tr><td colspan="9">Cargando...</td></tr></tbody>
+          <tbody id="tablaClubes"><tr><td colspan="10">Cargando...</td></tr></tbody>
         </table>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="texto-ayuda" id="paginacionClubesInfo"></span>
@@ -289,6 +320,11 @@
           <h2 id="tituloUsuariosClub">Usuarios del Club</h2>
           <button class="btn btn-secundario" id="btnCerrarUsuariosClub">Cerrar</button>
         </div>
+        <table>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaUsuariosClub"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        </table>
+        <h3 style="margin-top:16px;">Nuevo usuario</h3>
         <form id="formUsuarioClub">
           <input type="hidden" id="usuarioClubId">
           <div class="form-grid">
@@ -365,6 +401,33 @@
       <button class="btn" id="btnGuardarParticipaciones" style="margin-top:12px;">Guardar participaciones</button>
       <p class="mensaje-error oculto" id="participacionesError"></p>
       <p class="mensaje-ok oculto" id="participacionesOk"></p>
+    </div>
+
+    <!-- Popup de asignación masiva: elegir un torneo/categoría (y subcategoría,
+         si tiene) para inscribir de una a todos los clubes tildados en el Home. -->
+    <div class="oculto panel popup-modal" id="modalAsignarCategoriaMasivo">
+      <div class="panel-header">
+        <h2>Asignar clubes a una categoría</h2>
+        <button class="btn btn-secundario" id="btnCerrarAsignarMasivo">Cerrar</button>
+      </div>
+      <p class="texto-ayuda" id="resumenClubesAsignarMasivo"></p>
+      <div class="form-grid">
+        <div>
+          <label for="masivoTorneo">Torneo *</label>
+          <select id="masivoTorneo"></select>
+        </div>
+        <div>
+          <label for="masivoCategoria">Categoría *</label>
+          <select id="masivoCategoria"></select>
+        </div>
+        <div id="grupoMasivoSubcategoria" class="oculto">
+          <label for="masivoSubcategoria">Subcategoría *</label>
+          <select id="masivoSubcategoria"></select>
+        </div>
+      </div>
+      <button class="btn" id="btnConfirmarAsignarMasivo">Asignar</button>
+      <p class="mensaje-error oculto" id="asignarMasivoError"></p>
+      <p class="mensaje-ok oculto" id="asignarMasivoOk"></p>
     </div>
 
     <!-- ===== SECCIÓN TORNEOS ===== -->
@@ -445,6 +508,7 @@
 
         <form id="formCategoria" class="oculto">
           <input type="hidden" id="categoriaTorneoId">
+          <input type="hidden" id="categoriaIdEdicion">
           <div class="form-grid">
             <div>
               <label for="categoriaNombre">Nombre *</label>
@@ -631,7 +695,7 @@
             <button class="btn btn-secundario btn-pequeno" id="btnCompartirPostulacion">Compartir</button>
             <button class="btn btn-secundario btn-pequeno" id="btnDescargarQrPostulacion">Descargar QR</button>
           </div>
-          <div id="qrPostulacionContenedor"></div>
+          <div id="qrPostulacionContenedor" style="display:none;"></div>
         </div>
       </div>
 

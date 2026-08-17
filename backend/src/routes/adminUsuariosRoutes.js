@@ -91,4 +91,59 @@ router.patch('/:id/activo', async (req, res) => {
   }
 });
 
+// PUT /admin/usuarios/:id — edita nombre/email de un usuario liga_admin/super_admin.
+router.put('/:id', async (req, res) => {
+  const { nombre, email } = req.body;
+  try {
+    const { rows } = await query(
+      `UPDATE usuarios SET
+         nombre = COALESCE($1, nombre),
+         email = COALESCE($2, email)
+       WHERE id = $3
+       RETURNING id, email, nombre, rol, liga_id, club_id, activo`,
+      [nombre && nombre.trim() ? nombre.trim() : null, email && email.trim() ? email.trim().toLowerCase() : null, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+    res.json({ ok: true, usuario: rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ ok: false, error: `Ya existe un usuario con el email "${email}"` });
+    }
+    console.error('Error en PUT /admin/usuarios/:id:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /admin/usuarios/:id/password — cambia la contraseña de un usuario.
+router.patch('/:id/password', async (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 4) {
+    return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 4 caracteres' });
+  }
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const { rows } = await query(
+      'UPDATE usuarios SET password_hash = $1 WHERE id = $2 RETURNING id',
+      [passwordHash, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en PATCH /admin/usuarios/:id/password:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /admin/usuarios/:id — borra definitivamente un usuario.
+router.delete('/:id', async (req, res) => {
+  try {
+    const { rowCount } = await query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /admin/usuarios/:id:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 module.exports = router;

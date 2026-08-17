@@ -137,6 +137,21 @@ router.put('/:torneoId', async (req, res) => {
   }
 });
 
+// DELETE /liga/torneos/:torneoId — borra el torneo y, en cascada, sus
+// categorías, subcategorías, equipos inscriptos, partidos y estadísticas.
+router.delete('/:torneoId', async (req, res) => {
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
+
+    await query('DELETE FROM torneos WHERE id = $1', [req.params.torneoId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /liga/torneos/:torneoId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // PATCH /liga/torneos/:torneoId/estado — planificado -> en_curso -> finalizado (o suspendido)
 router.patch('/:torneoId/estado', async (req, res) => {
   const { estado } = req.body;
@@ -242,6 +257,26 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
     res.json({ ok: true, categoria: rows[0] });
   } catch (err) {
     console.error('Error en PUT /liga/torneos/:torneoId/categorias/:categoriaId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/torneos/:torneoId/categorias/:categoriaId — borra la
+// categoría y, en cascada, sus subcategorías, equipos inscriptos, partidos y
+// estadísticas.
+router.delete('/:torneoId/categorias/:categoriaId', async (req, res) => {
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
+
+    const { rowCount } = await query(
+      'DELETE FROM categorias WHERE id = $1 AND torneo_id = $2',
+      [req.params.categoriaId, req.params.torneoId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /liga/torneos/:torneoId/categorias/:categoriaId:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

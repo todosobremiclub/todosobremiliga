@@ -4,6 +4,16 @@
 let ligasCache = [];
 let tabActual = 'productiva';
 let logoBase64Actual = '';
+let paginaLigasActual = 1;
+const LIGAS_POR_PAGINA = 25;
+let totalLigasActual = 0;
+
+function mostrarFondoModal() {
+  document.getElementById('fondoModalGenerico').classList.remove('oculto');
+}
+function ocultarFondoModal() {
+  document.getElementById('fondoModalGenerico').classList.add('oculto');
+}
 
 const ESTADOS_DEMO_LABELS = {
   avanzado: 'Avanzado',
@@ -24,24 +34,37 @@ function conectarEventos() {
   document.getElementById('tabBtnProductivas').addEventListener('click', () => cambiarTabLigas('productiva'));
   document.getElementById('tabBtnDemo').addEventListener('click', () => cambiarTabLigas('demo'));
 
-  document.getElementById('buscadorLigas').addEventListener('input', () => cargarLigas());
+  document.getElementById('buscadorLigas').addEventListener('input', () => {
+    paginaLigasActual = 1;
+    cargarLigas();
+  });
+  document.getElementById('btnLigasPaginaAnterior').addEventListener('click', () => {
+    if (paginaLigasActual > 1) { paginaLigasActual -= 1; cargarLigas(); }
+  });
+  document.getElementById('btnLigasPaginaSiguiente').addEventListener('click', () => {
+    if (paginaLigasActual * LIGAS_POR_PAGINA < totalLigasActual) { paginaLigasActual += 1; cargarLigas(); }
+  });
 
   document.getElementById('btnMostrarFormLiga').addEventListener('click', () => {
     limpiarFormLiga();
     document.getElementById('formLiga').classList.remove('oculto');
+    mostrarFondoModal();
   });
 
   document.getElementById('btnCancelarFormLiga').addEventListener('click', () => {
     document.getElementById('formLiga').classList.add('oculto');
+    ocultarFondoModal();
   });
 
   document.getElementById('formLiga').addEventListener('submit', guardarLiga);
   document.getElementById('formUsuario').addEventListener('submit', crearUsuarioLiga);
   document.getElementById('btnCerrarUsuarios').addEventListener('click', () => {
     document.getElementById('panelUsuarios').classList.add('oculto');
+    ocultarFondoModal();
   });
   document.getElementById('btnCerrarVerLiga').addEventListener('click', () => {
     document.getElementById('panelVerLiga').classList.add('oculto');
+    ocultarFondoModal();
   });
 
   document.getElementById('ligaTipo').addEventListener('change', (e) => {
@@ -61,6 +84,7 @@ function cambiarTabLigas(tipo) {
   tabActual = tipo;
   document.getElementById('tabBtnProductivas').classList.toggle('activo', tipo === 'productiva');
   document.getElementById('tabBtnDemo').classList.toggle('activo', tipo === 'demo');
+  paginaLigasActual = 1;
   cargarLigas();
 }
 
@@ -105,10 +129,22 @@ async function cargarLigas() {
   tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
   const texto = document.getElementById('buscadorLigas').value.trim();
   try {
-    const params = new URLSearchParams({ tipo: tabActual });
+    const params = new URLSearchParams({
+      tipo: tabActual,
+      pagina: paginaLigasActual,
+      por_pagina: LIGAS_POR_PAGINA
+    });
     if (texto) params.set('q', texto);
     const data = await apiFetch(`/admin/ligas?${params.toString()}`);
     ligasCache = data.ligas;
+    totalLigasActual = data.total;
+
+    const desde = ligasCache.length ? (paginaLigasActual - 1) * LIGAS_POR_PAGINA + 1 : 0;
+    const hasta = (paginaLigasActual - 1) * LIGAS_POR_PAGINA + ligasCache.length;
+    document.getElementById('paginacionLigasInfo').textContent = `Mostrando ${desde}-${hasta} de ${totalLigasActual} ligas`;
+    document.getElementById('btnLigasPaginaAnterior').disabled = paginaLigasActual <= 1;
+    document.getElementById('btnLigasPaginaSiguiente').disabled = paginaLigasActual * LIGAS_POR_PAGINA >= totalLigasActual;
+
     if (!ligasCache.length) {
       tbody.innerHTML = '<tr><td colspan="5">No se encontraron Ligas.</td></tr>';
       return;
@@ -184,6 +220,7 @@ function editarLiga(ligaId) {
   document.getElementById('ligaColorAcentoHex').textContent = liga.color_acento || '#f59e0b';
   document.getElementById('ligaFormError').classList.add('oculto');
   document.getElementById('formLiga').classList.remove('oculto');
+  mostrarFondoModal();
 }
 
 async function guardarLiga(e) {
@@ -213,6 +250,7 @@ async function guardarLiga(e) {
       await apiFetch('/admin/ligas', { method: 'POST', body: JSON.stringify(cuerpo) });
     }
     document.getElementById('formLiga').classList.add('oculto');
+    ocultarFondoModal();
     cargarLigas();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -247,6 +285,7 @@ async function eliminarLiga(ligaId, nombreLiga) {
 async function verLiga(ligaId) {
   const contenedor = document.getElementById('contenidoVerLiga');
   document.getElementById('panelVerLiga').classList.remove('oculto');
+  mostrarFondoModal();
   document.getElementById('tituloVerLiga').textContent = 'Cargando...';
   contenedor.innerHTML = 'Cargando...';
   try {
@@ -281,19 +320,23 @@ async function verLiga(ligaId) {
 
 async function verUsuarios(ligaId, nombreLiga) {
   document.getElementById('panelUsuarios').classList.remove('oculto');
+  mostrarFondoModal();
   document.getElementById('tituloUsuarios').textContent = `Usuarios de "${nombreLiga}"`;
   document.getElementById('usuarioLigaId').value = ligaId;
   document.getElementById('usuarioFormError').classList.add('oculto');
   document.getElementById('usuarioFormOk').classList.add('oculto');
   document.getElementById('formUsuario').reset();
   document.getElementById('usuarioLigaId').value = ligaId; // reset() borra el hidden también, se vuelve a poner
+  cargarUsuariosDeLiga(ligaId);
+}
 
+async function cargarUsuariosDeLiga(ligaId) {
   const tbody = document.getElementById('tablaUsuarios');
-  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
   try {
     const data = await apiFetch(`/admin/usuarios?liga_id=${ligaId}`);
     if (!data.usuarios.length) {
-      tbody.innerHTML = '<tr><td colspan="4">Esta Liga todavía no tiene usuarios asignados.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5">Esta Liga todavía no tiene usuarios asignados.</td></tr>';
       return;
     }
     tbody.innerHTML = data.usuarios.map((u) => `
@@ -302,10 +345,68 @@ async function verUsuarios(ligaId, nombreLiga) {
         <td>${escapeHtml(u.email)}</td>
         <td>${escapeHtml(u.rol)}</td>
         <td><span class="badge ${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno" onclick="editarUsuarioAdmin('${ligaId}', '${u.id}', '${escapeHtml(u.nombre)}', '${escapeHtml(u.email)}')">Editar</button>
+          <button class="btn btn-secundario btn-pequeno" onclick="cambiarPasswordUsuarioAdmin('${u.id}')">Cambiar contraseña</button>
+          <button class="btn ${u.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoUsuarioAdmin('${ligaId}', '${u.id}', ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
+          <button class="btn btn-peligro btn-pequeno" onclick="eliminarUsuarioAdmin('${ligaId}', '${u.id}', '${escapeHtml(u.nombre)}')">Eliminar</button>
+        </td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function editarUsuarioAdmin(ligaId, usuarioId, nombreActual, emailActual) {
+  const nombre = prompt('Nombre:', nombreActual);
+  if (nombre === null) return;
+  const email = prompt('Email:', emailActual);
+  if (email === null) return;
+  try {
+    await apiFetch(`/admin/usuarios/${usuarioId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ nombre: nombre.trim(), email: email.trim() })
+    });
+    cargarUsuariosDeLiga(ligaId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function cambiarPasswordUsuarioAdmin(usuarioId) {
+  const password = prompt('Nueva contraseña (mínimo 4 caracteres):');
+  if (password === null) return;
+  try {
+    await apiFetch(`/admin/usuarios/${usuarioId}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password })
+    });
+    alert('Contraseña actualizada.');
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function toggleActivoUsuarioAdmin(ligaId, usuarioId, nuevoValor) {
+  try {
+    await apiFetch(`/admin/usuarios/${usuarioId}/activo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo: nuevoValor })
+    });
+    cargarUsuariosDeLiga(ligaId);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function eliminarUsuarioAdmin(ligaId, usuarioId, nombre) {
+  if (!confirm(`¿Eliminar definitivamente al usuario "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/admin/usuarios/${usuarioId}`, { method: 'DELETE' });
+    cargarUsuariosDeLiga(ligaId);
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
@@ -331,8 +432,7 @@ async function crearUsuarioLiga(e) {
     okEl.classList.remove('oculto');
     document.getElementById('formUsuario').reset();
     document.getElementById('usuarioLigaId').value = ligaId;
-    const nombreLiga = document.getElementById('tituloUsuarios').textContent;
-    verUsuarios(ligaId, nombreLiga.replace('Usuarios de "', '').replace('"', ''));
+    cargarUsuariosDeLiga(ligaId);
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');

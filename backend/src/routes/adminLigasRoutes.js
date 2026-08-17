@@ -19,7 +19,17 @@ router.get('/', async (req, res) => {
     return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_VALIDOS.join(', ')}` });
   }
 
+  const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
+  const porPagina = Math.min(25, Math.max(1, parseInt(req.query.por_pagina, 10) || 25));
+  const offset = (pagina - 1) * porPagina;
+
   try {
+    const totalResult = await query(
+      `SELECT COUNT(*)::int AS total FROM ligas l
+       WHERE ($1::varchar IS NULL OR l.tipo = $1)
+         AND ($2::text IS NULL OR l.nombre ILIKE '%' || $2 || '%')`,
+      [tipo || null, q || null]
+    );
     const { rows } = await query(
       `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.telefono, l.email_contacto,
               l.color_primario, l.color_secundario, l.color_acento, l.activo, l.tipo, l.estado_demo,
@@ -30,10 +40,11 @@ router.get('/', async (req, res) => {
        WHERE ($1::varchar IS NULL OR l.tipo = $1)
          AND ($2::text IS NULL OR l.nombre ILIKE '%' || $2 || '%')
        GROUP BY l.id
-       ORDER BY l.nombre ASC`,
-      [tipo || null, q || null]
+       ORDER BY l.nombre ASC
+       LIMIT $3 OFFSET $4`,
+      [tipo || null, q || null, porPagina, offset]
     );
-    res.json({ ok: true, ligas: rows });
+    res.json({ ok: true, ligas: rows, total: totalResult.rows[0].total, pagina, por_pagina: porPagina });
   } catch (err) {
     console.error('Error en GET /admin/ligas:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
