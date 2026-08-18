@@ -26,15 +26,26 @@ router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // subcategoria_id es opcional: si viene, filtra solo los equipos de esa
+    // subcategoría puntual (usado por la pantalla de "Gestionar equipos"
+    // cuando se entra desde una subcategoría); si no viene, trae TODOS los
+    // equipos de la categoría (vista general).
+    const params = [req.params.torneoId, req.params.categoriaId];
+    let filtroSub = '';
+    if (req.query.subcategoria_id) {
+      params.push(req.query.subcategoria_id);
+      filtroSub = ` AND et.subcategoria_id = $${params.length}`;
+    }
+
     const { rows } = await query(
       `SELECT et.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
               sub.nombre AS subcategoria_nombre
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
        LEFT JOIN categoria_subcategorias sub ON sub.id = et.subcategoria_id
-       WHERE et.torneo_id = $1 AND et.categoria_id = $2
+       WHERE et.torneo_id = $1 AND et.categoria_id = $2${filtroSub}
        ORDER BY c.nombre ASC`,
-      [req.params.torneoId, req.params.categoriaId]
+      params
     );
     res.json({ ok: true, equipos: rows });
   } catch (err) {
@@ -143,6 +154,12 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // Si la categoría tiene subcategorías, el fixture es siempre por
+    // subcategoría (los equipos ya pertenecen a una sola); subcategoria_id
+    // llega en la query string y filtra vía el equipo local (ambos equipos
+    // de un partido son siempre de la misma subcategoría).
+    const subcategoriaId = req.query.subcategoria_id || null;
+
     const { rows } = await query(
       `SELECT p.*, cl.id AS club_local_id, cv.id AS club_visitante_id,
               cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
@@ -168,9 +185,9 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
        LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
        LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
        LEFT JOIN tipos_cancha tcp ON tcp.id = cp.tipo_cancha_id
-       WHERE p.torneo_id = $1 AND p.categoria_id = $2
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
        ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
-      [req.params.torneoId, req.params.categoriaId]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
     const arbitrosResult = rows.length
@@ -189,8 +206,8 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     }));
 
     const jornadasResult = await query(
-      'SELECT jornada, descripcion FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2',
-      [req.params.torneoId, req.params.categoriaId]
+      'SELECT jornada, descripcion FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2 AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
     res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, jornadas: jornadasResult.rows });
@@ -204,24 +221,31 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 // guarda (o borra, si viene vacía) la descripción de una fecha del fixture
 // (ej: "Sábado 8 de Agosto" o "Semana del 1 al 8").
 router.put('/:torneoId/categorias/:categoriaId/jornadas/:jornada', async (req, res) => {
-  const { descripcion } = req.body;
+  const { descripcion, subcategoria_id } = req.body;
   const jornada = Number(req.params.jornada);
+  const subcategoriaId = subcategoria_id || null;
   if (!Number.isInteger(jornada)) return res.status(400).json({ ok: false, error: 'Jornada inválida' });
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // Borra la fila existente de esta (categoría, subcategoría, jornada) y,
+    // si corresponde, la vuelve a insertar — más simple que un ON CONFLICT
+    // sobre la combinación con subcategoria_id (que puede ser NULL).
+    await query(
+      'DELETE FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2 AND jornada = $3 AND subcategoria_id IS NOT DISTINCT FROM $4::uuid',
+      [req.params.torneoId, req.params.categoriaId, jornada, subcategoriaId]
+    );
+
     if (!descripcion || !descripcion.trim()) {
-      await query('DELETE FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2 AND jornada = $3', [req.params.torneoId, req.params.categoriaId, jornada]);
       return res.json({ ok: true, jornada: { jornada, descripcion: null } });
     }
 
     const { rows } = await query(
-      `INSERT INTO fixture_jornadas (torneo_id, categoria_id, jornada, descripcion)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (torneo_id, categoria_id, jornada) DO UPDATE SET descripcion = EXCLUDED.descripcion
+      `INSERT INTO fixture_jornadas (torneo_id, categoria_id, subcategoria_id, jornada, descripcion)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING jornada, descripcion`,
-      [req.params.torneoId, req.params.categoriaId, jornada, descripcion.trim()]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId, jornada, descripcion.trim()]
     );
     res.json({ ok: true, jornada: rows[0] });
   } catch (err) {
@@ -326,6 +350,21 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // Los dos equipos tienen que ser de la misma subcategoría (o ninguno
+    // tener subcategoría, si la categoría no las usa) — un equipo de "2018"
+    // no puede jugar contra uno de "2019".
+    const equiposCheck = await query(
+      'SELECT id, subcategoria_id FROM equipos_torneo WHERE id = ANY($1::uuid[]) AND torneo_id = $2 AND categoria_id = $3',
+      [[equipo_local_id, equipo_visitante_id], req.params.torneoId, req.params.categoriaId]
+    );
+    if (equiposCheck.rows.length !== 2) {
+      return res.status(400).json({ ok: false, error: 'Alguno de los equipos elegidos no pertenece a esta categoría' });
+    }
+    const subcategoriasEquipos = new Set(equiposCheck.rows.map((r) => r.subcategoria_id || null));
+    if (subcategoriasEquipos.size > 1) {
+      return res.status(400).json({ ok: false, error: 'Los dos equipos tienen que ser de la misma subcategoría' });
+    }
+
     // Validación manual: que ninguno de los dos equipos ya tenga un partido
     // programado en esa misma jornada (evita que un equipo juegue "dos veces"
     // en la misma fecha por error de carga).
@@ -369,25 +408,32 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 // del círculo) para todos los equipos inscriptos y activos de la categoría.
 // Rechaza si ya hay partidos cargados (hay que vaciar el fixture primero).
 router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, res) => {
-  const { ida_vuelta } = req.body;
+  const { ida_vuelta, subcategoria_id } = req.body;
+  const subcategoriaId = subcategoria_id || null;
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // Todo lo de acá abajo se restringe a los equipos de la subcategoría
+    // indicada (o a los que no tienen subcategoría, si la categoría no las
+    // usa) — así un fixture "Baby Fútbol A" con subcategorías 2018/2019/2020
+    // genera un round-robin propio para cada una, sin mezclar equipos.
     const existentes = await query(
-      'SELECT COUNT(*)::int AS cantidad FROM partidos WHERE torneo_id = $1 AND categoria_id = $2',
-      [req.params.torneoId, req.params.categoriaId]
+      `SELECT COUNT(*)::int AS cantidad FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     if (existentes.rows[0].cantidad > 0) {
       return res.status(409).json({
         ok: false,
-        error: 'Ya hay un fixture cargado para esta categoría. Borralo primero (botón "Vaciar fixture") si querés generar uno nuevo.'
+        error: 'Ya hay un fixture cargado para esta categoría/subcategoría. Borralo primero (botón "Vaciar fixture") si querés generar uno nuevo.'
       });
     }
 
     const equiposResult = await query(
-      'SELECT id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE',
-      [req.params.torneoId, req.params.categoriaId]
+      'SELECT id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     const equipoIds = equiposResult.rows.map((e) => e.id);
     if (equipoIds.length < 2) {
@@ -431,9 +477,13 @@ router.delete('/:torneoId/categorias/:categoriaId/fixture', async (req, res) => 
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    const subcategoriaId = req.query.subcategoria_id || null;
     const { rows } = await query(
-      `DELETE FROM partidos WHERE torneo_id = $1 AND categoria_id = $2 AND estado != 'jugado' RETURNING id`,
-      [req.params.torneoId, req.params.categoriaId]
+      `DELETE FROM partidos p USING equipos_torneo el
+       WHERE p.equipo_local_id = el.id AND p.torneo_id = $1 AND p.categoria_id = $2 AND p.estado != 'jugado'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       RETURNING p.id`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     res.json({ ok: true, borrados: rows.length });
   } catch (err) {
@@ -567,6 +617,7 @@ router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => 
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    const subcategoriaId = req.query.subcategoria_id || null;
     const { rows } = await query(
       `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre, SUM(e.goles)::int AS goles
        FROM partido_estadisticas_jugador e
@@ -574,11 +625,11 @@ router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => 
        JOIN jugadores j ON j.id = e.jugador_id
        JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
-       WHERE p.torneo_id = $1 AND p.categoria_id = $2
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $3::uuid
        GROUP BY j.id, j.nombre, j.apellido, c.nombre
        HAVING SUM(e.goles) > 0
        ORDER BY goles DESC, j.apellido ASC`,
-      [req.params.torneoId, req.params.categoriaId]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     res.json({ ok: true, goleadores: rows });
   } catch (err) {
@@ -593,6 +644,7 @@ router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    const subcategoriaId = req.query.subcategoria_id || null;
     const { rows } = await query(
       `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre,
               SUM(e.tarjetas_amarillas)::int AS tarjetas_amarillas, SUM(e.tarjetas_rojas)::int AS tarjetas_rojas
@@ -601,11 +653,11 @@ router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
        JOIN jugadores j ON j.id = e.jugador_id
        JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
-       WHERE p.torneo_id = $1 AND p.categoria_id = $2
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $3::uuid
        GROUP BY j.id, j.nombre, j.apellido, c.nombre
        HAVING SUM(e.tarjetas_amarillas) > 0 OR SUM(e.tarjetas_rojas) > 0
        ORDER BY tarjetas_rojas DESC, tarjetas_amarillas DESC, j.apellido ASC`,
-      [req.params.torneoId, req.params.categoriaId]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     res.json({ ok: true, tarjetas: rows });
   } catch (err) {
@@ -625,14 +677,15 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     // ronda: 'general' (default), o 'apertura'/'clausura' para torneos con
     // formato "Apertura y Clausura".
     const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
+    const subcategoriaId = req.query.subcategoria_id || null;
     const { rows } = await query(
       `SELECT tp.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
        FROM tabla_posiciones tp
        JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
-       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = $3
+       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = $3 AND et.subcategoria_id IS NOT DISTINCT FROM $4::uuid
        ORDER BY tp.puntos DESC, tp.diferencia DESC, tp.a_favor DESC`,
-      [req.params.torneoId, req.params.categoriaId, ronda]
+      [req.params.torneoId, req.params.categoriaId, ronda, subcategoriaId]
     );
     res.json({ ok: true, tabla: rows, formato_juego: contexto.formato_juego });
   } catch (err) {

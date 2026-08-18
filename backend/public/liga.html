@@ -636,36 +636,6 @@
           </div>
         </div>
 
-        <!-- Subcategorías de esta categoría (opcional): un nivel extra atado
-             a la categoría principal (ej: Primera / Reserva). Si tiene
-             subcategorías cargadas, los clubes se inscriben en una de ellas,
-             no en la categoría "pelada". -->
-        <div class="panel" style="background:var(--gris-100); margin-bottom:16px;">
-          <div class="panel-header"><h2 style="margin:0;">Subcategorías</h2></div>
-          <p class="texto-ayuda">Opcional. Si cargás alguna, los clubes se van a inscribir en una subcategoría puntual (ej: "Primera" o "Reserva"), no directamente en esta categoría.</p>
-          <table>
-            <thead><tr><th>Nombre</th><th>Precio de inscripción</th><th>Suma general</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaSubcategorias"><tr><td colspan="4">Cargando...</td></tr></tbody>
-          </table>
-          <form id="formSubcategoria" style="margin-top:10px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
-            <input type="hidden" id="subcategoriaIdEdicion">
-            <div style="flex:1;">
-              <label for="subcategoriaNombre">Nueva subcategoría</label>
-              <input type="text" id="subcategoriaNombre" placeholder="ej: Primera" required>
-            </div>
-            <div style="flex:1;">
-              <label for="subcategoriaPrecioInscripcion">Precio de inscripción</label>
-              <input type="number" id="subcategoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
-            </div>
-            <label class="check-inline" style="margin-bottom:8px;">
-              <input type="checkbox" id="subcategoriaSumaTablaGeneral" checked> Suma a la tabla general
-            </label>
-            <button type="submit" class="btn btn-pequeno">Agregar</button>
-            <button type="button" class="btn btn-secundario btn-pequeno oculto" id="btnCancelarSubcategoria">Cancelar edición</button>
-          </form>
-          <p class="mensaje-error oculto" id="subcategoriaFormError"></p>
-        </div>
-
         <div class="tabs">
           <button class="tab-btn activo" id="tabBtnFixture">Fixture</button>
           <button class="tab-btn" id="tabBtnTabla">Tabla de posiciones</button>
@@ -759,18 +729,57 @@
       </div>
     </div>
 
-    <!-- Gestionar equipos de una categoría: inscribir/dar de baja clubes.
-         Se abre encima de panelDetalleCategoria (que ya es un popup-modal),
-         por eso tiene su propio z-index más alto y su propio fondo. -->
+    <!-- Subcategorías de una categoría: pantalla intermedia que solo aparece
+         si la categoría tiene subcategorías cargadas (ej: 2018/2019/2020
+         dentro de "Baby Fútbol A"). Se abre encima de panelCategorias, y al
+         tocar una subcategoría se entra recién ahí al fixture/tabla/etc. -->
+    <div class="panel oculto" id="panelSubcategorias" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+      <div class="panel-header">
+        <h2 id="tituloSubcategorias">Subcategorías</h2>
+        <div>
+          <button class="btn btn-secundario" id="btnMostrarFormSubcategoria">+ Nueva Subcategoría</button>
+          <button class="btn btn-secundario" id="btnCerrarSubcategorias">Cerrar</button>
+        </div>
+      </div>
+
+      <form id="formSubcategoria" class="oculto">
+        <input type="hidden" id="subcategoriaIdEdicion">
+        <div class="form-grid">
+          <div>
+            <label for="subcategoriaNombre">Nombre *</label>
+            <input type="text" id="subcategoriaNombre" placeholder="ej: 2018" required>
+          </div>
+          <div>
+            <label for="subcategoriaPrecioInscripcion">Precio de inscripción</label>
+            <input type="number" id="subcategoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
+          </div>
+        </div>
+        <label class="check-inline" style="margin:8px 0;">
+          <input type="checkbox" id="subcategoriaSumaTablaGeneral" checked> Suma a la tabla general del torneo
+        </label>
+        <button type="submit" class="btn">Guardar</button>
+        <button type="button" class="btn btn-secundario" id="btnCancelarFormSubcategoria">Cancelar</button>
+        <p class="mensaje-error oculto" id="subcategoriaFormError"></p>
+      </form>
+
+      <div id="gridSubcategorias" class="grid-botones-grandes">
+        <p class="texto-ayuda">Cargando...</p>
+      </div>
+    </div>
+    <div class="oculto" id="fondoModalSubcategorias" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
+
+    <!-- Gestionar equipos de una categoría/subcategoría: inscribir/dar de
+         baja clubes. Se abre encima de panelDetalleCategoria (que ya es un
+         popup-modal), por eso tiene su propio z-index más alto y su propio
+         fondo. -->
     <div class="panel oculto" id="panelGestionarEquipos" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
       <div class="panel-header">
-        <h2>Gestionar equipos</h2>
+        <h2 id="tituloGestionarEquipos">Gestionar equipos</h2>
         <button class="btn btn-secundario" id="btnCerrarGestionarEquipos">Cerrar</button>
       </div>
       <label for="selectClubInscribir">Inscribir club(es) — mantené Ctrl (o Cmd) apretado para elegir varios</label>
       <div style="display:flex; gap:8px; margin-bottom:16px;">
         <select id="selectClubInscribir" multiple size="4" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
-        <select id="selectSubcategoriaInscribir" class="oculto" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
         <button class="btn" id="btnInscribirClub">Inscribir</button>
       </div>
       <p class="mensaje-error oculto" id="equipoFormError"></p>
