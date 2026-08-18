@@ -109,6 +109,32 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
   }
 });
 
+// DELETE /liga/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoId —
+// da de baja a un club de la categoría. Se borran en cascada sus partidos y
+// su fila de tabla de posiciones (el resto del fixture no se re-numera).
+router.delete('/:torneoId/categorias/:categoriaId/equipos/:equipoId', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+
+    const { rowCount } = await query(
+      'DELETE FROM equipos_torneo WHERE id = $1 AND torneo_id = $2 AND categoria_id = $3',
+      [req.params.equipoId, req.params.torneoId, req.params.categoriaId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Equipo no encontrado en esa categoría' });
+
+    // Los partidos y la fila de tabla del equipo borrado ya se fueron en
+    // cascada; recalculamos para que los rivales que le habían ganado/perdido
+    // no arrastren esos resultados en su tabla.
+    await recalcularTablaPosiciones(req.params.torneoId, req.params.categoriaId);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE equipo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // ===== PARTIDOS (fixture) =====
 
 // GET /liga/torneos/:torneoId/categorias/:categoriaId/partidos
@@ -122,7 +148,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
               cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
               cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color,
               cl.logo_url AS club_local_logo_url, cv.logo_url AS club_visitante_logo_url,
-              cl.direccion AS club_local_direccion,
+              COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
               COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
               COALESCE(ccSel.tamanio, ccl.tamanio) AS club_local_cancha_tamanio,
               COALESCE(tcSel.nombre, tcl.nombre) AS club_local_cancha_tipo_nombre,
