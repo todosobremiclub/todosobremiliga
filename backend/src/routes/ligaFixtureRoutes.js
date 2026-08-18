@@ -118,12 +118,15 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const { rows } = await query(
-      `SELECT p.*, cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
+      `SELECT p.*, cl.id AS club_local_id, cv.id AS club_visitante_id,
+              cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
               cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color,
               cl.logo_url AS club_local_logo_url, cv.logo_url AS club_visitante_logo_url,
               cl.direccion AS club_local_direccion,
-              ccl.tipo_techo AS club_local_cancha_techo, ccl.tamanio AS club_local_cancha_tamanio,
-              tcl.nombre AS club_local_cancha_tipo_nombre,
+              COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
+              COALESCE(ccSel.tamanio, ccl.tamanio) AS club_local_cancha_tamanio,
+              COALESCE(tcSel.nombre, tcl.nombre) AS club_local_cancha_tipo_nombre,
+              COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
               pr.nombre AS predio_nombre, cp.nombre AS cancha_predio_nombre,
               cp.tipo_techo AS cancha_predio_techo, cp.tamanio AS cancha_predio_tamanio,
               tcp.nombre AS cancha_predio_tipo_nombre
@@ -134,6 +137,8 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
        JOIN clubes cv ON cv.id = ev.club_id
        LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
        LEFT JOIN tipos_cancha tcl ON tcl.id = ccl.tipo_cancha_id
+       LEFT JOIN clubes_canchas ccSel ON ccSel.id = p.cancha_club_id
+       LEFT JOIN tipos_cancha tcSel ON tcSel.id = ccSel.tipo_cancha_id
        LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
        LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
        LEFT JOIN tipos_cancha tcp ON tcp.id = cp.tipo_cancha_id
@@ -141,9 +146,94 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
        ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId]
     );
-    res.json({ ok: true, partidos: rows, cancha_juego: contexto.cancha_juego });
+
+    const arbitrosResult = rows.length
+      ? await query(
+          `SELECT pa.partido_id, a.id, a.nombre, a.apellido, a.tipo
+           FROM partido_arbitros pa
+           JOIN arbitros_liga a ON a.id = pa.arbitro_id
+           WHERE pa.partido_id = ANY($1::uuid[])
+           ORDER BY a.apellido ASC, a.nombre ASC`,
+          [rows.map((p) => p.id)]
+        )
+      : { rows: [] };
+    const partidos = rows.map((p) => ({
+      ...p,
+      arbitros: arbitrosResult.rows.filter((a) => a.partido_id === p.id).map((a) => ({ id: a.id, nombre: a.nombre, apellido: a.apellido, tipo: a.tipo }))
+    }));
+
+    const jornadasResult = await query(
+      'SELECT jornada, descripcion FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2',
+      [req.params.torneoId, req.params.categoriaId]
+    );
+
+    res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, jornadas: jornadasResult.rows });
   } catch (err) {
     console.error('Error en GET partidos:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/torneos/:torneoId/categorias/:categoriaId/jornadas/:jornada —
+// guarda (o borra, si viene vacía) la descripción de una fecha del fixture
+// (ej: "Sábado 8 de Agosto" o "Semana del 1 al 8").
+router.put('/:torneoId/categorias/:categoriaId/jornadas/:jornada', async (req, res) => {
+  const { descripcion } = req.body;
+  const jornada = Number(req.params.jornada);
+  if (!Number.isInteger(jornada)) return res.status(400).json({ ok: false, error: 'Jornada inválida' });
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+
+    if (!descripcion || !descripcion.trim()) {
+      await query('DELETE FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2 AND jornada = $3', [req.params.torneoId, req.params.categoriaId, jornada]);
+      return res.json({ ok: true, jornada: { jornada, descripcion: null } });
+    }
+
+    const { rows } = await query(
+      `INSERT INTO fixture_jornadas (torneo_id, categoria_id, jornada, descripcion)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (torneo_id, categoria_id, jornada) DO UPDATE SET descripcion = EXCLUDED.descripcion
+       RETURNING jornada, descripcion`,
+      [req.params.torneoId, req.params.categoriaId, jornada, descripcion.trim()]
+    );
+    res.json({ ok: true, jornada: rows[0] });
+  } catch (err) {
+    console.error('Error en PUT jornada descripcion:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId/arbitros
+// — reemplaza por completo el/los árbitro(s) asignados a un partido
+// (body: { arbitro_ids: [] }), tomados del listado de Configuración → Árbitros.
+router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/arbitros', async (req, res) => {
+  const { arbitro_ids } = req.body;
+  if (!Array.isArray(arbitro_ids)) {
+    return res.status(400).json({ ok: false, error: 'Falta arbitro_ids (array)' });
+  }
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+
+    const partidoOk = await query(
+      'SELECT 1 FROM partidos WHERE id = $1 AND torneo_id = $2 AND categoria_id = $3',
+      [req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    if (!partidoOk.rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+
+    const validosResult = arbitro_ids.length
+      ? await query('SELECT id FROM arbitros_liga WHERE liga_id = $1 AND id = ANY($2::uuid[])', [req.ligaId, arbitro_ids])
+      : { rows: [] };
+    const idsValidos = validosResult.rows.map((r) => r.id);
+
+    await query('DELETE FROM partido_arbitros WHERE partido_id = $1', [req.params.partidoId]);
+    for (const arbitroId of idsValidos) {
+      await query('INSERT INTO partido_arbitros (partido_id, arbitro_id) VALUES ($1, $2)', [req.params.partidoId, arbitroId]);
+    }
+    res.json({ ok: true, guardados: idsValidos.length });
+  } catch (err) {
+    console.error('Error en PUT partido arbitros:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
@@ -152,7 +242,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 // edición rápida de fecha/hora y de dónde se juega (cancha propia de la Liga
 // o, si el torneo es "canchas de los clubes", simplemente la sede en texto).
 router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (req, res) => {
-  const { fecha, hora, sede, cancha_predio_id } = req.body;
+  const { fecha, hora, sede, cancha_predio_id, cancha_club_id } = req.body;
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
@@ -166,13 +256,25 @@ router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (re
       if (!canchaOk.rows[0]) return res.status(400).json({ ok: false, error: 'Esa cancha no pertenece a tu Liga' });
     }
 
+    if (cancha_club_id) {
+      // La cancha elegida tiene que ser del club LOCAL de este mismo partido.
+      const canchaOk = await query(
+        `SELECT 1 FROM clubes_canchas cc
+         JOIN equipos_torneo et ON et.club_id = cc.club_id
+         JOIN partidos p ON p.equipo_local_id = et.id
+         WHERE cc.id = $1 AND p.id = $2`,
+        [cancha_club_id, req.params.partidoId]
+      );
+      if (!canchaOk.rows[0]) return res.status(400).json({ ok: false, error: 'Esa cancha no pertenece al club local de este partido' });
+    }
+
     const { rows } = await query(
       `UPDATE partidos SET
          fecha = $1, hora = $2, sede = COALESCE($3, sede), cancha_predio_id = $4,
-         actualizado_at = NOW()
-       WHERE id = $5 AND torneo_id = $6 AND categoria_id = $7
+         cancha_club_id = $5, actualizado_at = NOW()
+       WHERE id = $6 AND torneo_id = $7 AND categoria_id = $8
        RETURNING *`,
-      [fecha || null, hora || null, sede, cancha_predio_id || null,
+      [fecha || null, hora || null, sede, cancha_predio_id || null, cancha_club_id || null,
        req.params.partidoId, req.params.torneoId, req.params.categoriaId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });

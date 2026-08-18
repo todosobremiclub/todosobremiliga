@@ -443,4 +443,74 @@ router.delete('/predios/:predioId/canchas/:canchaId', async (req, res) => {
   }
 });
 
+// ===================== ÁRBITROS DE LA LIGA =====================
+
+router.get('/arbitros', async (req, res) => {
+  try {
+    const { rows } = await query(
+      'SELECT * FROM arbitros_liga WHERE liga_id = $1 ORDER BY apellido ASC, nombre ASC',
+      [req.ligaId]
+    );
+    res.json({ ok: true, arbitros: rows });
+  } catch (err) {
+    console.error('Error en GET /liga/configuracion/arbitros:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+const TIPOS_ARBITRO_VALIDOS = ['arbitro', 'juez_linea', 'ambos'];
+
+router.post('/arbitros', async (req, res) => {
+  const { nombre, apellido, telefono, tipo } = req.body;
+  if (!nombre || !nombre.trim() || !apellido || !apellido.trim()) {
+    return res.status(400).json({ ok: false, error: 'Falta el nombre o el apellido' });
+  }
+  if (tipo && !TIPOS_ARBITRO_VALIDOS.includes(tipo)) {
+    return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_ARBITRO_VALIDOS.join(', ')}` });
+  }
+  try {
+    const { rows } = await query(
+      `INSERT INTO arbitros_liga (liga_id, nombre, apellido, telefono, tipo)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [req.ligaId, nombre.trim(), apellido.trim(), telefono || null, tipo || 'arbitro']
+    );
+    res.status(201).json({ ok: true, arbitro: rows[0] });
+  } catch (err) {
+    console.error('Error en POST /liga/configuracion/arbitros:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+router.put('/arbitros/:id', async (req, res) => {
+  const { nombre, apellido, telefono, tipo, activo } = req.body;
+  if (tipo && !TIPOS_ARBITRO_VALIDOS.includes(tipo)) {
+    return res.status(400).json({ ok: false, error: `Tipo inválido. Válidos: ${TIPOS_ARBITRO_VALIDOS.join(', ')}` });
+  }
+  try {
+    const { rows } = await query(
+      `UPDATE arbitros_liga SET
+         nombre = COALESCE($1, nombre), apellido = COALESCE($2, apellido),
+         telefono = $3, tipo = COALESCE($4, tipo), activo = COALESCE($5, activo)
+       WHERE id = $6 AND liga_id = $7 RETURNING *`,
+      [nombre ? nombre.trim() : null, apellido ? apellido.trim() : null, telefono || null, tipo || null, activo, req.params.id, req.ligaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'No encontrado en tu Liga' });
+    res.json({ ok: true, arbitro: rows[0] });
+  } catch (err) {
+    console.error('Error en PUT /liga/configuracion/arbitros/:id:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+router.delete('/arbitros/:id', async (req, res) => {
+  try {
+    const { rows } = await query('DELETE FROM arbitros_liga WHERE id = $1 AND liga_id = $2 RETURNING id', [req.params.id, req.ligaId]);
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'No encontrado en tu Liga' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /liga/configuracion/arbitros/:id:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 module.exports = router;

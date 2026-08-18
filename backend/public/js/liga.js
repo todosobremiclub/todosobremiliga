@@ -37,6 +37,9 @@ let prediosLigaCache = [];
 let predioActualId = null;
 let canchasPredioCache = [];
 let jornadaFixtureActual = 1;
+let arbitrosLigaCache = [];
+let canchasClubFixtureCache = {};
+let jornadasDescripcionCache = {};
 
 function torneoActualEsAperturaClausura() {
   const t = torneosCache.find((x) => x.id === torneoActualId);
@@ -352,6 +355,7 @@ function conectarEventos() {
 
   document.getElementById('btnJornadaAnterior').addEventListener('click', () => cambiarJornadaFixture(-1));
   document.getElementById('btnJornadaSiguiente').addEventListener('click', () => cambiarJornadaFixture(1));
+  document.getElementById('btnGuardarDescripcionJornada').addEventListener('click', guardarDescripcionJornada);
 
   document.getElementById('btnInscribirClub').addEventListener('click', inscribirClub);
   document.getElementById('formSubcategoria').addEventListener('submit', guardarSubcategoria);
@@ -450,6 +454,7 @@ function conectarEventos() {
   document.getElementById('tabBtnConfigCuentas').addEventListener('click', () => cambiarTabConfig('cuentas'));
   document.getElementById('tabBtnConfigTiposCancha').addEventListener('click', () => cambiarTabConfig('tiposCancha'));
   document.getElementById('tabBtnConfigPredios').addEventListener('click', () => cambiarTabConfig('predios'));
+  document.getElementById('tabBtnConfigArbitros').addEventListener('click', () => cambiarTabConfig('arbitros'));
 
   document.getElementById('btnMostrarFormModalidad').addEventListener('click', () => {
     document.getElementById('formModalidad').reset();
@@ -520,6 +525,17 @@ function conectarEventos() {
   document.getElementById('btnCerrarCanchasPredio').addEventListener('click', cerrarCanchasPredio);
   document.getElementById('formCanchaPredio').addEventListener('submit', guardarCanchaPredio);
   document.getElementById('btnCancelarCanchaPredio').addEventListener('click', limpiarFormCanchaPredio);
+
+  document.getElementById('btnMostrarFormArbitro').addEventListener('click', () => {
+    document.getElementById('formArbitro').reset();
+    document.getElementById('arbitroIdEdicion').value = '';
+    document.getElementById('arbitroFormError').classList.add('oculto');
+    document.getElementById('formArbitro').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormArbitro').addEventListener('click', () => {
+    document.getElementById('formArbitro').classList.add('oculto');
+  });
+  document.getElementById('formArbitro').addEventListener('submit', guardarArbitro);
 }
 
 function cambiarTab(nombre) {
@@ -558,12 +574,12 @@ function cambiarTabConfig(nombre) {
   const secciones = {
     modalidades: 'subConfigModalidades', tiposGasto: 'subConfigTiposGasto',
     tiposIngreso: 'subConfigTiposIngreso', cuentas: 'subConfigCuentas',
-    tiposCancha: 'subConfigTiposCancha', predios: 'subConfigPredios'
+    tiposCancha: 'subConfigTiposCancha', predios: 'subConfigPredios', arbitros: 'subConfigArbitros'
   };
   const botones = {
     modalidades: 'tabBtnConfigModalidades', tiposGasto: 'tabBtnConfigTiposGasto',
     tiposIngreso: 'tabBtnConfigTiposIngreso', cuentas: 'tabBtnConfigCuentas',
-    tiposCancha: 'tabBtnConfigTiposCancha', predios: 'tabBtnConfigPredios'
+    tiposCancha: 'tabBtnConfigTiposCancha', predios: 'tabBtnConfigPredios', arbitros: 'tabBtnConfigArbitros'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -575,6 +591,7 @@ function cambiarTabConfig(nombre) {
   if (nombre === 'cuentas') cargarCuentas();
   if (nombre === 'tiposCancha') cargarTiposCancha();
   if (nombre === 'predios') cargarPredios();
+  if (nombre === 'arbitros') cargarArbitros();
 }
 
 // ----- Categorías de torneo (modalidades) -----
@@ -1105,6 +1122,81 @@ async function eliminarCanchaPredio(canchaId) {
     renderTablaCanchasPredio();
   } catch (err) {
     alert('Error: ' + err.message);
+  }
+}
+
+// ----- Árbitros de la Liga -----
+
+const NOMBRES_TIPO_ARBITRO = { arbitro: 'Árbitro', juez_linea: 'Juez de línea', ambos: 'Ambos' };
+
+async function cargarArbitros() {
+  const tbody = document.getElementById('tablaArbitros');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/arbitros');
+    arbitrosLigaCache = data.arbitros;
+    tbody.innerHTML = arbitrosLigaCache.length ? arbitrosLigaCache.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.apellido)}, ${escapeHtml(a.nombre)}</td>
+        <td>${escapeHtml(a.telefono || '-')}</td>
+        <td>${escapeHtml(NOMBRES_TIPO_ARBITRO[a.tipo] || a.tipo)}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarArbitro('${a.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarArbitro('${a.id}', '${escapeHtml(a.apellido)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="4">Todavía no cargaste árbitros.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarArbitro(id) {
+  const a = arbitrosLigaCache.find((x) => x.id === id);
+  if (!a) return;
+  document.getElementById('arbitroIdEdicion').value = a.id;
+  document.getElementById('arbitroNombre').value = a.nombre || '';
+  document.getElementById('arbitroApellido').value = a.apellido || '';
+  document.getElementById('arbitroTelefono').value = a.telefono || '';
+  document.getElementById('arbitroTipo').value = a.tipo || 'arbitro';
+  document.getElementById('arbitroFormError').classList.add('oculto');
+  document.getElementById('formArbitro').classList.remove('oculto');
+}
+
+async function eliminarArbitro(id, apellido) {
+  if (!confirm(`¿Eliminar al árbitro "${apellido}"?`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/arbitros/${id}`, { method: 'DELETE' });
+    cargarArbitros();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarArbitro(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('arbitroFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('arbitroIdEdicion').value;
+  const cuerpo = {
+    nombre: document.getElementById('arbitroNombre').value.trim(),
+    apellido: document.getElementById('arbitroApellido').value.trim(),
+    telefono: document.getElementById('arbitroTelefono').value.trim() || undefined,
+    tipo: document.getElementById('arbitroTipo').value
+  };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/arbitros/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/arbitros', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formArbitro').reset();
+    document.getElementById('arbitroIdEdicion').value = '';
+    document.getElementById('formArbitro').classList.add('oculto');
+    cargarArbitros();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
   }
 }
 
@@ -2774,10 +2866,21 @@ async function cargarPartidos() {
   document.getElementById('partidoLocal').innerHTML = opcionesEquipos;
   document.getElementById('partidoVisitante').innerHTML = opcionesEquipos;
 
+  if (!arbitrosLigaCache.length) {
+    try {
+      const dataArbitros = await apiFetch('/liga/configuracion/arbitros');
+      arbitrosLigaCache = dataArbitros.arbitros;
+    } catch (err) {
+      // seguimos igual; el select de árbitros va a quedar vacío
+    }
+  }
+
   try {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos`);
     partidosCache = data.partidos;
     fixtureCanchaJuegoActual = data.cancha_juego || 'clubes';
+    jornadasDescripcionCache = {};
+    (data.jornadas || []).forEach((j) => { jornadasDescripcionCache[j.jornada] = j.descripcion; });
 
     if (fixtureCanchaJuegoActual === 'propias_liga' && !prediosLigaCache.length) {
       try {
@@ -2788,13 +2891,28 @@ async function cargarPartidos() {
       }
     }
 
+    if (fixtureCanchaJuegoActual === 'clubes') {
+      const clubIdsLocal = Array.from(new Set(partidosCache.map((p) => p.club_local_id).filter(Boolean)));
+      await Promise.all(clubIdsLocal.map(async (clubId) => {
+        if (canchasClubFixtureCache[clubId]) return;
+        try {
+          const dataCanchas = await apiFetch(`/liga/clubes/${clubId}/canchas`);
+          canchasClubFixtureCache[clubId] = dataCanchas.canchas;
+        } catch (err) {
+          canchasClubFixtureCache[clubId] = [];
+        }
+      }));
+    }
+
     if (!partidosCache.length) {
       document.getElementById('navegadorJornadas').classList.add('oculto');
+      document.getElementById('bloqueDescripcionJornada').classList.add('oculto');
       contenedor.innerHTML = '<p class="texto-ayuda">Todavía no hay partidos programados.</p>';
       return;
     }
 
     document.getElementById('navegadorJornadas').classList.remove('oculto');
+    document.getElementById('bloqueDescripcionJornada').classList.remove('oculto');
     const jornadasDisponibles = Array.from(new Set(partidosCache.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
     if (!jornadasDisponibles.includes(jornadaFixtureActual)) {
       jornadaFixtureActual = jornadasDisponibles[0];
@@ -2802,7 +2920,21 @@ async function cargarPartidos() {
     renderJornadaFixture(jornadasDisponibles);
   } catch (err) {
     document.getElementById('navegadorJornadas').classList.add('oculto');
+    document.getElementById('bloqueDescripcionJornada').classList.add('oculto');
     contenedor.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function guardarDescripcionJornada() {
+  const valor = document.getElementById('inputDescripcionJornada').value.trim();
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/jornadas/${jornadaFixtureActual}`, {
+      method: 'PUT',
+      body: JSON.stringify({ descripcion: valor || undefined })
+    });
+    jornadasDescripcionCache[jornadaFixtureActual] = valor || null;
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
@@ -2837,6 +2969,7 @@ function renderJornadaFixture(jornadasDisponibles) {
 
   document.getElementById('btnJornadaAnterior').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === 0;
   document.getElementById('btnJornadaSiguiente').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === jornadasDisponibles.length - 1;
+  document.getElementById('inputDescripcionJornada').value = jornadasDescripcionCache[jornadaFixtureActual] || '';
 
   contenedor.innerHTML = partidosJornada.map((p) => {
     const logoLocal = p.club_local_logo_url
@@ -2856,13 +2989,44 @@ function renderJornadaFixture(jornadasDisponibles) {
           </select>
         </div>`;
     } else {
-      const detalles = [];
-      if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
-      if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
-      if (p.club_local_cancha_tamanio) detalles.push(escapeHtml(p.club_local_cancha_tamanio));
-      if (p.club_local_cancha_tipo_nombre) detalles.push(escapeHtml(p.club_local_cancha_tipo_nombre));
-      bloqueCancha = `<div><label style="font-size:12px;">Cancha (del local)</label><p class="texto-ayuda" style="margin:2px 0;">${detalles.length ? detalles.join(' · ') : 'Sin datos de cancha cargados'}</p></div>`;
+      const canchasClub = canchasClubFixtureCache[p.club_local_id] || [];
+      if (canchasClub.length > 1) {
+        // El club local tiene más de una cancha: por defecto la principal,
+        // pero se puede elegir otra puntualmente para este partido.
+        const seleccionada = p.cancha_club_id || (canchasClub.find((c) => c.es_principal) || {}).id || '';
+        const opciones = canchasClub.map((c) => {
+          const etiqueta = `${escapeHtml(c.nombre || 'Cancha')}${c.es_principal ? ' (Principal)' : ''}`;
+          return `<option value="${c.id}" ${c.id === seleccionada ? 'selected' : ''}>${etiqueta}</option>`;
+        }).join('');
+        bloqueCancha = `
+          <div>
+            <label style="font-size:12px;">Cancha del local</label>
+            <select data-partido-id="${p.id}" class="select-cancha-club-partido" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+              ${opciones}
+            </select>
+          </div>`;
+      } else {
+        const detalles = [];
+        if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
+        if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
+        if (p.club_local_cancha_tamanio) detalles.push(escapeHtml(p.club_local_cancha_tamanio));
+        if (p.club_local_cancha_tipo_nombre) detalles.push(escapeHtml(p.club_local_cancha_tipo_nombre));
+        bloqueCancha = `<div><label style="font-size:12px;">Cancha (del local)</label><p class="texto-ayuda" style="margin:2px 0;">${detalles.length ? detalles.join(' · ') : 'Sin datos de cancha cargados'}</p></div>`;
+      }
     }
+
+    const arbitroIdsAsignados = new Set((p.arbitros || []).map((a) => a.id));
+    const opcionesArbitros = arbitrosLigaCache.map((a) =>
+      `<option value="${a.id}" ${arbitroIdsAsignados.has(a.id) ? 'selected' : ''}>${escapeHtml(a.apellido)}, ${escapeHtml(a.nombre)} (${escapeHtml(NOMBRES_TIPO_ARBITRO[a.tipo] || a.tipo)})</option>`
+    ).join('');
+    const bloqueArbitros = `
+      <div>
+        <label style="font-size:12px;">Árbitro(s)</label>
+        <select data-partido-id="${p.id}" class="select-arbitros-partido" multiple size="3" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+          ${opcionesArbitros}
+        </select>
+        ${!arbitrosLigaCache.length ? '<p class="texto-ayuda" style="margin:2px 0;">Cargá árbitros en Configuración → Árbitros.</p>' : ''}
+      </div>`;
 
     return `
       <div class="panel" style="margin-bottom:12px;">
@@ -2885,8 +3049,9 @@ function renderJornadaFixture(jornadasDisponibles) {
             <input type="time" class="input-hora-partido" data-partido-id="${p.id}" value="${p.hora ? String(p.hora).slice(0, 5) : ''}" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
           </div>
           ${bloqueCancha}
+          ${bloqueArbitros}
         </div>
-        <button class="btn btn-secundario btn-pequeno" style="margin-top:8px;" onclick="guardarProgramacionPartido('${p.id}')">Guardar día/horario/cancha</button>
+        <button class="btn btn-secundario btn-pequeno" style="margin-top:8px;" onclick="guardarProgramacionPartido('${p.id}')">Guardar día/horario/cancha/árbitros</button>
         <p class="mensaje-error oculto" id="errorProgramacion-${p.id}"></p>
       </div>
     `;
@@ -2898,17 +3063,27 @@ async function guardarProgramacionPartido(partidoId) {
   if (errorEl) errorEl.classList.add('oculto');
   const fechaEl = document.querySelector(`.input-fecha-partido[data-partido-id="${partidoId}"]`);
   const horaEl = document.querySelector(`.input-hora-partido[data-partido-id="${partidoId}"]`);
-  const canchaEl = document.querySelector(`.select-cancha-predio-partido[data-partido-id="${partidoId}"]`);
+  const canchaPredioEl = document.querySelector(`.select-cancha-predio-partido[data-partido-id="${partidoId}"]`);
+  const canchaClubEl = document.querySelector(`.select-cancha-club-partido[data-partido-id="${partidoId}"]`);
+  const arbitrosEl = document.querySelector(`.select-arbitros-partido[data-partido-id="${partidoId}"]`);
   const cuerpo = {
     fecha: fechaEl && fechaEl.value ? fechaEl.value : undefined,
     hora: horaEl && horaEl.value ? horaEl.value : undefined,
-    cancha_predio_id: canchaEl ? (canchaEl.value || null) : undefined
+    cancha_predio_id: canchaPredioEl ? (canchaPredioEl.value || null) : undefined,
+    cancha_club_id: canchaClubEl ? (canchaClubEl.value || null) : undefined
   };
   try {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}`, {
       method: 'PATCH',
       body: JSON.stringify(cuerpo)
     });
+    if (arbitrosEl) {
+      const arbitroIds = Array.from(arbitrosEl.selectedOptions).map((o) => o.value);
+      await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}/arbitros`, {
+        method: 'PUT',
+        body: JSON.stringify({ arbitro_ids: arbitroIds })
+      });
+    }
     cargarPartidos();
   } catch (err) {
     if (errorEl) {
