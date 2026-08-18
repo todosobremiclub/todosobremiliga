@@ -100,10 +100,12 @@ router.get('/', async (req, res) => {
     const { rows } = await query(
       `SELECT c.*, cl.id AS membresia_id, cl.activo AS activo_en_liga, cl.fecha_alta,
               cc.tipo_techo AS cancha_tipo_techo, cc.tamanio AS cancha_tamanio, cc.piso AS cancha_piso,
+              cc.tipo_cancha_id AS cancha_tipo_cancha_id, tc.nombre AS cancha_tipo_cancha_nombre,
               cc.cancha_reglamentaria AS cancha_reglamentaria
        FROM club_liga cl
        JOIN clubes c ON c.id = cl.club_id
        LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
+       LEFT JOIN tipos_cancha tc ON tc.id = cc.tipo_cancha_id
        WHERE cl.liga_id = $1${filtros}${filtroCancha}
        ORDER BY ${columnaOrden} ${direccionOrden} NULLS LAST
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -143,11 +145,11 @@ router.get('/filtros-disponibles', async (req, res) => {
 });
 
 // Crea la cancha "principal" de un club recién creado (siempre existe una).
-async function crearCanchaPrincipal(client, clubId, { tipo_techo, tamanio, piso, reglamentaria }) {
+async function crearCanchaPrincipal(client, clubId, { tipo_techo, tamanio, piso, tipo_cancha_id, reglamentaria }) {
   await client.query(
-    `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, cancha_reglamentaria, es_principal, orden)
-     VALUES ($1, 'Cancha principal', $2, $3, $4, $5, TRUE, 0)`,
-    [clubId, (tipo_techo === 'techada' ? 'techada' : 'aire_libre'), tamanio || null, piso || null, !!reglamentaria]
+    `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, tipo_cancha_id, cancha_reglamentaria, es_principal, orden)
+     VALUES ($1, 'Cancha principal', $2, $3, $4, $5, $6, TRUE, 0)`,
+    [clubId, (tipo_techo === 'techada' ? 'techada' : 'aire_libre'), tamanio || null, piso || null, tipo_cancha_id || null, !!reglamentaria]
   );
 }
 
@@ -244,7 +246,7 @@ router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
     email_contacto, color_primario, color_secundario, ciudad, provincia,
-    cancha_tipo_techo, cancha_tamanio, cancha_piso, cancha_reglamentaria
+    cancha_tipo_techo, cancha_tamanio, cancha_piso, cancha_tipo_cancha_id, cancha_reglamentaria
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -275,7 +277,8 @@ router.post('/', async (req, res) => {
     );
 
     await crearCanchaPrincipal(client, club.id, {
-      tipo_techo: cancha_tipo_techo, tamanio: cancha_tamanio, piso: cancha_piso, reglamentaria: cancha_reglamentaria
+      tipo_techo: cancha_tipo_techo, tamanio: cancha_tamanio, piso: cancha_piso,
+      tipo_cancha_id: cancha_tipo_cancha_id, reglamentaria: cancha_reglamentaria
     });
 
     await client.query('COMMIT');
@@ -303,7 +306,7 @@ router.put('/:clubId', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,
     email_contacto, color_primario, color_secundario, ciudad, provincia,
-    cancha_tipo_techo, cancha_tamanio, cancha_piso, cancha_reglamentaria
+    cancha_tipo_techo, cancha_tamanio, cancha_piso, cancha_tipo_cancha_id, cancha_reglamentaria
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -339,21 +342,23 @@ router.put('/:clubId', async (req, res) => {
 
     // Actualiza (o crea, si es un club viejo que todavía no tenía) la cancha
     // principal con los datos del formulario.
-    if (cancha_tipo_techo || cancha_tamanio || cancha_piso || cancha_reglamentaria !== undefined) {
+    if (cancha_tipo_techo || cancha_tamanio || cancha_piso || cancha_tipo_cancha_id || cancha_reglamentaria !== undefined) {
       const existente = await query(
         'SELECT id FROM clubes_canchas WHERE club_id = $1 AND es_principal = TRUE',
         [req.params.clubId]
       );
       if (existente.rows[0]) {
         await query(
-          `UPDATE clubes_canchas SET tipo_techo = $1, tamanio = $2, piso = $3, cancha_reglamentaria = $4 WHERE id = $5`,
-          [cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null, !!cancha_reglamentaria, existente.rows[0].id]
+          `UPDATE clubes_canchas SET tipo_techo = $1, tamanio = $2, piso = $3, tipo_cancha_id = $4, cancha_reglamentaria = $5 WHERE id = $6`,
+          [cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null,
+           cancha_tipo_cancha_id || null, !!cancha_reglamentaria, existente.rows[0].id]
         );
       } else {
         await query(
-          `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, cancha_reglamentaria, es_principal, orden)
-           VALUES ($1, 'Cancha principal', $2, $3, $4, $5, TRUE, 0)`,
-          [req.params.clubId, cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null, !!cancha_reglamentaria]
+          `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, tipo_cancha_id, cancha_reglamentaria, es_principal, orden)
+           VALUES ($1, 'Cancha principal', $2, $3, $4, $5, $6, TRUE, 0)`,
+          [req.params.clubId, cancha_tipo_techo === 'techada' ? 'techada' : 'aire_libre', cancha_tamanio || null, cancha_piso || null,
+           cancha_tipo_cancha_id || null, !!cancha_reglamentaria]
         );
       }
     }
@@ -430,7 +435,9 @@ router.get('/:clubId/canchas', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
     }
     const { rows } = await query(
-      'SELECT * FROM clubes_canchas WHERE club_id = $1 ORDER BY es_principal DESC, orden ASC, creado_at ASC',
+      `SELECT cc.*, tc.nombre AS tipo_cancha_nombre
+       FROM clubes_canchas cc LEFT JOIN tipos_cancha tc ON tc.id = cc.tipo_cancha_id
+       WHERE cc.club_id = $1 ORDER BY cc.es_principal DESC, cc.orden ASC, cc.creado_at ASC`,
       [req.params.clubId]
     );
     res.json({ ok: true, canchas: rows });
@@ -442,7 +449,7 @@ router.get('/:clubId/canchas', async (req, res) => {
 
 // POST /liga/clubes/:clubId/canchas — agrega una cancha SECUNDARIA
 router.post('/:clubId/canchas', async (req, res) => {
-  const { nombre, tipo_techo, tamanio, piso } = req.body;
+  const { nombre, tipo_techo, tamanio, tipo_cancha_id } = req.body;
   try {
     const pertenece = await query(
       'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
@@ -452,11 +459,11 @@ router.post('/:clubId/canchas', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
     }
     const { rows } = await query(
-      `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, piso, es_principal, orden)
+      `INSERT INTO clubes_canchas (club_id, nombre, tipo_techo, tamanio, tipo_cancha_id, es_principal, orden)
        VALUES ($1, $2, $3, $4, $5, FALSE,
          (SELECT COALESCE(MAX(orden), 0) + 1 FROM clubes_canchas WHERE club_id = $1))
        RETURNING *`,
-      [req.params.clubId, nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, piso || null]
+      [req.params.clubId, nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, tipo_cancha_id || null]
     );
     res.status(201).json({ ok: true, cancha: rows[0] });
   } catch (err) {
@@ -467,13 +474,13 @@ router.post('/:clubId/canchas', async (req, res) => {
 
 // PUT /liga/clubes/:clubId/canchas/:canchaId — edita cualquier cancha (principal o secundaria)
 router.put('/:clubId/canchas/:canchaId', async (req, res) => {
-  const { nombre, tipo_techo, tamanio, piso } = req.body;
+  const { nombre, tipo_techo, tamanio, tipo_cancha_id } = req.body;
   try {
     const { rows } = await query(
-      `UPDATE clubes_canchas SET nombre = $1, tipo_techo = $2, tamanio = $3, piso = $4
+      `UPDATE clubes_canchas SET nombre = $1, tipo_techo = $2, tamanio = $3, tipo_cancha_id = $4
        WHERE id = $5 AND club_id = $6
        RETURNING *`,
-      [nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, piso || null,
+      [nombre || null, tipo_techo === 'techada' ? 'techada' : 'aire_libre', tamanio || null, tipo_cancha_id || null,
        req.params.canchaId, req.params.clubId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Cancha no encontrada' });

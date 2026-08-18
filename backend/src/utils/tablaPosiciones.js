@@ -31,36 +31,14 @@ function calcularPuntosPartido(resultadoLocal, resultadoVisitante, sistemaPuntaj
   return { local: 1, visitante: 1 };
 }
 
-// Recalcula TODA la tabla de posiciones de una categoría, a partir de los
-// partidos jugados. Se recalcula desde cero cada vez (simple y sin riesgo de
-// arrastrar errores de un cálculo incremental) — el volumen de partidos por
-// categoría es chico, así que no hay problema de performance.
-async function recalcularTablaPosiciones(torneoId, categoriaId) {
-  const torneoResult = await query('SELECT sistema_puntaje FROM torneos WHERE id = $1', [torneoId]);
-  const sistemaPuntaje = torneoResult.rows[0]?.sistema_puntaje || {};
-
-  const equiposResult = await query(
-    'SELECT id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2',
-    [torneoId, categoriaId]
-  );
-
+// Calcula las estadísticas (PJ, G, E, P, GF, GC, Pts) de una lista de
+// equipoIds a partir de una lista de partidos ya jugados.
+function calcularStats(equipoIds, partidos, sistemaPuntaje) {
   const stats = {};
-  for (const equipo of equiposResult.rows) {
-    stats[equipo.id] = {
-      partidos_jugados: 0, ganados: 0, empatados: 0, perdidos: 0,
-      a_favor: 0, en_contra: 0, puntos: 0
-    };
+  for (const id of equipoIds) {
+    stats[id] = { partidos_jugados: 0, ganados: 0, empatados: 0, perdidos: 0, a_favor: 0, en_contra: 0, puntos: 0 };
   }
-
-  const partidosResult = await query(
-    `SELECT equipo_local_id, equipo_visitante_id, resultado_local, resultado_visitante
-     FROM partidos
-     WHERE torneo_id = $1 AND categoria_id = $2 AND estado = 'jugado'
-       AND resultado_local IS NOT NULL AND resultado_visitante IS NOT NULL`,
-    [torneoId, categoriaId]
-  );
-
-  for (const p of partidosResult.rows) {
+  for (const p of partidos) {
     const local = stats[p.equipo_local_id];
     const visitante = stats[p.equipo_visitante_id];
     if (!local || !visitante) continue; // equipo dado de baja, se ignora
@@ -89,13 +67,16 @@ async function recalcularTablaPosiciones(torneoId, categoriaId) {
       visitante.empatados += 1;
     }
   }
+  return stats;
+}
 
+async function guardarTabla(torneoId, categoriaId, ronda, stats) {
   for (const [equipoTorneoId, s] of Object.entries(stats)) {
     await query(
       `INSERT INTO tabla_posiciones
-         (torneo_id, categoria_id, equipo_torneo_id, partidos_jugados, ganados, empatados, perdidos, a_favor, en_contra, diferencia, puntos, actualizado_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
-       ON CONFLICT (torneo_id, categoria_id, equipo_torneo_id) DO UPDATE SET
+         (torneo_id, categoria_id, equipo_torneo_id, ronda, partidos_jugados, ganados, empatados, perdidos, a_favor, en_contra, diferencia, puntos, actualizado_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+       ON CONFLICT (torneo_id, categoria_id, equipo_torneo_id, ronda) DO UPDATE SET
          partidos_jugados = EXCLUDED.partidos_jugados,
          ganados = EXCLUDED.ganados,
          empatados = EXCLUDED.empatados,
@@ -105,9 +86,48 @@ async function recalcularTablaPosiciones(torneoId, categoriaId) {
          diferencia = EXCLUDED.diferencia,
          puntos = EXCLUDED.puntos,
          actualizado_at = NOW()`,
-      [torneoId, categoriaId, equipoTorneoId, s.partidos_jugados, s.ganados, s.empatados,
+      [torneoId, categoriaId, equipoTorneoId, ronda, s.partidos_jugados, s.ganados, s.empatados,
        s.perdidos, s.a_favor, s.en_contra, s.a_favor - s.en_contra, s.puntos]
     );
+  }
+}
+
+// Recalcula TODA la tabla de posiciones de una categoría, a partir de los
+// partidos jugados. Se recalcula desde cero cada vez (simple y sin riesgo de
+// arrastrar errores de un cálculo incremental) — el volumen de partidos por
+// categoría es chico, así que no hay problema de performance.
+//
+// Si el torneo tiene formato "apertura_clausura", se guardan TRES tablas
+// separadas (ronda='apertura', ronda='clausura' y ronda='general' con el
+// acumulado de ambas). Para el resto de los formatos, se guarda solo la
+// tabla "general" (comportamiento de siempre).
+async function recalcularTablaPosiciones(torneoId, categoriaId) {
+  const torneoResult = await query('SELECT sistema_puntaje, formato_juego FROM torneos WHERE id = $1', [torneoId]);
+  const sistemaPuntaje = torneoResult.rows[0]?.sistema_puntaje || {};
+  const formatoJuego = torneoResult.rows[0]?.formato_juego;
+
+  const equiposResult = await query(
+    'SELECT id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2',
+    [torneoId, categoriaId]
+  );
+  const equipoIds = equiposResult.rows.map((e) => e.id);
+
+  const partidosResult = await query(
+    `SELECT equipo_local_id, equipo_visitante_id, resultado_local, resultado_visitante, ronda
+     FROM partidos
+     WHERE torneo_id = $1 AND categoria_id = $2 AND estado = 'jugado'
+       AND resultado_local IS NOT NULL AND resultado_visitante IS NOT NULL`,
+    [torneoId, categoriaId]
+  );
+
+  if (formatoJuego === 'apertura_clausura') {
+    const deApertura = partidosResult.rows.filter((p) => p.ronda === 'apertura');
+    const deClausura = partidosResult.rows.filter((p) => p.ronda === 'clausura');
+    await guardarTabla(torneoId, categoriaId, 'apertura', calcularStats(equipoIds, deApertura, sistemaPuntaje));
+    await guardarTabla(torneoId, categoriaId, 'clausura', calcularStats(equipoIds, deClausura, sistemaPuntaje));
+    await guardarTabla(torneoId, categoriaId, 'general', calcularStats(equipoIds, partidosResult.rows, sistemaPuntaje));
+  } else {
+    await guardarTabla(torneoId, categoriaId, 'general', calcularStats(equipoIds, partidosResult.rows, sistemaPuntaje));
   }
 }
 

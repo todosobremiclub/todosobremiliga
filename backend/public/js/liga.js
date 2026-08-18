@@ -31,6 +31,21 @@ let torneoActualId = null;
 let torneoActualNombre = '';
 let categoriaActualId = null;
 let categoriaActualNombre = '';
+let rondaTablaActual = 'general';
+let tiposCanchaCache = [];
+let prediosLigaCache = [];
+let predioActualId = null;
+let canchasPredioCache = [];
+let jornadaFixtureActual = 1;
+
+function torneoActualEsAperturaClausura() {
+  const t = torneosCache.find((x) => x.id === torneoActualId);
+  return !!(t && t.formato_juego === 'apertura_clausura');
+}
+
+function torneoActualObj() {
+  return torneosCache.find((x) => x.id === torneoActualId) || null;
+}
 
 // ----- Popups: todas las pantallas de edición/detalle (Club, Usuarios,
 // Canchas, Documentos, Notas, Torneo, Categorías, Detalle de categoría,
@@ -331,6 +346,13 @@ function conectarEventos() {
   document.getElementById('tabBtnGoleadores').addEventListener('click', () => cambiarTabDetalle('goleadores'));
   document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTabDetalle('tarjetas'));
 
+  document.getElementById('tabBtnRondaGeneral').addEventListener('click', () => cambiarRondaTabla('general'));
+  document.getElementById('tabBtnRondaApertura').addEventListener('click', () => cambiarRondaTabla('apertura'));
+  document.getElementById('tabBtnRondaClausura').addEventListener('click', () => cambiarRondaTabla('clausura'));
+
+  document.getElementById('btnJornadaAnterior').addEventListener('click', () => cambiarJornadaFixture(-1));
+  document.getElementById('btnJornadaSiguiente').addEventListener('click', () => cambiarJornadaFixture(1));
+
   document.getElementById('btnInscribirClub').addEventListener('click', inscribirClub);
   document.getElementById('formSubcategoria').addEventListener('submit', guardarSubcategoria);
   document.getElementById('btnCancelarSubcategoria').addEventListener('click', limpiarFormSubcategoria);
@@ -426,6 +448,8 @@ function conectarEventos() {
   document.getElementById('tabBtnConfigTiposGasto').addEventListener('click', () => cambiarTabConfig('tiposGasto'));
   document.getElementById('tabBtnConfigTiposIngreso').addEventListener('click', () => cambiarTabConfig('tiposIngreso'));
   document.getElementById('tabBtnConfigCuentas').addEventListener('click', () => cambiarTabConfig('cuentas'));
+  document.getElementById('tabBtnConfigTiposCancha').addEventListener('click', () => cambiarTabConfig('tiposCancha'));
+  document.getElementById('tabBtnConfigPredios').addEventListener('click', () => cambiarTabConfig('predios'));
 
   document.getElementById('btnMostrarFormModalidad').addEventListener('click', () => {
     document.getElementById('formModalidad').reset();
@@ -470,6 +494,32 @@ function conectarEventos() {
     document.getElementById('formCuenta').classList.add('oculto');
   });
   document.getElementById('formCuenta').addEventListener('submit', guardarCuenta);
+
+  document.getElementById('btnMostrarFormTipoCancha').addEventListener('click', () => {
+    document.getElementById('formTipoCancha').reset();
+    document.getElementById('tipoCanchaIdEdicion').value = '';
+    document.getElementById('tipoCanchaFormError').classList.add('oculto');
+    document.getElementById('formTipoCancha').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormTipoCancha').addEventListener('click', () => {
+    document.getElementById('formTipoCancha').classList.add('oculto');
+  });
+  document.getElementById('formTipoCancha').addEventListener('submit', guardarTipoCancha);
+
+  document.getElementById('btnMostrarFormPredio').addEventListener('click', () => {
+    document.getElementById('formPredio').reset();
+    document.getElementById('predioIdEdicion').value = '';
+    document.getElementById('predioFormError').classList.add('oculto');
+    document.getElementById('formPredio').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormPredio').addEventListener('click', () => {
+    document.getElementById('formPredio').classList.add('oculto');
+  });
+  document.getElementById('formPredio').addEventListener('submit', guardarPredio);
+
+  document.getElementById('btnCerrarCanchasPredio').addEventListener('click', cerrarCanchasPredio);
+  document.getElementById('formCanchaPredio').addEventListener('submit', guardarCanchaPredio);
+  document.getElementById('btnCancelarCanchaPredio').addEventListener('click', limpiarFormCanchaPredio);
 }
 
 function cambiarTab(nombre) {
@@ -507,11 +557,13 @@ function cambiarTab(nombre) {
 function cambiarTabConfig(nombre) {
   const secciones = {
     modalidades: 'subConfigModalidades', tiposGasto: 'subConfigTiposGasto',
-    tiposIngreso: 'subConfigTiposIngreso', cuentas: 'subConfigCuentas'
+    tiposIngreso: 'subConfigTiposIngreso', cuentas: 'subConfigCuentas',
+    tiposCancha: 'subConfigTiposCancha', predios: 'subConfigPredios'
   };
   const botones = {
     modalidades: 'tabBtnConfigModalidades', tiposGasto: 'tabBtnConfigTiposGasto',
-    tiposIngreso: 'tabBtnConfigTiposIngreso', cuentas: 'tabBtnConfigCuentas'
+    tiposIngreso: 'tabBtnConfigTiposIngreso', cuentas: 'tabBtnConfigCuentas',
+    tiposCancha: 'tabBtnConfigTiposCancha', predios: 'tabBtnConfigPredios'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -521,6 +573,8 @@ function cambiarTabConfig(nombre) {
   if (nombre === 'tiposGasto') cargarTiposGasto();
   if (nombre === 'tiposIngreso') cargarTiposIngreso();
   if (nombre === 'cuentas') cargarCuentas();
+  if (nombre === 'tiposCancha') cargarTiposCancha();
+  if (nombre === 'predios') cargarPredios();
 }
 
 // ----- Categorías de torneo (modalidades) -----
@@ -784,6 +838,273 @@ async function guardarCuenta(e) {
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Tipos de cancha -----
+
+async function cargarTiposCancha() {
+  const tbody = document.getElementById('tablaTiposCancha');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/tipos-cancha');
+    tiposCanchaCache = data.tipos;
+    tbody.innerHTML = tiposCanchaCache.length ? tiposCanchaCache.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.nombre)}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarTipoCancha('${t.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarTipoCancha('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="2">Todavía no cargaste tipos de cancha.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarTipoCancha(id) {
+  const t = tiposCanchaCache.find((x) => x.id === id);
+  if (!t) return;
+  document.getElementById('tipoCanchaIdEdicion').value = t.id;
+  document.getElementById('tipoCanchaNombre').value = t.nombre || '';
+  document.getElementById('tipoCanchaFormError').classList.add('oculto');
+  document.getElementById('formTipoCancha').classList.remove('oculto');
+}
+
+async function eliminarTipoCancha(id, nombre) {
+  if (!confirm(`¿Eliminar el tipo de cancha "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/tipos-cancha/${id}`, { method: 'DELETE' });
+    tiposCanchaCache = [];
+    cargarTiposCancha();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarTipoCancha(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('tipoCanchaFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('tipoCanchaIdEdicion').value;
+  const cuerpo = { nombre: document.getElementById('tipoCanchaNombre').value.trim() };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/tipos-cancha/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/tipos-cancha', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formTipoCancha').reset();
+    document.getElementById('tipoCanchaIdEdicion').value = '';
+    document.getElementById('formTipoCancha').classList.add('oculto');
+    tiposCanchaCache = [];
+    cargarTiposCancha();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// Puebla los desplegables de "Tipo de cancha" del club (principal y
+// secundarias) y de las canchas propias de la Liga, trayendo la lista
+// configurada en Configuración → Tipos de cancha (si todavía no está en caché).
+async function poblarSelectTipoCancha() {
+  try {
+    if (!tiposCanchaCache.length) {
+      const data = await apiFetch('/liga/configuracion/tipos-cancha');
+      tiposCanchaCache = data.tipos;
+    }
+  } catch (err) { /* si falla, los selects quedan con la opción por defecto */ }
+  const opciones = '<option value="">Sin especificar</option>' +
+    tiposCanchaCache.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  ['clubCanchaTipo', 'canchaTipo', 'canchaPredioTipo'].forEach((id) => {
+    const select = document.getElementById(id);
+    if (select) select.innerHTML = opciones;
+  });
+}
+
+// ----- Predios y canchas propias de la Liga -----
+
+async function cargarPredios() {
+  const cont = document.getElementById('listaPredios');
+  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const data = await apiFetch('/liga/configuracion/predios');
+    prediosLigaCache = data.predios;
+    renderListaPredios();
+  } catch (err) {
+    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderListaPredios() {
+  const cont = document.getElementById('listaPredios');
+  if (!prediosLigaCache.length) {
+    cont.innerHTML = '<p class="texto-ayuda">Todavía no cargaste ningún predio.</p>';
+    return;
+  }
+  cont.innerHTML = prediosLigaCache.map((p) => `
+    <div class="panel" style="margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <strong>${escapeHtml(p.nombre)}</strong>
+          ${p.direccion ? `<span class="texto-ayuda"> — ${escapeHtml(p.direccion)}</span>` : ''}
+          <span class="texto-ayuda"> (${(p.canchas || []).length} cancha${(p.canchas || []).length === 1 ? '' : 's'})</span>
+        </div>
+        <div>
+          <button class="btn btn-secundario btn-pequeno" onclick="abrirCanchasPredio('${p.id}')">Ver canchas</button>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarPredio('${p.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarPredio('${p.id}', '${escapeHtml(p.nombre)}')">${ICONO_BASURA}</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editarPredio(id) {
+  const p = prediosLigaCache.find((x) => x.id === id);
+  if (!p) return;
+  document.getElementById('predioIdEdicion').value = p.id;
+  document.getElementById('predioNombre').value = p.nombre || '';
+  document.getElementById('predioDireccion').value = p.direccion || '';
+  document.getElementById('predioFormError').classList.add('oculto');
+  document.getElementById('formPredio').classList.remove('oculto');
+}
+
+async function eliminarPredio(id, nombre) {
+  if (!confirm(`¿Eliminar el predio "${nombre}"? Se borran también sus canchas.`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/predios/${id}`, { method: 'DELETE' });
+    cargarPredios();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarPredio(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('predioFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('predioIdEdicion').value;
+  const cuerpo = {
+    nombre: document.getElementById('predioNombre').value.trim(),
+    direccion: document.getElementById('predioDireccion').value.trim() || undefined
+  };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/predios/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/predios', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formPredio').reset();
+    document.getElementById('predioIdEdicion').value = '';
+    document.getElementById('formPredio').classList.add('oculto');
+    cargarPredios();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Canchas de un predio puntual (popup) -----
+
+async function abrirCanchasPredio(predioId) {
+  predioActualId = predioId;
+  const predio = prediosLigaCache.find((x) => x.id === predioId);
+  document.getElementById('tituloCanchasPredio').textContent = `Canchas de "${predio ? predio.nombre : ''}"`;
+  limpiarFormCanchaPredio();
+  await poblarSelectTipoCancha();
+  document.getElementById('modalCanchasPredio').classList.remove('oculto');
+  mostrarFondoModal();
+  renderTablaCanchasPredio();
+}
+
+function cerrarCanchasPredio() {
+  document.getElementById('modalCanchasPredio').classList.add('oculto');
+  ocultarFondoModal();
+  predioActualId = null;
+}
+
+function renderTablaCanchasPredio() {
+  const tbody = document.getElementById('tablaCanchasPredio');
+  const predio = prediosLigaCache.find((x) => x.id === predioActualId);
+  canchasPredioCache = (predio && predio.canchas) || [];
+  if (!canchasPredioCache.length) {
+    tbody.innerHTML = '<tr><td colspan="5">Este predio todavía no tiene canchas cargadas.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = canchasPredioCache.map((c) => `
+    <tr>
+      <td>${escapeHtml(c.nombre)}</td>
+      <td>${c.tipo_techo === 'techada' ? 'Techada' : 'Aire libre'}</td>
+      <td>${escapeHtml(c.tamanio || '-')}</td>
+      <td>${escapeHtml(c.tipo_cancha_nombre || '-')}</td>
+      <td>
+        <button class="btn btn-secundario btn-pequeno" onclick="editarCanchaPredio('${c.id}')">Editar</button>
+        <button class="btn btn-peligro btn-pequeno" onclick="eliminarCanchaPredio('${c.id}')">Eliminar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function limpiarFormCanchaPredio() {
+  document.getElementById('canchaPredioIdEdicion').value = '';
+  document.getElementById('canchaPredioNombre').value = '';
+  document.getElementById('canchaPredioTecho').value = 'aire_libre';
+  document.getElementById('canchaPredioTamanio').value = '';
+  document.getElementById('canchaPredioTipo').value = '';
+  document.getElementById('canchaPredioFormError').classList.add('oculto');
+  document.getElementById('btnGuardarCanchaPredio').textContent = 'Agregar cancha';
+  document.getElementById('btnCancelarCanchaPredio').classList.add('oculto');
+}
+
+function editarCanchaPredio(canchaId) {
+  const cancha = canchasPredioCache.find((c) => c.id === canchaId);
+  if (!cancha) return;
+  document.getElementById('canchaPredioIdEdicion').value = cancha.id;
+  document.getElementById('canchaPredioNombre').value = cancha.nombre || '';
+  document.getElementById('canchaPredioTecho').value = cancha.tipo_techo || 'aire_libre';
+  document.getElementById('canchaPredioTamanio').value = cancha.tamanio || '';
+  document.getElementById('canchaPredioTipo').value = cancha.tipo_cancha_id || '';
+  document.getElementById('btnGuardarCanchaPredio').textContent = 'Guardar cambios';
+  document.getElementById('btnCancelarCanchaPredio').classList.remove('oculto');
+}
+
+async function guardarCanchaPredio(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('canchaPredioFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('canchaPredioIdEdicion').value;
+  const cuerpo = {
+    nombre: document.getElementById('canchaPredioNombre').value.trim(),
+    tipo_techo: document.getElementById('canchaPredioTecho').value,
+    tamanio: document.getElementById('canchaPredioTamanio').value.trim() || undefined,
+    tipo_cancha_id: document.getElementById('canchaPredioTipo').value || undefined
+  };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/predios/${predioActualId}/canchas/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch(`/liga/configuracion/predios/${predioActualId}/canchas`, { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    limpiarFormCanchaPredio();
+    await cargarPredios();
+    renderTablaCanchasPredio();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function eliminarCanchaPredio(canchaId) {
+  if (!confirm('¿Eliminar esta cancha?')) return;
+  try {
+    await apiFetch(`/liga/configuracion/predios/${predioActualId}/canchas/${canchaId}`, { method: 'DELETE' });
+    await cargarPredios();
+    renderTablaCanchasPredio();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 
@@ -1220,6 +1541,7 @@ async function subirCargaMasivaClubes(e) {
     document.getElementById('cargaMasivaArchivo').value = '';
     paginaClubesActual = 1;
     cargarClubes();
+    cargarFiltrosDisponiblesClubes();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -1241,6 +1563,7 @@ function onElegirLogoClub(e) {
 }
 
 function limpiarFormClub() {
+  poblarSelectTipoCancha();
   document.getElementById('clubIdEdicion').value = '';
   document.getElementById('clubNombre').value = '';
   document.getElementById('clubDireccion').value = '';
@@ -1258,7 +1581,7 @@ function limpiarFormClub() {
   document.getElementById('clubColorSecundarioHex').textContent = '#1e3a8a';
   document.getElementById('clubCanchaTecho').value = 'aire_libre';
   document.getElementById('clubCanchaTamanio').value = '';
-  document.getElementById('clubCanchaPiso').value = '';
+  document.getElementById('clubCanchaTipo').value = '';
   document.getElementById('clubCanchaReglamentaria').checked = false;
   document.getElementById('clubCanchaTamanio').disabled = false;
   document.getElementById('clubFormError').classList.add('oculto');
@@ -1271,9 +1594,10 @@ function limpiarFormClub() {
   document.getElementById('btnAbrirComentariosDesdeForm').classList.add('oculto');
 }
 
-function editarClub(clubId) {
+async function editarClub(clubId) {
   const club = clubesCache.find((c) => c.id === clubId);
   if (!club) return;
+  await poblarSelectTipoCancha();
   document.getElementById('clubIdEdicion').value = club.id;
   document.getElementById('clubNombre').value = club.nombre || '';
   document.getElementById('clubDireccion').value = club.direccion || '';
@@ -1297,7 +1621,7 @@ function editarClub(clubId) {
   document.getElementById('clubColorSecundarioHex').textContent = club.color_secundario || '#1e3a8a';
   document.getElementById('clubCanchaTecho').value = club.cancha_tipo_techo || 'aire_libre';
   document.getElementById('clubCanchaTamanio').value = club.cancha_tamanio || '';
-  document.getElementById('clubCanchaPiso').value = club.cancha_piso || '';
+  document.getElementById('clubCanchaTipo').value = club.cancha_tipo_cancha_id || '';
   document.getElementById('clubCanchaReglamentaria').checked = !!club.cancha_reglamentaria;
   document.getElementById('clubCanchaTamanio').disabled = !!club.cancha_reglamentaria;
   document.getElementById('clubFormError').classList.add('oculto');
@@ -1365,7 +1689,7 @@ async function guardarClub(e) {
     color_secundario: document.getElementById('clubColorSecundario').value,
     cancha_tipo_techo: document.getElementById('clubCanchaTecho').value,
     cancha_tamanio: document.getElementById('clubCanchaTamanio').value.trim() || undefined,
-    cancha_piso: document.getElementById('clubCanchaPiso').value.trim() || undefined,
+    cancha_tipo_cancha_id: document.getElementById('clubCanchaTipo').value || undefined,
     cancha_reglamentaria: document.getElementById('clubCanchaReglamentaria').checked
   };
 
@@ -1379,6 +1703,7 @@ async function guardarClub(e) {
     document.getElementById('formClub').classList.add('oculto');
     ocultarFondoModal();
     cargarClubes();
+    cargarFiltrosDisponiblesClubes();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -1790,7 +2115,7 @@ async function cargarCanchasClub() {
         <td>${escapeHtml(c.nombre || '-')}${c.es_principal ? ' <span class="badge badge-activo">Principal</span>' : ''}</td>
         <td>${c.tipo_techo === 'techada' ? 'Techada' : 'Aire libre'}</td>
         <td>${escapeHtml(c.tamanio || '-')}</td>
-        <td>${escapeHtml(c.piso || '-')}</td>
+        <td>${escapeHtml(c.tipo_cancha_nombre || '-')}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno" onclick="editarCanchaSecundaria('${c.id}')">Editar</button>
           ${!c.es_principal ? `<button class="btn btn-peligro btn-pequeno" onclick="eliminarCanchaSecundaria('${c.id}')">Eliminar</button>` : ''}
@@ -1804,24 +2129,26 @@ async function cargarCanchasClub() {
 }
 
 function limpiarFormCanchaSecundaria() {
+  poblarSelectTipoCancha();
   document.getElementById('canchaIdEdicion').value = '';
   document.getElementById('canchaNombre').value = '';
   document.getElementById('canchaTecho').value = 'aire_libre';
   document.getElementById('canchaTamanio').value = '';
-  document.getElementById('canchaPiso').value = '';
+  document.getElementById('canchaTipo').value = '';
   document.getElementById('canchaFormError').classList.add('oculto');
   document.getElementById('btnGuardarCanchaSecundaria').textContent = 'Agregar cancha';
   document.getElementById('btnCancelarCanchaSecundaria').classList.add('oculto');
 }
 
-function editarCanchaSecundaria(canchaId) {
+async function editarCanchaSecundaria(canchaId) {
   const cancha = (window.canchasClubCache || []).find((c) => c.id === canchaId);
   if (!cancha) return;
+  await poblarSelectTipoCancha();
   document.getElementById('canchaIdEdicion').value = cancha.id;
   document.getElementById('canchaNombre').value = cancha.nombre || '';
   document.getElementById('canchaTecho').value = cancha.tipo_techo || 'aire_libre';
   document.getElementById('canchaTamanio').value = cancha.tamanio || '';
-  document.getElementById('canchaPiso').value = cancha.piso || '';
+  document.getElementById('canchaTipo').value = cancha.tipo_cancha_id || '';
   document.getElementById('btnGuardarCanchaSecundaria').textContent = 'Guardar cambios';
   document.getElementById('btnCancelarCanchaSecundaria').classList.remove('oculto');
 }
@@ -1836,7 +2163,7 @@ async function guardarCanchaSecundaria(e) {
     nombre: document.getElementById('canchaNombre').value.trim(),
     tipo_techo: document.getElementById('canchaTecho').value,
     tamanio: document.getElementById('canchaTamanio').value.trim() || undefined,
-    piso: document.getElementById('canchaPiso').value.trim() || undefined
+    tipo_cancha_id: document.getElementById('canchaTipo').value || undefined
   };
 
   try {
@@ -1962,6 +2289,7 @@ async function aceptarPostulacion(id) {
     cargarPostulaciones();
     paginaClubesActual = 1;
     cargarClubes();
+    cargarFiltrosDisponiblesClubes();
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -2012,11 +2340,18 @@ function renderTorneos() {
     tbody.innerHTML = '<tr><td colspan="5">No se encontraron torneos.</td></tr>';
     return;
   }
+  const NOMBRES_FORMATO = {
+    todos_contra_todos: 'Todos contra todos',
+    grupos_playoffs: 'Grupos + playoffs',
+    liguilla_ida_vuelta: 'Liguilla ida y vuelta',
+    eliminacion_directa: 'Eliminación directa',
+    apertura_clausura: 'Apertura y Clausura'
+  };
   tbody.innerHTML = lista.map((t) => `
     <tr>
       <td>${escapeHtml(t.nombre)}</td>
       <td>${escapeHtml(t.deporte)}</td>
-      <td>${t.precio_inscripcion != null ? `$${Number(t.precio_inscripcion).toLocaleString('es-AR')}` : '-'}</td>
+      <td>${escapeHtml(NOMBRES_FORMATO[t.formato_juego] || t.formato_juego || '-')}</td>
       <td><span class="badge badge-activo">${escapeHtml(t.estado || 'planificado')}</span></td>
       <td>
         <button class="btn btn-secundario btn-pequeno" onclick="editarTorneo('${t.id}')">Editar</button>
@@ -2050,7 +2385,9 @@ function editarTorneo(torneoId) {
   const sp = torneo.sistema_puntaje || {};
   document.getElementById('torneoPtsVictoria').value = sp.victoria != null ? sp.victoria : 3;
   document.getElementById('torneoPtsEmpate').value = sp.empate != null ? sp.empate : 1;
-  document.getElementById('torneoPrecioInscripcion').value = torneo.precio_inscripcion != null ? torneo.precio_inscripcion : '';
+  document.getElementById('torneoPtsDerrota').value = sp.derrota != null ? sp.derrota : 0;
+  document.getElementById('torneoFechaInicio').value = torneo.fecha_inicio ? String(torneo.fecha_inicio).slice(0, 10) : '';
+  document.getElementById('torneoCanchaJuego').value = torneo.cancha_juego || 'clubes';
   document.getElementById('torneoFormError').classList.add('oculto');
   document.getElementById('formTorneo').classList.remove('oculto');
   mostrarFondoModal();
@@ -2064,6 +2401,7 @@ async function guardarTorneo(e) {
   const id = document.getElementById('torneoIdEdicion').value;
   const ptsVictoria = Number(document.getElementById('torneoPtsVictoria').value || 3);
   const ptsEmpate = Number(document.getElementById('torneoPtsEmpate').value || 0);
+  const ptsDerrota = Number(document.getElementById('torneoPtsDerrota').value || 0);
 
   const cuerpo = {
     nombre: document.getElementById('torneoNombre').value.trim(),
@@ -2073,9 +2411,10 @@ async function guardarTorneo(e) {
     sistema_puntaje: {
       victoria: ptsVictoria,
       empate: ptsEmpate,
-      derrota: 0
+      derrota: ptsDerrota
     },
-    precio_inscripcion: document.getElementById('torneoPrecioInscripcion').value || undefined
+    fecha_inicio: document.getElementById('torneoFechaInicio').value || undefined,
+    cancha_juego: document.getElementById('torneoCanchaJuego').value || undefined
   };
 
   try {
@@ -2119,7 +2458,7 @@ async function cargarCategorias(torneoId) {
     tbody.innerHTML = categoriasCache.map((c) => `
       <tr>
         <td>${escapeHtml(c.nombre)}</td>
-        <td>${escapeHtml(c.genero || '-')}</td>
+        <td>${c.precio_inscripcion != null ? `$${Number(c.precio_inscripcion).toLocaleString('es-AR')}` : '-'}</td>
         <td>${c.subcategorias && c.subcategorias.length ? escapeHtml(c.subcategorias.map((s) => s.nombre).join(', ')) : '-'}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarCategoria('${c.id}')">${ICONO_LAPIZ}</button>
@@ -2139,7 +2478,7 @@ function editarCategoria(categoriaId) {
   document.getElementById('categoriaIdEdicion').value = categoria.id;
   document.getElementById('categoriaTorneoId').value = torneoActualId;
   document.getElementById('categoriaNombre').value = categoria.nombre || '';
-  document.getElementById('categoriaGenero').value = categoria.genero || '';
+  document.getElementById('categoriaPrecioInscripcion').value = categoria.precio_inscripcion != null ? categoria.precio_inscripcion : '';
   document.getElementById('categoriaFormError').classList.add('oculto');
   document.getElementById('formCategoria').classList.remove('oculto');
 }
@@ -2164,7 +2503,7 @@ async function guardarCategoria(e) {
   const id = document.getElementById('categoriaIdEdicion').value;
   const cuerpo = {
     nombre: document.getElementById('categoriaNombre').value.trim(),
-    genero: document.getElementById('categoriaGenero').value || undefined
+    precio_inscripcion: document.getElementById('categoriaPrecioInscripcion').value || undefined
   };
 
   try {
@@ -2206,13 +2545,14 @@ async function cargarSubcategorias() {
     categoriasCache = data.categorias;
     const subcategorias = subcategoriasDeCategoriaActual();
     if (!subcategorias.length) {
-      tbody.innerHTML = '<tr><td colspan="2">Todavía no cargaste subcategorías.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no cargaste subcategorías.</td></tr>';
     } else {
       tbody.innerHTML = subcategorias.map((s) => `
         <tr>
           <td>${escapeHtml(s.nombre)}</td>
+          <td>${s.precio_inscripcion != null ? `$${Number(s.precio_inscripcion).toLocaleString('es-AR')}` : '-'}</td>
           <td>
-            <button class="btn btn-secundario btn-pequeno" onclick="editarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">Editar</button>
+            <button class="btn btn-secundario btn-pequeno" onclick="editarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}', ${s.precio_inscripcion != null ? s.precio_inscripcion : 'null'})">Editar</button>
             <button class="btn btn-peligro btn-pequeno" onclick="eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">Eliminar</button>
           </td>
         </tr>
@@ -2223,9 +2563,10 @@ async function cargarSubcategorias() {
   }
 }
 
-function editarSubcategoria(subcategoriaId, nombre) {
+function editarSubcategoria(subcategoriaId, nombre, precioInscripcion) {
   document.getElementById('subcategoriaIdEdicion').value = subcategoriaId;
   document.getElementById('subcategoriaNombre').value = nombre;
+  document.getElementById('subcategoriaPrecioInscripcion').value = precioInscripcion != null ? precioInscripcion : '';
   document.getElementById('btnCancelarSubcategoria').classList.remove('oculto');
   document.getElementById('subcategoriaNombre').focus();
 }
@@ -2233,6 +2574,7 @@ function editarSubcategoria(subcategoriaId, nombre) {
 function limpiarFormSubcategoria() {
   document.getElementById('subcategoriaIdEdicion').value = '';
   document.getElementById('subcategoriaNombre').value = '';
+  document.getElementById('subcategoriaPrecioInscripcion').value = '';
   document.getElementById('btnCancelarSubcategoria').classList.add('oculto');
   document.getElementById('subcategoriaFormError').classList.add('oculto');
 }
@@ -2243,18 +2585,19 @@ async function guardarSubcategoria(e) {
   errorEl.classList.add('oculto');
   const id = document.getElementById('subcategoriaIdEdicion').value;
   const nombre = document.getElementById('subcategoriaNombre').value.trim();
+  const precioInscripcion = document.getElementById('subcategoriaPrecioInscripcion').value || undefined;
   if (!nombre) return;
 
   try {
     if (id) {
       await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ nombre })
+        body: JSON.stringify({ nombre, precio_inscripcion: precioInscripcion })
       });
     } else {
       await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias`, {
         method: 'POST',
-        body: JSON.stringify({ nombre })
+        body: JSON.stringify({ nombre, precio_inscripcion: precioInscripcion })
       });
     }
     limpiarFormSubcategoria();
@@ -2290,6 +2633,8 @@ function verDetalleCategoria(categoriaId, nombreCategoria) {
   document.getElementById('formGenerarFixture').classList.add('oculto');
   document.getElementById('formPartido').classList.add('oculto');
   document.getElementById('fixtureIdaVuelta').checked = false;
+  jornadaFixtureActual = 1;
+  rondaTablaActual = 'general';
   limpiarFormSubcategoria();
   cargarSubcategorias();
   cambiarTabDetalle('equipos');
@@ -2310,9 +2655,21 @@ function cambiarTabDetalle(nombre) {
   });
   if (nombre === 'equipos') cargarEquipos();
   if (nombre === 'fixture') cargarPartidos();
-  if (nombre === 'tabla') cargarTabla();
+  if (nombre === 'tabla') {
+    document.getElementById('tabsRondaTabla').classList.toggle('oculto', !torneoActualEsAperturaClausura());
+    cargarTabla();
+  }
   if (nombre === 'goleadores') cargarGoleadores();
   if (nombre === 'tarjetas') cargarTarjetas();
+}
+
+function cambiarRondaTabla(ronda) {
+  rondaTablaActual = ronda;
+  const botones = { general: 'tabBtnRondaGeneral', apertura: 'tabBtnRondaApertura', clausura: 'tabBtnRondaClausura' };
+  Object.keys(botones).forEach((key) => {
+    document.getElementById(botones[key]).classList.toggle('activo', key === ronda);
+  });
+  cargarTabla();
 }
 
 async function cargarEquipos() {
@@ -2398,9 +2755,11 @@ async function inscribirClub() {
   cargarEquipos();
 }
 
+let fixtureCanchaJuegoActual = 'clubes';
+
 async function cargarPartidos() {
-  const tbody = document.getElementById('tablaPartidos');
-  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  const contenedor = document.getElementById('contenedorPartidosJornada');
+  contenedor.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
 
   // Aseguramos tener los equipos ya cargados para poblar los selects del form.
   if (!equiposCache.length) {
@@ -2418,24 +2777,146 @@ async function cargarPartidos() {
   try {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos`);
     partidosCache = data.partidos;
+    fixtureCanchaJuegoActual = data.cancha_juego || 'clubes';
+
+    if (fixtureCanchaJuegoActual === 'propias_liga' && !prediosLigaCache.length) {
+      try {
+        const dataPredios = await apiFetch('/liga/configuracion/predios');
+        prediosLigaCache = dataPredios.predios;
+      } catch (err) {
+        // seguimos igual; el desplegable va a quedar vacío
+      }
+    }
+
     if (!partidosCache.length) {
-      tbody.innerHTML = '<tr><td colspan="6">Todavía no hay partidos programados.</td></tr>';
+      document.getElementById('navegadorJornadas').classList.add('oculto');
+      contenedor.innerHTML = '<p class="texto-ayuda">Todavía no hay partidos programados.</p>';
       return;
     }
-    tbody.innerHTML = partidosCache.map((p) => `
-      <tr>
-        <td>${p.jornada != null ? p.jornada : '-'}</td>
-        <td>${swatch(p.club_local_color)}${escapeHtml(p.club_local_nombre)}</td>
-        <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'Sin jugar'}</td>
-        <td>${swatch(p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}</td>
-        <td><span class="badge ${p.estado === 'jugado' ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(p.estado || 'programado')}</span></td>
-        <td>
-          <button class="btn btn-secundario btn-pequeno" onclick="abrirModalResultado('${p.id}')">Cargar resultado</button>
-        </td>
-      </tr>
-    `).join('');
+
+    document.getElementById('navegadorJornadas').classList.remove('oculto');
+    const jornadasDisponibles = Array.from(new Set(partidosCache.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
+    if (!jornadasDisponibles.includes(jornadaFixtureActual)) {
+      jornadaFixtureActual = jornadasDisponibles[0];
+    }
+    renderJornadaFixture(jornadasDisponibles);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+    document.getElementById('navegadorJornadas').classList.add('oculto');
+    contenedor.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function cambiarJornadaFixture(delta) {
+  const jornadasDisponibles = Array.from(new Set(partidosCache.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
+  const idx = jornadasDisponibles.indexOf(jornadaFixtureActual);
+  const nuevoIdx = idx + delta;
+  if (nuevoIdx < 0 || nuevoIdx >= jornadasDisponibles.length) return;
+  jornadaFixtureActual = jornadasDisponibles[nuevoIdx];
+  renderJornadaFixture(jornadasDisponibles);
+}
+
+function opcionesCanchasPredio(canchaPredioIdSeleccionada) {
+  let html = '<option value="">Sin asignar</option>';
+  prediosLigaCache.forEach((predio) => {
+    (predio.canchas || []).forEach((cancha) => {
+      const selected = cancha.id === canchaPredioIdSeleccionada ? 'selected' : '';
+      html += `<option value="${cancha.id}" ${selected}>${escapeHtml(predio.nombre)} - ${escapeHtml(cancha.nombre)}</option>`;
+    });
+  });
+  return html;
+}
+
+function renderJornadaFixture(jornadasDisponibles) {
+  const contenedor = document.getElementById('contenedorPartidosJornada');
+  const esAperturaClausura = torneoActualEsAperturaClausura();
+  const partidosJornada = partidosCache.filter((p) => (p.jornada != null ? p.jornada : 0) === jornadaFixtureActual);
+  const rondaLabel = { apertura: ' (Apertura)', clausura: ' (Clausura)' };
+  const ronda = partidosJornada[0] && partidosJornada[0].ronda;
+  document.getElementById('tituloJornadaActual').textContent =
+    `Fecha ${jornadaFixtureActual}${esAperturaClausura && ronda ? rondaLabel[ronda] || '' : ''}`;
+
+  document.getElementById('btnJornadaAnterior').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === 0;
+  document.getElementById('btnJornadaSiguiente').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === jornadasDisponibles.length - 1;
+
+  contenedor.innerHTML = partidosJornada.map((p) => {
+    const logoLocal = p.club_local_logo_url
+      ? `<img src="${escapeHtml(p.club_local_logo_url)}" alt="" style="width:32px; height:32px; object-fit:contain; border-radius:6px;">`
+      : swatch(p.club_local_color);
+    const logoVisitante = p.club_visitante_logo_url
+      ? `<img src="${escapeHtml(p.club_visitante_logo_url)}" alt="" style="width:32px; height:32px; object-fit:contain; border-radius:6px;">`
+      : swatch(p.club_visitante_color);
+
+    let bloqueCancha;
+    if (fixtureCanchaJuegoActual === 'propias_liga') {
+      bloqueCancha = `
+        <div>
+          <label style="font-size:12px;">Predio y cancha</label>
+          <select data-partido-id="${p.id}" class="select-cancha-predio-partido" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+            ${opcionesCanchasPredio(p.cancha_predio_id)}
+          </select>
+        </div>`;
+    } else {
+      const detalles = [];
+      if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
+      if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
+      if (p.club_local_cancha_tamanio) detalles.push(escapeHtml(p.club_local_cancha_tamanio));
+      if (p.club_local_cancha_tipo_nombre) detalles.push(escapeHtml(p.club_local_cancha_tipo_nombre));
+      bloqueCancha = `<div><label style="font-size:12px;">Cancha (del local)</label><p class="texto-ayuda" style="margin:2px 0;">${detalles.length ? detalles.join(' · ') : 'Sin datos de cancha cargados'}</p></div>`;
+    }
+
+    return `
+      <div class="panel" style="margin-bottom:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:220px;">
+            ${logoLocal}<strong>${escapeHtml(p.club_local_nombre)}</strong>
+            <span style="margin:0 8px;">${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</span>
+            <strong>${escapeHtml(p.club_visitante_nombre)}</strong>${logoVisitante}
+          </div>
+          <span class="badge ${p.estado === 'jugado' ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(p.estado || 'programado')}</span>
+          <button class="btn btn-secundario btn-pequeno" onclick="abrirModalResultado('${p.id}')">Cargar resultado</button>
+        </div>
+        <div class="form-grid" style="margin-top:10px;">
+          <div>
+            <label style="font-size:12px;">Día</label>
+            <input type="date" class="input-fecha-partido" data-partido-id="${p.id}" value="${p.fecha ? String(p.fecha).slice(0, 10) : ''}" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+          </div>
+          <div>
+            <label style="font-size:12px;">Horario</label>
+            <input type="time" class="input-hora-partido" data-partido-id="${p.id}" value="${p.hora ? String(p.hora).slice(0, 5) : ''}" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+          </div>
+          ${bloqueCancha}
+        </div>
+        <button class="btn btn-secundario btn-pequeno" style="margin-top:8px;" onclick="guardarProgramacionPartido('${p.id}')">Guardar día/horario/cancha</button>
+        <p class="mensaje-error oculto" id="errorProgramacion-${p.id}"></p>
+      </div>
+    `;
+  }).join('');
+}
+
+async function guardarProgramacionPartido(partidoId) {
+  const errorEl = document.getElementById(`errorProgramacion-${partidoId}`);
+  if (errorEl) errorEl.classList.add('oculto');
+  const fechaEl = document.querySelector(`.input-fecha-partido[data-partido-id="${partidoId}"]`);
+  const horaEl = document.querySelector(`.input-hora-partido[data-partido-id="${partidoId}"]`);
+  const canchaEl = document.querySelector(`.select-cancha-predio-partido[data-partido-id="${partidoId}"]`);
+  const cuerpo = {
+    fecha: fechaEl && fechaEl.value ? fechaEl.value : undefined,
+    hora: horaEl && horaEl.value ? horaEl.value : undefined,
+    cancha_predio_id: canchaEl ? (canchaEl.value || null) : undefined
+  };
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(cuerpo)
+    });
+    cargarPartidos();
+  } catch (err) {
+    if (errorEl) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('oculto');
+    } else {
+      alert('Error: ' + err.message);
+    }
   }
 }
 
@@ -2476,6 +2957,7 @@ async function generarFixtureAutomatico(e) {
     });
     document.getElementById('formGenerarFixture').classList.add('oculto');
     alert(`Se generaron ${data.partidos_creados} partidos en ${data.jornadas} jornadas.`);
+    jornadaFixtureActual = 1;
     cargarPartidos();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -2641,7 +3123,8 @@ async function cargarTabla() {
   const tbody = document.getElementById('tablaPosiciones');
   tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
   try {
-    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tabla`);
+    const ronda = torneoActualEsAperturaClausura() ? rondaTablaActual : 'general';
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tabla?ronda=${ronda}`);
     const tabla = data.tabla;
     if (!tabla.length) {
       tbody.innerHTML = '<tr><td colspan="9">Todavía no hay datos de tabla para esta categoría.</td></tr>';

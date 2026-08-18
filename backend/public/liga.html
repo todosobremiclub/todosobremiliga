@@ -248,6 +248,12 @@
             </div>
           </div>
 
+          <div class="oculto" id="bloqueModalidadesClub" style="margin:10px 0;">
+            <h3 style="margin-bottom:4px;">Categorías de torneo en las que participa</h3>
+            <p class="texto-ayuda" style="margin-top:0;">Se configuran en Configuración → Categorías de torneo. Tildá en cuáles participa este club (puede ser en varias, o en ninguna).</p>
+            <div id="listaModalidadesClub" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+          </div>
+
           <h3 style="margin-bottom:4px;">Cancha principal</h3>
           <div class="form-grid">
             <div>
@@ -262,19 +268,13 @@
               <input type="text" id="clubCanchaTamanio" placeholder="Ej: Reglamentaria (40x20m)">
             </div>
             <div>
-              <label for="clubCanchaPiso">Piso de la cancha</label>
-              <input type="text" id="clubCanchaPiso" placeholder="Ej: Césped sintético">
+              <label for="clubCanchaTipo">Tipo de cancha</label>
+              <select id="clubCanchaTipo"><option value="">Sin especificar</option></select>
             </div>
           </div>
           <label class="check-inline" style="margin-bottom:10px;">
             <input type="checkbox" id="clubCanchaReglamentaria"> Cancha reglamentaria (40x20)
           </label>
-
-          <div class="oculto" id="bloqueModalidadesClub" style="margin:10px 0;">
-            <h3 style="margin-bottom:4px;">Categorías de torneo en las que participa</h3>
-            <p class="texto-ayuda" style="margin-top:0;">Se configuran en Configuración → Categorías de torneo. Tildá en cuáles participa este club (puede ser en varias, o en ninguna).</p>
-            <div id="listaModalidadesClub" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
-          </div>
 
           <div class="oculto" id="bloqueEstadoClub" style="margin:10px 0;">
             <label class="check-inline">
@@ -297,7 +297,7 @@
             <button class="btn btn-secundario" id="btnCerrarCanchasClub">Cerrar</button>
           </div>
           <table>
-            <thead><tr><th>Nombre</th><th>Techo</th><th>Tamaño</th><th>Piso</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Techo</th><th>Tamaño</th><th>Tipo de cancha</th><th>Acciones</th></tr></thead>
             <tbody id="tablaCanchasClub"><tr><td colspan="5">Cargando...</td></tr></tbody>
           </table>
           <form id="formCanchaSecundaria" style="margin-top:12px;">
@@ -319,8 +319,8 @@
                 <input type="text" id="canchaTamanio">
               </div>
               <div>
-                <label for="canchaPiso">Piso</label>
-                <input type="text" id="canchaPiso">
+                <label for="canchaTipo">Tipo de cancha</label>
+                <select id="canchaTipo"><option value="">Sin especificar</option></select>
               </div>
             </div>
             <button type="submit" class="btn btn-pequeno" id="btnGuardarCanchaSecundaria">Agregar cancha</button>
@@ -518,9 +518,13 @@
                 <option value="grupos_playoffs">Grupos + playoffs</option>
                 <option value="liguilla_ida_vuelta">Liguilla ida y vuelta</option>
                 <option value="eliminacion_directa">Eliminación directa</option>
+                <option value="apertura_clausura">Apertura y Clausura</option>
               </select>
               <p class="texto-ayuda" style="margin:4px 0 0;">
                 "Liguilla ida y vuelta" es un todos-contra-todos donde cada club juega dos veces contra cada rival: una vez de local y una de visitante (se generan el doble de fechas que en "Todos contra todos"). Al usar "Generar automático" en el Fixture, el tilde "Ida y vuelta" queda marcado por defecto si elegís este formato.
+              </p>
+              <p class="texto-ayuda" style="margin:4px 0 0;">
+                "Apertura y Clausura" genera los mismos cruces dos veces: una primera ronda (Apertura, con su propia tabla y campeón) y una segunda ronda (Clausura, mismos partidos con la localía invertida, con su propia tabla y campeón), además de una tabla general que suma ambas rondas.
               </p>
             </div>
             <div>
@@ -532,12 +536,23 @@
               <input type="number" id="torneoPtsEmpate" value="1">
             </div>
             <div>
-              <label for="torneoPrecioInscripcion">Precio de inscripción al torneo</label>
-              <input type="number" id="torneoPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
+              <label for="torneoPtsDerrota">Puntos por derrota</label>
+              <input type="number" id="torneoPtsDerrota" value="0">
+            </div>
+            <div>
+              <label for="torneoFechaInicio">Fecha de inicio del torneo</label>
+              <input type="date" id="torneoFechaInicio">
+            </div>
+            <div>
+              <label for="torneoCanchaJuego">¿Dónde se juega?</label>
+              <select id="torneoCanchaJuego">
+                <option value="clubes">En las canchas de los clubes</option>
+                <option value="propias_liga">En canchas propias de la Liga</option>
+              </select>
+              <p class="texto-ayuda" style="margin:4px 0 0;">Si elegís "canchas propias de la Liga", en el Fixture vas a poder asignar el predio y la cancha (cargados en Configuración → Predios y canchas propias) a cada partido.</p>
             </div>
           </div>
           <p class="texto-ayuda">Para deportes sin empate (como vóley), dejá los puntos de empate en 0 — el sistema calcula igual quién gana según el resultado cargado.</p>
-          <p class="texto-ayuda">El precio de inscripción es lo que le cobrás a un club por anotarse a este torneo (distinto del precio "por partido" de las categorías de torneo, que se configura en Configuración).</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormTorneo">Cancelar</button>
           <p class="mensaje-error oculto" id="torneoFormError"></p>
@@ -545,7 +560,7 @@
 
         <table>
           <thead>
-            <tr><th>Nombre</th><th>Deporte</th><th>Precio de inscripción</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Deporte</th><th>Formato</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
           <tbody id="tablaTorneos"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
@@ -570,23 +585,18 @@
               <input type="text" id="categoriaNombre" required placeholder="ej: Primera División">
             </div>
             <div>
-              <label for="categoriaGenero">Género</label>
-              <select id="categoriaGenero">
-                <option value="">Sin especificar</option>
-                <option value="masculino">Masculino</option>
-                <option value="femenino">Femenino</option>
-                <option value="mixto">Mixto</option>
-              </select>
+              <label for="categoriaPrecioInscripcion">Precio de inscripción</label>
+              <input type="number" id="categoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
             </div>
           </div>
-          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, entrando a "Ver detalle" de la categoría ya creada.</p>
+          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, entrando a "Ver detalle" de la categoría ya creada. Si la categoría tiene subcategorías, el precio de inscripción se define en cada subcategoría (ver más abajo) en lugar de acá.</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
           <p class="mensaje-error oculto" id="categoriaFormError"></p>
         </form>
 
         <table>
-          <thead><tr><th>Nombre</th><th>Género</th><th>Subcategorías</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Precio de inscripción</th><th>Subcategorías</th><th>Acciones</th></tr></thead>
           <tbody id="tablaCategorias"><tr><td colspan="4">Cargando...</td></tr></tbody>
         </table>
       </div>
@@ -606,14 +616,18 @@
           <div class="panel-header"><h2 style="margin:0;">Subcategorías</h2></div>
           <p class="texto-ayuda">Opcional. Si cargás alguna, los clubes se van a inscribir en una subcategoría puntual (ej: "Primera" o "Reserva"), no directamente en esta categoría.</p>
           <table>
-            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaSubcategorias"><tr><td colspan="2">Cargando...</td></tr></tbody>
+            <thead><tr><th>Nombre</th><th>Precio de inscripción</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaSubcategorias"><tr><td colspan="3">Cargando...</td></tr></tbody>
           </table>
           <form id="formSubcategoria" style="margin-top:10px; display:flex; gap:8px; align-items:flex-end;">
             <input type="hidden" id="subcategoriaIdEdicion">
             <div style="flex:1;">
               <label for="subcategoriaNombre">Nueva subcategoría</label>
               <input type="text" id="subcategoriaNombre" placeholder="ej: Primera" required>
+            </div>
+            <div style="flex:1;">
+              <label for="subcategoriaPrecioInscripcion">Precio de inscripción</label>
+              <input type="number" id="subcategoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
             </div>
             <button type="submit" class="btn btn-pequeno">Agregar</button>
             <button type="button" class="btn btn-secundario btn-pequeno oculto" id="btnCancelarSubcategoria">Cancelar edición</button>
@@ -684,14 +698,23 @@
             <button type="button" class="btn btn-secundario" id="btnCancelarFormPartido">Cancelar</button>
             <p class="mensaje-error oculto" id="partidoFormError"></p>
           </form>
-          <table>
-            <thead><tr><th>Jornada</th><th>Local</th><th>Resultado</th><th>Visitante</th><th>Estado</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaPartidos"><tr><td colspan="6">Cargando...</td></tr></tbody>
-          </table>
+
+          <!-- Navegador de jornadas: muestra una fecha (jornada) a la vez -->
+          <div id="navegadorJornadas" class="oculto" style="display:flex; align-items:center; justify-content:center; gap:16px; margin:12px 0;">
+            <button class="btn btn-secundario btn-pequeno" id="btnJornadaAnterior">← Anterior</button>
+            <span id="tituloJornadaActual" style="font-weight:700;"></span>
+            <button class="btn btn-secundario btn-pequeno" id="btnJornadaSiguiente">Siguiente →</button>
+          </div>
+          <div id="contenedorPartidosJornada"></div>
         </div>
 
         <!-- Tabla de posiciones -->
         <div id="subSeccionTabla" class="oculto">
+          <div class="tabs oculto" id="tabsRondaTabla">
+            <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
+            <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
+            <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
+          </div>
           <table>
             <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
             <tbody id="tablaPosiciones"><tr><td colspan="9">Cargando...</td></tr></tbody>
@@ -717,7 +740,7 @@
     </div>
 
     <!-- Modal simple para cargar resultado + goles/tarjetas por jugador -->
-    <div class="panel oculto" id="panelCargarResultado" style="position:fixed; top:5%; left:10%; right:10%; max-height:88vh; overflow:auto; z-index:50; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+    <div class="panel oculto" id="panelCargarResultado" style="position:fixed; top:5%; left:10%; right:10%; max-height:88vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
       <div class="panel-header">
         <h2>Cargar resultado</h2>
         <button class="btn btn-secundario" id="btnCerrarCargarResultado">Cerrar</button>
@@ -734,7 +757,7 @@
         <p class="mensaje-error oculto" id="resultadoFormError"></p>
       </form>
     </div>
-    <div class="oculto" id="fondoModalResultado" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:40;"></div>
+    <div class="oculto" id="fondoModalResultado" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
 
     <!-- ===== SECCIÓN POSTULACIONES ===== -->
     <div id="seccionPostulaciones" class="oculto">
@@ -1008,6 +1031,8 @@
         <button class="tab-btn" id="tabBtnConfigTiposGasto">Tipos de gasto</button>
         <button class="tab-btn" id="tabBtnConfigTiposIngreso">Tipos de ingreso</button>
         <button class="tab-btn" id="tabBtnConfigCuentas">Cuentas</button>
+        <button class="tab-btn" id="tabBtnConfigTiposCancha">Tipos de cancha</button>
+        <button class="tab-btn" id="tabBtnConfigPredios">Predios y canchas propias</button>
       </div>
 
       <!-- Categorías de torneo (modalidades): Futsal, Senior, Leyendas, etc. -->
@@ -1104,6 +1129,85 @@
             <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
             <tbody id="tablaCuentas"><tr><td colspan="2">Cargando...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Tipos de cancha -->
+      <div id="subConfigTiposCancha" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Tipos de cancha</h2>
+            <button class="btn" id="btnMostrarFormTipoCancha">+ Nuevo tipo</button>
+          </div>
+          <p class="texto-ayuda">Esta lista reemplaza el campo de texto libre "Piso de la cancha" al cargar o editar un club (ej: Césped sintético, Cemento, Parquet).</p>
+          <form id="formTipoCancha" class="oculto">
+            <input type="hidden" id="tipoCanchaIdEdicion">
+            <div class="form-grid una-columna">
+              <div><label for="tipoCanchaNombre">Nombre *</label><input type="text" id="tipoCanchaNombre" required placeholder="ej: Césped sintético"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormTipoCancha">Cancelar</button>
+            <p class="mensaje-error oculto" id="tipoCanchaFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaTiposCancha"><tr><td colspan="2">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Predios y canchas propias de la Liga (opcional) -->
+      <div id="subConfigPredios" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Predios y canchas propias de la Liga</h2>
+            <button class="btn" id="btnMostrarFormPredio">+ Nuevo predio</button>
+          </div>
+          <p class="texto-ayuda">Opcional. Cargá acá los predios propios de tu Liga y las canchas de cada uno, para poder asignarlas después a los partidos del fixture de los torneos que jueguen en "canchas propias de la Liga".</p>
+          <form id="formPredio" class="oculto">
+            <input type="hidden" id="predioIdEdicion">
+            <div class="form-grid">
+              <div><label for="predioNombre">Nombre del predio *</label><input type="text" id="predioNombre" required placeholder="ej: Predio Municipal"></div>
+              <div><label for="predioDireccion">Dirección</label><input type="text" id="predioDireccion"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormPredio">Cancelar</button>
+            <p class="mensaje-error oculto" id="predioFormError"></p>
+          </form>
+          <div id="listaPredios"><p class="texto-ayuda">Cargando...</p></div>
+        </div>
+
+        <!-- Popup: canchas de un predio puntual -->
+        <div class="oculto panel popup-modal" id="modalCanchasPredio">
+          <div class="panel-header">
+            <h2 id="tituloCanchasPredio">Canchas del predio</h2>
+            <button class="btn btn-secundario" id="btnCerrarCanchasPredio">Cerrar</button>
+          </div>
+          <table>
+            <thead><tr><th>Nombre</th><th>Techo</th><th>Tamaño</th><th>Tipo de cancha</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaCanchasPredio"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          </table>
+          <form id="formCanchaPredio" style="margin-top:12px;">
+            <input type="hidden" id="canchaPredioIdEdicion">
+            <div class="form-grid">
+              <div><label for="canchaPredioNombre">Nombre de la cancha *</label><input type="text" id="canchaPredioNombre" required placeholder="ej: Cancha 1"></div>
+              <div>
+                <label for="canchaPredioTecho">Techada o al aire libre</label>
+                <select id="canchaPredioTecho">
+                  <option value="aire_libre">Aire libre</option>
+                  <option value="techada">Techada</option>
+                </select>
+              </div>
+              <div><label for="canchaPredioTamanio">Tamaño</label><input type="text" id="canchaPredioTamanio"></div>
+              <div>
+                <label for="canchaPredioTipo">Tipo de cancha</label>
+                <select id="canchaPredioTipo"><option value="">Sin especificar</option></select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-pequeno" id="btnGuardarCanchaPredio">Agregar cancha</button>
+            <button type="button" class="btn btn-secundario btn-pequeno oculto" id="btnCancelarCanchaPredio">Cancelar edición</button>
+            <p class="mensaje-error oculto" id="canchaPredioFormError"></p>
+          </form>
         </div>
       </div>
     </div>

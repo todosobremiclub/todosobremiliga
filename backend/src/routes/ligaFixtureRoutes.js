@@ -119,19 +119,66 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 
     const { rows } = await query(
       `SELECT p.*, cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
-              cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color
+              cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color,
+              cl.logo_url AS club_local_logo_url, cv.logo_url AS club_visitante_logo_url,
+              cl.direccion AS club_local_direccion,
+              ccl.tipo_techo AS club_local_cancha_techo, ccl.tamanio AS club_local_cancha_tamanio,
+              tcl.nombre AS club_local_cancha_tipo_nombre,
+              pr.nombre AS predio_nombre, cp.nombre AS cancha_predio_nombre,
+              cp.tipo_techo AS cancha_predio_techo, cp.tamanio AS cancha_predio_tamanio,
+              tcp.nombre AS cancha_predio_tipo_nombre
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
        JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
        JOIN clubes cl ON cl.id = el.club_id
        JOIN clubes cv ON cv.id = ev.club_id
+       LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
+       LEFT JOIN tipos_cancha tcl ON tcl.id = ccl.tipo_cancha_id
+       LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
+       LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
+       LEFT JOIN tipos_cancha tcp ON tcp.id = cp.tipo_cancha_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2
        ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId]
     );
-    res.json({ ok: true, partidos: rows });
+    res.json({ ok: true, partidos: rows, cancha_juego: contexto.cancha_juego });
   } catch (err) {
     console.error('Error en GET partidos:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId —
+// edición rápida de fecha/hora y de dónde se juega (cancha propia de la Liga
+// o, si el torneo es "canchas de los clubes", simplemente la sede en texto).
+router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (req, res) => {
+  const { fecha, hora, sede, cancha_predio_id } = req.body;
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+
+    if (cancha_predio_id) {
+      const canchaOk = await query(
+        `SELECT 1 FROM canchas_predio cp JOIN predios_liga pr ON pr.id = cp.predio_id
+         WHERE cp.id = $1 AND pr.liga_id = $2`,
+        [cancha_predio_id, req.ligaId]
+      );
+      if (!canchaOk.rows[0]) return res.status(400).json({ ok: false, error: 'Esa cancha no pertenece a tu Liga' });
+    }
+
+    const { rows } = await query(
+      `UPDATE partidos SET
+         fecha = $1, hora = $2, sede = COALESCE($3, sede), cancha_predio_id = $4,
+         actualizado_at = NOW()
+       WHERE id = $5 AND torneo_id = $6 AND categoria_id = $7
+       RETURNING *`,
+      [fecha || null, hora || null, sede, cancha_predio_id || null,
+       req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+    res.json({ ok: true, partido: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH partido:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
@@ -219,17 +266,23 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
       return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 equipos inscriptos para generar un fixture' });
     }
 
-    const idaVuelta = ida_vuelta != null ? !!ida_vuelta : contexto.formato_juego === 'liguilla_ida_vuelta';
+    // "Apertura y Clausura" SIEMPRE genera las dos ruedas (apertura + clausura
+    // invirtiendo localía), etiquetando cada partido con su ronda para poder
+    // armar las 3 tablas (apertura / clausura / general) por separado.
+    const esAperturaClausura = contexto.formato_juego === 'apertura_clausura';
+    const idaVuelta = esAperturaClausura ? true : (ida_vuelta != null ? !!ida_vuelta : contexto.formato_juego === 'liguilla_ida_vuelta');
     const rondas = generarRoundRobin(equipoIds, idaVuelta);
+    const mitadRondas = esAperturaClausura ? rondas.length / 2 : null;
 
     let cantidadCreados = 0;
     for (let i = 0; i < rondas.length; i++) {
       const jornada = i + 1;
+      const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
       for (const [localId, visitanteId] of rondas[i]) {
         await query(
-          `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [req.params.torneoId, req.params.categoriaId, localId, visitanteId, jornada]
+          `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [req.params.torneoId, req.params.categoriaId, localId, visitanteId, jornada, ronda]
         );
         cantidadCreados += 1;
       }
@@ -441,16 +494,19 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    // ronda: 'general' (default), o 'apertura'/'clausura' para torneos con
+    // formato "Apertura y Clausura".
+    const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
     const { rows } = await query(
       `SELECT tp.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
        FROM tabla_posiciones tp
        JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
-       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2
+       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = $3
        ORDER BY tp.puntos DESC, tp.diferencia DESC, tp.a_favor DESC`,
-      [req.params.torneoId, req.params.categoriaId]
+      [req.params.torneoId, req.params.categoriaId, ronda]
     );
-    res.json({ ok: true, tabla: rows });
+    res.json({ ok: true, tabla: rows, formato_juego: contexto.formato_juego });
   } catch (err) {
     console.error('Error en GET tabla:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
