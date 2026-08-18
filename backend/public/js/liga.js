@@ -14,6 +14,10 @@ let totalClubesActual = 0;
 let ordenClubesCampo = 'nombre';
 let ordenClubesDireccion = 'asc';
 let clubesSeleccionadosIds = new Set();
+let modalidadesLigaCache = [];
+let tiposGastoCache = [];
+let tiposIngresoCache = [];
+let cuentasLigaCache = [];
 
 // ----- Íconos SVG reutilizados en botones de acciones (evitan depender de
 // librerías externas de íconos y quedan livianos). -----
@@ -107,6 +111,7 @@ function conectarEventos() {
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
   document.getElementById('tabBtnFinanzas').addEventListener('click', () => cambiarTab('finanzas'));
   document.getElementById('tabBtnAgenda').addEventListener('click', () => cambiarTab('agenda'));
+  document.getElementById('tabBtnConfiguracion').addEventListener('click', () => cambiarTab('configuracion'));
 
   // ---- Clubes ----
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
@@ -182,6 +187,10 @@ function conectarEventos() {
   document.getElementById('btnDropdownProvincia').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleDropdownPanel('provincia');
+  });
+  document.getElementById('btnDropdownModalidad').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdownPanel('modalidad');
   });
   document.addEventListener('click', (e) => {
     // Cierra cualquier dropdown de filtro abierto si se hace click afuera.
@@ -382,6 +391,7 @@ function conectarEventos() {
     document.getElementById('formIngreso').reset();
     document.getElementById('ingresoFormError').classList.add('oculto');
     poblarSelectClubesIngreso();
+    poblarSelectFinanzasIngreso();
     document.getElementById('formIngreso').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormIngreso').addEventListener('click', () => {
@@ -392,6 +402,7 @@ function conectarEventos() {
   document.getElementById('btnMostrarFormGasto').addEventListener('click', () => {
     document.getElementById('formGasto').reset();
     document.getElementById('gastoFormError').classList.add('oculto');
+    poblarSelectFinanzasGasto();
     document.getElementById('formGasto').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormGasto').addEventListener('click', () => {
@@ -409,18 +420,68 @@ function conectarEventos() {
     document.getElementById('formEvento').classList.add('oculto');
   });
   document.getElementById('formEvento').addEventListener('submit', guardarEvento);
+
+  // ---- Configuración ----
+  document.getElementById('tabBtnConfigModalidades').addEventListener('click', () => cambiarTabConfig('modalidades'));
+  document.getElementById('tabBtnConfigTiposGasto').addEventListener('click', () => cambiarTabConfig('tiposGasto'));
+  document.getElementById('tabBtnConfigTiposIngreso').addEventListener('click', () => cambiarTabConfig('tiposIngreso'));
+  document.getElementById('tabBtnConfigCuentas').addEventListener('click', () => cambiarTabConfig('cuentas'));
+
+  document.getElementById('btnMostrarFormModalidad').addEventListener('click', () => {
+    document.getElementById('formModalidad').reset();
+    document.getElementById('modalidadIdEdicion').value = '';
+    document.getElementById('modalidadFormError').classList.add('oculto');
+    document.getElementById('formModalidad').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormModalidad').addEventListener('click', () => {
+    document.getElementById('formModalidad').classList.add('oculto');
+  });
+  document.getElementById('formModalidad').addEventListener('submit', guardarModalidad);
+
+  document.getElementById('btnMostrarFormTipoGasto').addEventListener('click', () => {
+    document.getElementById('formTipoGasto').reset();
+    document.getElementById('tipoGastoIdEdicion').value = '';
+    document.getElementById('tipoGastoFormError').classList.add('oculto');
+    document.getElementById('formTipoGasto').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormTipoGasto').addEventListener('click', () => {
+    document.getElementById('formTipoGasto').classList.add('oculto');
+  });
+  document.getElementById('formTipoGasto').addEventListener('submit', guardarTipoGasto);
+
+  document.getElementById('btnMostrarFormTipoIngreso').addEventListener('click', () => {
+    document.getElementById('formTipoIngreso').reset();
+    document.getElementById('tipoIngresoIdEdicion').value = '';
+    document.getElementById('tipoIngresoFormError').classList.add('oculto');
+    document.getElementById('formTipoIngreso').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormTipoIngreso').addEventListener('click', () => {
+    document.getElementById('formTipoIngreso').classList.add('oculto');
+  });
+  document.getElementById('formTipoIngreso').addEventListener('submit', guardarTipoIngreso);
+
+  document.getElementById('btnMostrarFormCuenta').addEventListener('click', () => {
+    document.getElementById('formCuenta').reset();
+    document.getElementById('cuentaIdEdicion').value = '';
+    document.getElementById('cuentaFormError').classList.add('oculto');
+    document.getElementById('formCuenta').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormCuenta').addEventListener('click', () => {
+    document.getElementById('formCuenta').classList.add('oculto');
+  });
+  document.getElementById('formCuenta').addEventListener('submit', guardarCuenta);
 }
 
 function cambiarTab(nombre) {
   const secciones = {
     clubes: 'seccionClubes', torneos: 'seccionTorneos', postulaciones: 'seccionPostulaciones', fichajes: 'seccionFichajes',
     noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones',
-    finanzas: 'seccionFinanzas', agenda: 'seccionAgenda'
+    finanzas: 'seccionFinanzas', agenda: 'seccionAgenda', configuracion: 'seccionConfiguracion'
   };
   const botones = {
     clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos', postulaciones: 'tabBtnPostulaciones', fichajes: 'tabBtnFichajes',
     noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones',
-    finanzas: 'tabBtnFinanzas', agenda: 'tabBtnAgenda'
+    finanzas: 'tabBtnFinanzas', agenda: 'tabBtnAgenda', configuracion: 'tabBtnConfiguracion'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -438,6 +499,292 @@ function cambiarTab(nombre) {
   if (nombre === 'notificaciones') cargarNotificaciones();
   if (nombre === 'finanzas') cargarFinanzas();
   if (nombre === 'agenda') cargarAgenda();
+  if (nombre === 'configuracion') cambiarTabConfig('modalidades');
+}
+
+// ===================== CONFIGURACIÓN =====================
+
+function cambiarTabConfig(nombre) {
+  const secciones = {
+    modalidades: 'subConfigModalidades', tiposGasto: 'subConfigTiposGasto',
+    tiposIngreso: 'subConfigTiposIngreso', cuentas: 'subConfigCuentas'
+  };
+  const botones = {
+    modalidades: 'tabBtnConfigModalidades', tiposGasto: 'tabBtnConfigTiposGasto',
+    tiposIngreso: 'tabBtnConfigTiposIngreso', cuentas: 'tabBtnConfigCuentas'
+  };
+  Object.keys(secciones).forEach((key) => {
+    document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
+    document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
+  });
+  if (nombre === 'modalidades') cargarModalidades();
+  if (nombre === 'tiposGasto') cargarTiposGasto();
+  if (nombre === 'tiposIngreso') cargarTiposIngreso();
+  if (nombre === 'cuentas') cargarCuentas();
+}
+
+// ----- Categorías de torneo (modalidades) -----
+
+async function cargarModalidades() {
+  const tbody = document.getElementById('tablaModalidades');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/modalidades');
+    modalidadesLigaCache = data.modalidades;
+    if (!modalidadesLigaCache.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no cargaste categorías de torneo.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = modalidadesLigaCache.map((m) => `
+      <tr>
+        <td>${escapeHtml(m.nombre)}</td>
+        <td>${m.precio != null ? `$${Number(m.precio).toLocaleString('es-AR')}` : '-'}</td>
+        <td>${m.cantidad_clubes}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarModalidad('${m.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarModalidad('${m.id}', '${escapeHtml(m.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarModalidad(id) {
+  const m = modalidadesLigaCache.find((x) => x.id === id);
+  if (!m) return;
+  document.getElementById('modalidadIdEdicion').value = m.id;
+  document.getElementById('modalidadNombre').value = m.nombre || '';
+  document.getElementById('modalidadPrecio').value = m.precio != null ? m.precio : '';
+  document.getElementById('modalidadFormError').classList.add('oculto');
+  document.getElementById('formModalidad').classList.remove('oculto');
+}
+
+async function eliminarModalidad(id, nombre) {
+  if (!confirm(`¿Eliminar la categoría de torneo "${nombre}"? Los clubes anotados en ella dejan de estarlo.`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/modalidades/${id}`, { method: 'DELETE' });
+    cargarModalidades();
+    cargarFiltroModalidadesClubes();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarModalidad(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('modalidadFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('modalidadIdEdicion').value;
+  const cuerpo = {
+    nombre: document.getElementById('modalidadNombre').value.trim(),
+    precio: document.getElementById('modalidadPrecio').value || undefined
+  };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/modalidades/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/modalidades', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formModalidad').reset();
+    document.getElementById('modalidadIdEdicion').value = '';
+    document.getElementById('formModalidad').classList.add('oculto');
+    cargarModalidades();
+    cargarFiltroModalidadesClubes();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Tipos de gasto -----
+
+async function cargarTiposGasto() {
+  const tbody = document.getElementById('tablaTiposGasto');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/tipos-gasto');
+    tiposGastoCache = data.tipos;
+    tbody.innerHTML = tiposGastoCache.length ? tiposGastoCache.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.nombre)}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarTipoGasto('${t.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarTipoGasto('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="2">Todavía no cargaste tipos de gasto.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarTipoGasto(id) {
+  const t = tiposGastoCache.find((x) => x.id === id);
+  if (!t) return;
+  document.getElementById('tipoGastoIdEdicion').value = t.id;
+  document.getElementById('tipoGastoNombre').value = t.nombre || '';
+  document.getElementById('tipoGastoFormError').classList.add('oculto');
+  document.getElementById('formTipoGasto').classList.remove('oculto');
+}
+
+async function eliminarTipoGasto(id, nombre) {
+  if (!confirm(`¿Eliminar el tipo de gasto "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/tipos-gasto/${id}`, { method: 'DELETE' });
+    cargarTiposGasto();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarTipoGasto(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('tipoGastoFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('tipoGastoIdEdicion').value;
+  const cuerpo = { nombre: document.getElementById('tipoGastoNombre').value.trim() };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/tipos-gasto/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/tipos-gasto', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formTipoGasto').reset();
+    document.getElementById('tipoGastoIdEdicion').value = '';
+    document.getElementById('formTipoGasto').classList.add('oculto');
+    cargarTiposGasto();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Tipos de ingreso -----
+
+async function cargarTiposIngreso() {
+  const tbody = document.getElementById('tablaTiposIngreso');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/tipos-ingreso');
+    tiposIngresoCache = data.tipos;
+    tbody.innerHTML = tiposIngresoCache.length ? tiposIngresoCache.map((t) => `
+      <tr>
+        <td>${escapeHtml(t.nombre)}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarTipoIngreso('${t.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarTipoIngreso('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="2">Todavía no cargaste tipos de ingreso.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarTipoIngreso(id) {
+  const t = tiposIngresoCache.find((x) => x.id === id);
+  if (!t) return;
+  document.getElementById('tipoIngresoIdEdicion').value = t.id;
+  document.getElementById('tipoIngresoNombre').value = t.nombre || '';
+  document.getElementById('tipoIngresoFormError').classList.add('oculto');
+  document.getElementById('formTipoIngreso').classList.remove('oculto');
+}
+
+async function eliminarTipoIngreso(id, nombre) {
+  if (!confirm(`¿Eliminar el tipo de ingreso "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/tipos-ingreso/${id}`, { method: 'DELETE' });
+    cargarTiposIngreso();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarTipoIngreso(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('tipoIngresoFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('tipoIngresoIdEdicion').value;
+  const cuerpo = { nombre: document.getElementById('tipoIngresoNombre').value.trim() };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/tipos-ingreso/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/tipos-ingreso', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formTipoIngreso').reset();
+    document.getElementById('tipoIngresoIdEdicion').value = '';
+    document.getElementById('formTipoIngreso').classList.add('oculto');
+    cargarTiposIngreso();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ----- Cuentas de la Liga -----
+
+async function cargarCuentas() {
+  const tbody = document.getElementById('tablaCuentas');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/configuracion/cuentas');
+    cuentasLigaCache = data.cuentas;
+    tbody.innerHTML = cuentasLigaCache.length ? cuentasLigaCache.map((c) => `
+      <tr>
+        <td>${escapeHtml(c.nombre)}</td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarCuenta('${c.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarCuenta('${c.id}', '${escapeHtml(c.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="2">Todavía no cargaste cuentas.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function editarCuenta(id) {
+  const c = cuentasLigaCache.find((x) => x.id === id);
+  if (!c) return;
+  document.getElementById('cuentaIdEdicion').value = c.id;
+  document.getElementById('cuentaNombre').value = c.nombre || '';
+  document.getElementById('cuentaFormError').classList.add('oculto');
+  document.getElementById('formCuenta').classList.remove('oculto');
+}
+
+async function eliminarCuenta(id, nombre) {
+  if (!confirm(`¿Eliminar la cuenta "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/liga/configuracion/cuentas/${id}`, { method: 'DELETE' });
+    cargarCuentas();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function guardarCuenta(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('cuentaFormError');
+  errorEl.classList.add('oculto');
+  const id = document.getElementById('cuentaIdEdicion').value;
+  const cuerpo = { nombre: document.getElementById('cuentaNombre').value.trim() };
+  try {
+    if (id) {
+      await apiFetch(`/liga/configuracion/cuentas/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+    } else {
+      await apiFetch('/liga/configuracion/cuentas', { method: 'POST', body: JSON.stringify(cuerpo) });
+    }
+    document.getElementById('formCuenta').reset();
+    document.getElementById('cuentaIdEdicion').value = '';
+    document.getElementById('formCuenta').classList.add('oculto');
+    cargarCuentas();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
 }
 
 // ===================== FICHAJES (aprobar/rechazar) =====================
@@ -533,19 +880,23 @@ function actualizarFlechasOrdenClubes() {
 // pantalla) por un botón compacto que despliega una lista de checkboxes.
 const dropdownsMultipleFiltro = {}; // { ciudad: {opciones:[], seleccion:Set}, provincia: {...} }
 
+// `opciones` acepta un array de strings (ej: ciudades) o de objetos
+// {value, label} (ej: modalidades, donde el value es el id y el label el
+// nombre a mostrar).
 function armarDropdownMultiple(clave, opciones) {
+  const normalizadas = opciones.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
   dropdownsMultipleFiltro[clave] = dropdownsMultipleFiltro[clave] || { opciones: [], seleccion: new Set() };
-  dropdownsMultipleFiltro[clave].opciones = opciones;
+  dropdownsMultipleFiltro[clave].opciones = normalizadas;
   const panel = document.getElementById(`panelDropdown${capitalizar(clave)}`);
-  if (!opciones.length) {
+  if (!normalizadas.length) {
     panel.innerHTML = '<div class="dropdown-multi-vacio">No hay valores cargados todavía.</div>';
     return;
   }
-  panel.innerHTML = opciones.map((valor) => `
+  panel.innerHTML = normalizadas.map((op) => `
     <label class="dropdown-multi-opcion">
-      <input type="checkbox" class="chk-dropdown-multi" data-clave="${clave}" value="${escapeHtml(valor)}"
-        ${dropdownsMultipleFiltro[clave].seleccion.has(valor) ? 'checked' : ''}>
-      ${escapeHtml(valor)}
+      <input type="checkbox" class="chk-dropdown-multi" data-clave="${clave}" value="${escapeHtml(op.value)}"
+        ${dropdownsMultipleFiltro[clave].seleccion.has(op.value) ? 'checked' : ''}>
+      ${escapeHtml(op.label)}
     </label>
   `).join('');
   panel.querySelectorAll('.chk-dropdown-multi').forEach((chk) => {
@@ -593,6 +944,19 @@ async function cargarFiltrosDisponiblesClubes() {
   } catch (err) {
     // si falla, los filtros quedan vacíos (no bloquea el resto de la pantalla)
   }
+  cargarFiltroModalidadesClubes();
+}
+
+// Trae las categorías de torneo (modalidades) configuradas en Configuración,
+// para poder filtrar los Clubes por ellas (ej: "traeme solo los que juegan Senior").
+async function cargarFiltroModalidadesClubes() {
+  try {
+    const data = await apiFetch('/liga/configuracion/modalidades');
+    modalidadesLigaCache = data.modalidades;
+    armarDropdownMultiple('modalidad', data.modalidades.map((m) => ({ value: m.id, label: m.nombre })));
+  } catch (err) {
+    // si falla, el filtro queda vacío
+  }
 }
 
 async function cargarClubes() {
@@ -601,6 +965,7 @@ async function cargarClubes() {
   const texto = document.getElementById('buscadorClubes').value.trim();
   const ciudades = valoresDropdown('ciudad');
   const provincias = valoresDropdown('provincia');
+  const modalidades = valoresDropdown('modalidad');
   const canchaTecho = document.getElementById('filtroClubesCancha').value;
   const incluirInactivos = document.getElementById('filtroClubesInactivos').checked;
   const soloReglamentaria = document.getElementById('filtroClubesReglamentaria').checked;
@@ -615,6 +980,7 @@ async function cargarClubes() {
     if (texto) params.set('q', texto);
     ciudades.forEach((c) => params.append('ciudad', c));
     provincias.forEach((p) => params.append('provincia', p));
+    modalidades.forEach((m) => params.append('modalidad_id', m));
     if (canchaTecho) params.set('cancha_techo', canchaTecho);
     if (incluirInactivos) params.set('incluir_inactivos', 'true');
     if (soloReglamentaria) params.set('cancha_reglamentaria', 'true');
@@ -899,6 +1265,8 @@ function limpiarFormClub() {
   document.getElementById('btnGestionarCanchas').classList.add('oculto');
   document.getElementById('panelCanchasClub').classList.add('oculto');
   document.getElementById('bloqueEstadoClub').classList.add('oculto');
+  document.getElementById('bloqueModalidadesClub').classList.add('oculto');
+  document.getElementById('listaModalidadesClub').innerHTML = '';
   document.getElementById('btnAbrirDocumentosDesdeForm').classList.add('oculto');
   document.getElementById('btnAbrirComentariosDesdeForm').classList.add('oculto');
 }
@@ -940,7 +1308,43 @@ function editarClub(clubId) {
   document.getElementById('clubActivoEnLiga').checked = !!club.activo_en_liga;
   document.getElementById('btnAbrirDocumentosDesdeForm').classList.remove('oculto');
   document.getElementById('btnAbrirComentariosDesdeForm').classList.remove('oculto');
+  document.getElementById('bloqueModalidadesClub').classList.remove('oculto');
+  cargarModalidadesDeClub(club.id);
   mostrarFondoModal();
+}
+
+// Trae las categorías de torneo de la Liga (modalidades) marcando en cuáles
+// participa este club, y pinta los checkboxes dentro del popup de edición.
+async function cargarModalidadesDeClub(clubId) {
+  const cont = document.getElementById('listaModalidadesClub');
+  cont.innerHTML = '<span class="texto-ayuda">Cargando...</span>';
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubId}/modalidades`);
+    if (!data.modalidades.length) {
+      cont.innerHTML = '<span class="texto-ayuda">Todavía no configuraste categorías de torneo en tu Liga (Configuración → Categorías de torneo).</span>';
+      return;
+    }
+    cont.innerHTML = data.modalidades.map((m) => `
+      <label class="check-inline">
+        <input type="checkbox" class="chk-modalidad-club" value="${m.id}" ${m.anotado ? 'checked' : ''}>
+        ${escapeHtml(m.nombre)}${m.precio != null ? ` ($${Number(m.precio).toLocaleString('es-AR')})` : ''}
+      </label>
+    `).join('');
+  } catch (err) {
+    cont.innerHTML = `<span class="mensaje-error">Error: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+async function guardarModalidadesDeClub(clubId) {
+  const seleccionadas = Array.from(document.querySelectorAll('.chk-modalidad-club:checked')).map((el) => el.value);
+  try {
+    await apiFetch(`/liga/clubes/${clubId}/modalidades`, {
+      method: 'PUT',
+      body: JSON.stringify({ modalidad_ids: seleccionadas })
+    });
+  } catch (err) {
+    alert('El club se guardó, pero hubo un error al guardar sus categorías de torneo: ' + err.message);
+  }
 }
 
 async function guardarClub(e) {
@@ -968,6 +1372,7 @@ async function guardarClub(e) {
   try {
     if (id) {
       await apiFetch(`/liga/clubes/${id}`, { method: 'PUT', body: JSON.stringify(cuerpo) });
+      await guardarModalidadesDeClub(id);
     } else {
       await apiFetch('/liga/clubes', { method: 'POST', body: JSON.stringify(cuerpo) });
     }
@@ -2386,6 +2791,46 @@ function poblarSelectClubesIngreso() {
   select.innerHTML = '<option value="">Sin asociar a un club</option>' + opciones;
 }
 
+// Trae (si todavía no están en caché) los tipos de gasto/ingreso y las
+// cuentas configuradas en Configuración, para poblar los desplegables de
+// los formularios de Finanzas.
+async function asegurarListasFinanzas() {
+  try {
+    if (!cuentasLigaCache.length) {
+      const data = await apiFetch('/liga/configuracion/cuentas');
+      cuentasLigaCache = data.cuentas;
+    }
+  } catch (err) { /* si falla, el select de cuenta queda con la opción por defecto */ }
+}
+
+async function poblarSelectFinanzasIngreso() {
+  await asegurarListasFinanzas();
+  try {
+    if (!tiposIngresoCache.length) {
+      const data = await apiFetch('/liga/configuracion/tipos-ingreso');
+      tiposIngresoCache = data.tipos;
+    }
+  } catch (err) { /* si falla, el select de tipo queda con la opción por defecto */ }
+  document.getElementById('ingresoTipo').innerHTML = '<option value="">Sin clasificar</option>' +
+    tiposIngresoCache.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  document.getElementById('ingresoCuenta').innerHTML = '<option value="">Sin especificar</option>' +
+    cuentasLigaCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+}
+
+async function poblarSelectFinanzasGasto() {
+  await asegurarListasFinanzas();
+  try {
+    if (!tiposGastoCache.length) {
+      const data = await apiFetch('/liga/configuracion/tipos-gasto');
+      tiposGastoCache = data.tipos;
+    }
+  } catch (err) { /* si falla, el select de tipo queda con la opción por defecto */ }
+  document.getElementById('gastoTipo').innerHTML = '<option value="">Sin clasificar</option>' +
+    tiposGastoCache.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  document.getElementById('gastoCuenta').innerHTML = '<option value="">Sin especificar</option>' +
+    cuentasLigaCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+}
+
 function formatearMonto(monto) {
   return '$' + Number(monto).toLocaleString('es-AR', { minimumFractionDigits: 2 });
 }
@@ -2404,20 +2849,22 @@ async function cargarIngresos() {
     document.getElementById('totalIngresos').textContent = formatearMonto(total);
 
     if (!ingresos.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún ingreso.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">Todavía no cargaste ningún ingreso.</td></tr>';
       return;
     }
     tbody.innerHTML = ingresos.map((i) => `
       <tr>
         <td>${escapeHtml(i.concepto)}</td>
         <td>${escapeHtml(i.club_nombre || '-')}</td>
+        <td>${escapeHtml(i.tipo_ingreso_nombre || '-')}</td>
+        <td>${escapeHtml(i.cuenta_nombre || '-')}</td>
         <td>${formatearMonto(i.monto)}</td>
         <td>${new Date(i.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
         <td><button class="btn btn-peligro btn-pequeno" onclick="borrarIngreso('${i.id}')">Borrar</button></td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -2431,7 +2878,8 @@ async function guardarIngreso(e) {
     monto: document.getElementById('ingresoMonto').value,
     fecha: document.getElementById('ingresoFecha').value || undefined,
     club_id: document.getElementById('ingresoClub').value || undefined,
-    categoria: document.getElementById('ingresoCategoria').value.trim() || undefined
+    tipo_ingreso_id: document.getElementById('ingresoTipo').value || undefined,
+    cuenta_id: document.getElementById('ingresoCuenta').value || undefined
   };
 
   try {
@@ -2464,20 +2912,21 @@ async function cargarGastos() {
     document.getElementById('totalGastos').textContent = formatearMonto(total);
 
     if (!gastos.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún gasto.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Todavía no cargaste ningún gasto.</td></tr>';
       return;
     }
     tbody.innerHTML = gastos.map((g) => `
       <tr>
         <td>${escapeHtml(g.concepto)}</td>
-        <td>${escapeHtml(g.categoria || '-')}</td>
+        <td>${escapeHtml(g.tipo_gasto_nombre || g.categoria || '-')}</td>
+        <td>${escapeHtml(g.cuenta_nombre || '-')}</td>
         <td>${formatearMonto(g.monto)}</td>
         <td>${new Date(g.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
         <td><button class="btn btn-peligro btn-pequeno" onclick="borrarGasto('${g.id}')">Borrar</button></td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -2490,7 +2939,8 @@ async function guardarGasto(e) {
     concepto: document.getElementById('gastoConcepto').value.trim(),
     monto: document.getElementById('gastoMonto').value,
     fecha: document.getElementById('gastoFecha').value || undefined,
-    categoria: document.getElementById('gastoCategoria').value.trim() || undefined
+    tipo_gasto_id: document.getElementById('gastoTipo').value || undefined,
+    cuenta_id: document.getElementById('gastoCuenta').value || undefined
   };
 
   try {

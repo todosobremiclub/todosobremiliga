@@ -49,6 +49,7 @@ router.get('/', async (req, res) => {
     };
     const ciudades = normalizarLista(req.query.ciudad);
     const provincias = normalizarLista(req.query.provincia);
+    const modalidadIds = normalizarLista(req.query.modalidad_id);
     const canchaTecho = (req.query.cancha_techo || '').trim();
     const soloReglamentaria = req.query.cancha_reglamentaria === 'true';
     const incluirInactivos = req.query.incluir_inactivos === 'true';
@@ -69,6 +70,10 @@ router.get('/', async (req, res) => {
     if (provincias.length) {
       params.push(provincias);
       filtros += ` AND c.provincia = ANY($${params.length}::text[])`;
+    }
+    if (modalidadIds.length) {
+      params.push(modalidadIds);
+      filtros += ` AND EXISTS (SELECT 1 FROM club_modalidades cm WHERE cm.club_id = c.id AND cm.modalidad_id = ANY($${params.length}::uuid[]))`;
     }
     if (!incluirInactivos) {
       filtros += ` AND cl.activo = TRUE`;
@@ -656,6 +661,58 @@ router.put('/:clubId/participaciones', async (req, res) => {
     res.json({ ok: true, agregadas: aAgregar.length, quitadas: aQuitar.length });
   } catch (err) {
     console.error('Error en PUT participaciones:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// ===== Modalidades del club (Categorías de torneo configuradas en la Liga:
+// Futsal, Senior, Leyendas, etc. — no confundir con las "categorías" propias
+// de cada torneo). Un club puede estar anotado en varias a la vez. =====
+
+// GET /liga/clubes/:clubId/modalidades — modalidades en las que este club
+// está anotado + el listado completo de modalidades de la Liga (para poder
+// armar los checkboxes de "está anotado / no está anotado" en el front).
+router.get('/:clubId/modalidades', async (req, res) => {
+  try {
+    const pertenece = await query('SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2', [req.params.clubId, req.ligaId]);
+    if (!pertenece.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+
+    const todas = await query('SELECT * FROM modalidades_liga WHERE liga_id = $1 ORDER BY nombre ASC', [req.ligaId]);
+    const anotadas = await query('SELECT modalidad_id FROM club_modalidades WHERE club_id = $1', [req.params.clubId]);
+    const anotadasIds = new Set(anotadas.rows.map((r) => r.modalidad_id));
+    res.json({
+      ok: true,
+      modalidades: todas.rows.map((m) => ({ ...m, anotado: anotadasIds.has(m.id) }))
+    });
+  } catch (err) {
+    console.error('Error en GET /:clubId/modalidades:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/clubes/:clubId/modalidades — reemplaza por completo el conjunto
+// de modalidades del club (body: { modalidad_ids: [] }).
+router.put('/:clubId/modalidades', async (req, res) => {
+  const { modalidad_ids } = req.body;
+  if (!Array.isArray(modalidad_ids)) {
+    return res.status(400).json({ ok: false, error: 'Falta modalidad_ids (array)' });
+  }
+  try {
+    const pertenece = await query('SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2', [req.params.clubId, req.ligaId]);
+    if (!pertenece.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+
+    const validasResult = modalidad_ids.length
+      ? await query('SELECT id FROM modalidades_liga WHERE liga_id = $1 AND id = ANY($2::uuid[])', [req.ligaId, modalidad_ids])
+      : { rows: [] };
+    const idsValidos = validasResult.rows.map((r) => r.id);
+
+    await query('DELETE FROM club_modalidades WHERE club_id = $1', [req.params.clubId]);
+    for (const modalidadId of idsValidos) {
+      await query('INSERT INTO club_modalidades (club_id, modalidad_id) VALUES ($1, $2)', [req.params.clubId, modalidadId]);
+    }
+    res.json({ ok: true, guardadas: idsValidos.length });
+  } catch (err) {
+    console.error('Error en PUT /:clubId/modalidades:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

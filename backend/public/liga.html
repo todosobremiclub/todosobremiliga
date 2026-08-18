@@ -126,6 +126,7 @@
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
       <button class="tab-btn" id="tabBtnFinanzas">Finanzas</button>
       <button class="tab-btn" id="tabBtnAgenda">Agenda</button>
+      <button class="tab-btn" id="tabBtnConfiguracion">Configuración</button>
     </div>
 
     <!-- ===== SECCIÓN CLUBES ===== -->
@@ -159,6 +160,12 @@
             <option value="aire_libre">Aire libre</option>
             <option value="techada">Techada</option>
           </select>
+          <div class="dropdown-multi" id="dropdownModalidad">
+            <button type="button" class="dropdown-multi-boton" id="btnDropdownModalidad">
+              Categoría de torneo <span class="dropdown-multi-contador oculto" id="contadorModalidad">0</span> ▾
+            </button>
+            <div class="dropdown-multi-panel oculto" id="panelDropdownModalidad"></div>
+          </div>
           <label class="check-inline">
             <input type="checkbox" id="filtroClubesInactivos"> Ver inactivos
           </label>
@@ -262,6 +269,12 @@
           <label class="check-inline" style="margin-bottom:10px;">
             <input type="checkbox" id="clubCanchaReglamentaria"> Cancha reglamentaria (40x20)
           </label>
+
+          <div class="oculto" id="bloqueModalidadesClub" style="margin:10px 0;">
+            <h3 style="margin-bottom:4px;">Categorías de torneo en las que participa</h3>
+            <p class="texto-ayuda" style="margin-top:0;">Se configuran en Configuración → Categorías de torneo. Tildá en cuáles participa este club (puede ser en varias, o en ninguna).</p>
+            <div id="listaModalidadesClub" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+          </div>
 
           <div class="oculto" id="bloqueEstadoClub" style="margin:10px 0;">
             <label class="check-inline">
@@ -897,15 +910,22 @@
               <label for="ingresoClub">Club (opcional)</label>
               <select id="ingresoClub"><option value="">Sin asociar a un club</option></select>
             </div>
-            <div><label for="ingresoCategoria">Categoría</label><input type="text" id="ingresoCategoria" placeholder="ej: cuota, sponsor"></div>
+            <div>
+              <label for="ingresoTipo">Tipo de ingreso</label>
+              <select id="ingresoTipo"><option value="">Sin clasificar</option></select>
+            </div>
+            <div>
+              <label for="ingresoCuenta">Cuenta</label>
+              <select id="ingresoCuenta"><option value="">Sin especificar</option></select>
+            </div>
           </div>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormIngreso">Cancelar</button>
           <p class="mensaje-error oculto" id="ingresoFormError"></p>
         </form>
         <table>
-          <thead><tr><th>Concepto</th><th>Club</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaIngresos"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <thead><tr><th>Concepto</th><th>Club</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaIngresos"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -919,15 +939,22 @@
             <div><label for="gastoConcepto">Concepto *</label><input type="text" id="gastoConcepto" required></div>
             <div><label for="gastoMonto">Monto *</label><input type="number" id="gastoMonto" step="0.01" required></div>
             <div><label for="gastoFecha">Fecha</label><input type="date" id="gastoFecha"></div>
-            <div><label for="gastoCategoria">Categoría</label><input type="text" id="gastoCategoria" placeholder="ej: arbitrajes, cancha"></div>
+            <div>
+              <label for="gastoTipo">Tipo de gasto</label>
+              <select id="gastoTipo"><option value="">Sin clasificar</option></select>
+            </div>
+            <div>
+              <label for="gastoCuenta">Cuenta</label>
+              <select id="gastoCuenta"><option value="">Sin especificar</option></select>
+            </div>
           </div>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormGasto">Cancelar</button>
           <p class="mensaje-error oculto" id="gastoFormError"></p>
         </form>
         <table>
-          <thead><tr><th>Concepto</th><th>Categoría</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaGastos"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <thead><tr><th>Concepto</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaGastos"><tr><td colspan="6">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -966,6 +993,113 @@
           <thead><tr><th>Fecha</th><th>Título</th><th>Tipo</th><th>Lugar</th><th>Acciones</th></tr></thead>
           <tbody id="tablaAgenda"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN CONFIGURACIÓN ===== -->
+    <div id="seccionConfiguracion" class="oculto">
+      <div class="tabs">
+        <button class="tab-btn activo" id="tabBtnConfigModalidades">Categorías de torneo</button>
+        <button class="tab-btn" id="tabBtnConfigTiposGasto">Tipos de gasto</button>
+        <button class="tab-btn" id="tabBtnConfigTiposIngreso">Tipos de ingreso</button>
+        <button class="tab-btn" id="tabBtnConfigCuentas">Cuentas</button>
+      </div>
+
+      <!-- Categorías de torneo (modalidades): Futsal, Senior, Leyendas, etc. -->
+      <div id="subConfigModalidades">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Categorías de torneo</h2>
+            <button class="btn" id="btnMostrarFormModalidad">+ Nueva categoría</button>
+          </div>
+          <p class="texto-ayuda">Son categorías propias de tu Liga (ej: Futsal, Senior, Leyendas) — no confundir con las categorías de cada torneo. Cada club puede anotarse en varias, y podés cobrarle un precio fijo a cada categoría. Después vas a poder filtrar los Clubes por estas categorías.</p>
+          <form id="formModalidad" class="oculto">
+            <input type="hidden" id="modalidadIdEdicion">
+            <div class="form-grid">
+              <div><label for="modalidadNombre">Nombre *</label><input type="text" id="modalidadNombre" required placeholder="ej: Senior"></div>
+              <div><label for="modalidadPrecio">Precio</label><input type="number" id="modalidadPrecio" step="0.01" min="0"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormModalidad">Cancelar</button>
+            <p class="mensaje-error oculto" id="modalidadFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Precio</th><th>Clubes anotados</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaModalidades"><tr><td colspan="4">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tipos de gasto -->
+      <div id="subConfigTiposGasto" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Tipos de gasto</h2>
+            <button class="btn" id="btnMostrarFormTipoGasto">+ Nuevo tipo</button>
+          </div>
+          <p class="texto-ayuda">Esta lista aparece como desplegable al cargar un Gasto en Finanzas.</p>
+          <form id="formTipoGasto" class="oculto">
+            <input type="hidden" id="tipoGastoIdEdicion">
+            <div class="form-grid una-columna">
+              <div><label for="tipoGastoNombre">Nombre *</label><input type="text" id="tipoGastoNombre" required placeholder="ej: Arbitrajes"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormTipoGasto">Cancelar</button>
+            <p class="mensaje-error oculto" id="tipoGastoFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaTiposGasto"><tr><td colspan="2">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tipos de ingreso -->
+      <div id="subConfigTiposIngreso" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Tipos de ingreso</h2>
+            <button class="btn" id="btnMostrarFormTipoIngreso">+ Nuevo tipo</button>
+          </div>
+          <p class="texto-ayuda">Esta lista aparece como desplegable al cargar un Ingreso en Finanzas.</p>
+          <form id="formTipoIngreso" class="oculto">
+            <input type="hidden" id="tipoIngresoIdEdicion">
+            <div class="form-grid una-columna">
+              <div><label for="tipoIngresoNombre">Nombre *</label><input type="text" id="tipoIngresoNombre" required placeholder="ej: Cuota societaria"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormTipoIngreso">Cancelar</button>
+            <p class="mensaje-error oculto" id="tipoIngresoFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaTiposIngreso"><tr><td colspan="2">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Cuentas de la Liga -->
+      <div id="subConfigCuentas" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Cuentas</h2>
+            <button class="btn" id="btnMostrarFormCuenta">+ Nueva cuenta</button>
+          </div>
+          <p class="texto-ayuda">Cuentas o cajas de tu Liga (ej: Banco Galicia, Caja chica, Mercado Pago) — se eligen tanto al registrar un Gasto como un Ingreso.</p>
+          <form id="formCuenta" class="oculto">
+            <input type="hidden" id="cuentaIdEdicion">
+            <div class="form-grid una-columna">
+              <div><label for="cuentaNombre">Nombre *</label><input type="text" id="cuentaNombre" required placeholder="ej: Banco Galicia"></div>
+            </div>
+            <button type="submit" class="btn">Guardar</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormCuenta">Cancelar</button>
+            <p class="mensaje-error oculto" id="cuentaFormError"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaCuentas"><tr><td colspan="2">Cargando...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

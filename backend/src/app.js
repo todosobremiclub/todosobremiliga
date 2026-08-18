@@ -58,6 +58,9 @@ app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), 
 app.use('/liga/perfil', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPerfilRoutes'));
 // Postulaciones de Clubes recibidas por el formulario público (QR/link), a aceptar o rechazar.
 app.use('/liga/postulaciones', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPostulacionesRoutes'));
+// Configuración de la Liga: categorías de torneo (modalidades) con precio,
+// y las listas de tipos de gasto / tipos de ingreso / cuentas.
+app.use('/liga/configuracion', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaConfiguracionRoutes'));
 
 // ===== MÓDULO WEB (público, sin login) =====
 // Lo que consume el sitio web público de cada Liga: info de la liga,
