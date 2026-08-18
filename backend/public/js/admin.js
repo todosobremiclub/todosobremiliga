@@ -44,6 +44,12 @@ function conectarEventos() {
   document.getElementById('btnLigasPaginaSiguiente').addEventListener('click', () => {
     if (paginaLigasActual * LIGAS_POR_PAGINA < totalLigasActual) { paginaLigasActual += 1; cargarLigas(); }
   });
+  document.getElementById('btnLigasPaginaAnteriorTop').addEventListener('click', () => {
+    if (paginaLigasActual > 1) { paginaLigasActual -= 1; cargarLigas(); }
+  });
+  document.getElementById('btnLigasPaginaSiguienteTop').addEventListener('click', () => {
+    if (paginaLigasActual * LIGAS_POR_PAGINA < totalLigasActual) { paginaLigasActual += 1; cargarLigas(); }
+  });
 
   document.getElementById('btnMostrarFormLiga').addEventListener('click', () => {
     limpiarFormLiga();
@@ -141,9 +147,12 @@ async function cargarLigas() {
 
     const desde = ligasCache.length ? (paginaLigasActual - 1) * LIGAS_POR_PAGINA + 1 : 0;
     const hasta = (paginaLigasActual - 1) * LIGAS_POR_PAGINA + ligasCache.length;
-    document.getElementById('paginacionLigasInfo').textContent = `Mostrando ${desde}-${hasta} de ${totalLigasActual} ligas`;
-    document.getElementById('btnLigasPaginaAnterior').disabled = paginaLigasActual <= 1;
-    document.getElementById('btnLigasPaginaSiguiente').disabled = paginaLigasActual * LIGAS_POR_PAGINA >= totalLigasActual;
+    const textoPaginacionLigas = `Mostrando ${desde}-${hasta} de ${totalLigasActual} ligas`;
+    const deshabilitarAnteriorLigas = paginaLigasActual <= 1;
+    const deshabilitarSiguienteLigas = paginaLigasActual * LIGAS_POR_PAGINA >= totalLigasActual;
+    ['paginacionLigasInfo', 'paginacionLigasInfoTop'].forEach((id) => { document.getElementById(id).textContent = textoPaginacionLigas; });
+    ['btnLigasPaginaAnterior', 'btnLigasPaginaAnteriorTop'].forEach((id) => { document.getElementById(id).disabled = deshabilitarAnteriorLigas; });
+    ['btnLigasPaginaSiguiente', 'btnLigasPaginaSiguienteTop'].forEach((id) => { document.getElementById(id).disabled = deshabilitarSiguienteLigas; });
 
     if (!ligasCache.length) {
       tbody.innerHTML = '<tr><td colspan="5">No se encontraron Ligas.</td></tr>';

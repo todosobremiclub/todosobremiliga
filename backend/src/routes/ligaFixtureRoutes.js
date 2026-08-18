@@ -76,6 +76,23 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
       subcategoriaIdFinal = subcategoria_id;
     }
 
+    // Dentro de un mismo torneo, un club no puede quedar inscripto en dos
+    // categorías DISTINTAS (sí puede tener equipo en varias subcategorías de
+    // la MISMA categoría, ej: Primera y Reserva).
+    const otraCategoria = await query(
+      `SELECT c.nombre AS categoria_nombre FROM equipos_torneo et
+       JOIN categorias c ON c.id = et.categoria_id
+       WHERE et.torneo_id = $1 AND et.club_id = $2 AND et.categoria_id != $3
+       LIMIT 1`,
+      [req.params.torneoId, club_id, req.params.categoriaId]
+    );
+    if (otraCategoria.rows[0]) {
+      return res.status(409).json({
+        ok: false,
+        error: `Ese club ya está inscripto en este torneo en la categoría "${otraCategoria.rows[0].categoria_nombre}". Un club no puede jugar en dos categorías distintas del mismo torneo.`
+      });
+    }
+
     const { rows } = await query(
       `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id, grupo)
        VALUES ($1, $2, $3, $4, $5)

@@ -68,12 +68,35 @@
     background: var(--rojo, #dc2626); color: #fff; border-radius: 999px;
     font-size: 11px; font-weight: 700; vertical-align: middle;
   }
-  select.select-multiple-filtro { min-width: 160px; padding: 4px; font-size: 12px; }
   .barra-acciones-masivas {
     display: none; align-items: center; gap: 10px; background: var(--gris-100);
     border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
   }
   .barra-acciones-masivas.visible { display: flex; }
+  /* Filtro desplegable de selección múltiple (Ciudad / Provincia): un botón
+     compacto que al hacer click despliega una lista de checkboxes, en vez
+     de un <select multiple> grande que ocupaba mucho lugar en pantalla. */
+  .dropdown-multi { position: relative; display: inline-block; }
+  .dropdown-multi-boton {
+    padding: 8px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 13px;
+    background: var(--blanco); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    min-width: 140px; justify-content: space-between;
+  }
+  .dropdown-multi-contador {
+    background: var(--azul); color: #fff; border-radius: 999px; font-size: 11px;
+    padding: 0 6px; min-width: 16px; text-align: center;
+  }
+  .dropdown-multi-panel {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 65;
+    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15); padding: 8px; min-width: 200px;
+    max-height: 220px; overflow-y: auto;
+  }
+  .dropdown-multi-opcion {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 4px;
+    white-space: nowrap; cursor: pointer;
+  }
+  .dropdown-multi-vacio { font-size: 12px; color: var(--gris-600); padding: 4px; }
 </style>
 </head>
 <body class="liga-fondo-cancha">
@@ -119,13 +142,17 @@
 
         <div class="barra-filtros">
           <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre...">
-          <div>
-            <label class="texto-ayuda" style="display:block;">Ciudad</label>
-            <select id="filtroClubesCiudad" class="select-multiple-filtro" multiple size="3"></select>
+          <div class="dropdown-multi" id="dropdownCiudad">
+            <button type="button" class="dropdown-multi-boton" id="btnDropdownCiudad">
+              Ciudad <span class="dropdown-multi-contador oculto" id="contadorCiudad">0</span> ▾
+            </button>
+            <div class="dropdown-multi-panel oculto" id="panelDropdownCiudad"></div>
           </div>
-          <div>
-            <label class="texto-ayuda" style="display:block;">Provincia</label>
-            <select id="filtroClubesProvincia" class="select-multiple-filtro" multiple size="3"></select>
+          <div class="dropdown-multi" id="dropdownProvincia">
+            <button type="button" class="dropdown-multi-boton" id="btnDropdownProvincia">
+              Provincia <span class="dropdown-multi-contador oculto" id="contadorProvincia">0</span> ▾
+            </button>
+            <div class="dropdown-multi-panel oculto" id="panelDropdownProvincia"></div>
           </div>
           <select id="filtroClubesCancha">
             <option value="">Todas las canchas</option>
@@ -289,6 +316,13 @@
           </form>
         </div>
 
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span class="texto-ayuda" id="paginacionClubesInfoTop"></span>
+          <div>
+            <button class="btn btn-secundario btn-pequeno" id="btnClubesPaginaAnteriorTop">← Anterior</button>
+            <button class="btn btn-secundario btn-pequeno" id="btnClubesPaginaSiguienteTop">Siguiente →</button>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
@@ -472,6 +506,9 @@
                 <option value="liguilla_ida_vuelta">Liguilla ida y vuelta</option>
                 <option value="eliminacion_directa">Eliminación directa</option>
               </select>
+              <p class="texto-ayuda" style="margin:4px 0 0;">
+                "Liguilla ida y vuelta" es un todos-contra-todos donde cada club juega dos veces contra cada rival: una vez de local y una de visitante (se generan el doble de fechas que en "Todos contra todos"). Al usar "Generar automático" en el Fixture, el tilde "Ida y vuelta" queda marcado por defecto si elegís este formato.
+              </p>
             </div>
             <div>
               <label for="torneoPtsVictoria">Puntos por victoria</label>
@@ -576,9 +613,9 @@
 
         <!-- Equipos -->
         <div id="subSeccionEquipos">
-          <label for="selectClubInscribir">Inscribir club</label>
+          <label for="selectClubInscribir">Inscribir club(es) — mantené Ctrl (o Cmd) apretado para elegir varios</label>
           <div style="display:flex; gap:8px; margin-bottom:16px;">
-            <select id="selectClubInscribir" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
+            <select id="selectClubInscribir" multiple size="4" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
             <select id="selectSubcategoriaInscribir" class="oculto" style="flex:1; padding:8px; border:1px solid var(--gris-300); border-radius:8px;"></select>
             <button class="btn" id="btnInscribirClub">Inscribir</button>
           </div>

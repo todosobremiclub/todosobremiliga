@@ -175,13 +175,19 @@ function conectarEventos() {
     paginaClubesActual = 1;
     cargarClubes();
   });
-  document.getElementById('filtroClubesCiudad').addEventListener('change', () => {
-    paginaClubesActual = 1;
-    cargarClubes();
+  document.getElementById('btnDropdownCiudad').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdownPanel('ciudad');
   });
-  document.getElementById('filtroClubesProvincia').addEventListener('change', () => {
-    paginaClubesActual = 1;
-    cargarClubes();
+  document.getElementById('btnDropdownProvincia').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdownPanel('provincia');
+  });
+  document.addEventListener('click', (e) => {
+    // Cierra cualquier dropdown de filtro abierto si se hace click afuera.
+    if (!e.target.closest('.dropdown-multi')) {
+      document.querySelectorAll('.dropdown-multi-panel').forEach((p) => p.classList.add('oculto'));
+    }
   });
   document.getElementById('filtroClubesCancha').addEventListener('change', () => {
     paginaClubesActual = 1;
@@ -237,6 +243,15 @@ function conectarEventos() {
   });
   document.getElementById('btnClubesPaginaSiguiente').addEventListener('click', () => {
     if (paginaClubesActual * CLUBES_POR_PAGINA < totalClubesActual) { paginaClubesActual += 1; cargarClubes(); }
+  });
+  document.getElementById('btnClubesPaginaAnteriorTop').addEventListener('click', () => {
+    if (paginaClubesActual > 1) { paginaClubesActual -= 1; cargarClubes(); }
+  });
+  document.getElementById('btnClubesPaginaSiguienteTop').addEventListener('click', () => {
+    if (paginaClubesActual * CLUBES_POR_PAGINA < totalClubesActual) { paginaClubesActual += 1; cargarClubes(); }
+  });
+  document.getElementById('clubCanchaReglamentaria').addEventListener('change', (e) => {
+    document.getElementById('clubCanchaTamanio').disabled = e.target.checked;
   });
 
   document.getElementById('btnDescargarPlantillaClubes').addEventListener('click', descargarPlantillaClubes);
@@ -513,31 +528,79 @@ function actualizarFlechasOrdenClubes() {
   });
 }
 
+// ----- Filtro desplegable de selección múltiple (Ciudad / Provincia) -----
+// Reemplaza al <select multiple size="3"> (que ocupaba mucho lugar en
+// pantalla) por un botón compacto que despliega una lista de checkboxes.
+const dropdownsMultipleFiltro = {}; // { ciudad: {opciones:[], seleccion:Set}, provincia: {...} }
+
+function armarDropdownMultiple(clave, opciones) {
+  dropdownsMultipleFiltro[clave] = dropdownsMultipleFiltro[clave] || { opciones: [], seleccion: new Set() };
+  dropdownsMultipleFiltro[clave].opciones = opciones;
+  const panel = document.getElementById(`panelDropdown${capitalizar(clave)}`);
+  if (!opciones.length) {
+    panel.innerHTML = '<div class="dropdown-multi-vacio">No hay valores cargados todavía.</div>';
+    return;
+  }
+  panel.innerHTML = opciones.map((valor) => `
+    <label class="dropdown-multi-opcion">
+      <input type="checkbox" class="chk-dropdown-multi" data-clave="${clave}" value="${escapeHtml(valor)}"
+        ${dropdownsMultipleFiltro[clave].seleccion.has(valor) ? 'checked' : ''}>
+      ${escapeHtml(valor)}
+    </label>
+  `).join('');
+  panel.querySelectorAll('.chk-dropdown-multi').forEach((chk) => {
+    chk.addEventListener('change', () => {
+      if (chk.checked) dropdownsMultipleFiltro[clave].seleccion.add(chk.value);
+      else dropdownsMultipleFiltro[clave].seleccion.delete(chk.value);
+      actualizarContadorDropdown(clave);
+      paginaClubesActual = 1;
+      cargarClubes();
+    });
+  });
+}
+
+function capitalizar(texto) {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function actualizarContadorDropdown(clave) {
+  const cantidad = dropdownsMultipleFiltro[clave] ? dropdownsMultipleFiltro[clave].seleccion.size : 0;
+  const badge = document.getElementById(`contador${capitalizar(clave)}`);
+  badge.textContent = String(cantidad);
+  badge.classList.toggle('oculto', cantidad === 0);
+}
+
+function valoresDropdown(clave) {
+  return dropdownsMultipleFiltro[clave] ? [...dropdownsMultipleFiltro[clave].seleccion] : [];
+}
+
+function toggleDropdownPanel(clave) {
+  const panel = document.getElementById(`panelDropdown${capitalizar(clave)}`);
+  const yaAbierto = !panel.classList.contains('oculto');
+  // Cerramos cualquier otro dropdown abierto antes de abrir este.
+  document.querySelectorAll('.dropdown-multi-panel').forEach((p) => p.classList.add('oculto'));
+  if (!yaAbierto) panel.classList.remove('oculto');
+}
+
 // Trae ciudades/provincias ya cargadas en algún club de la Liga, para poblar
-// los <select multiple> de filtro (en vez de que el usuario tenga que
-// escribir el texto exacto).
+// los desplegables de filtro (en vez de que el usuario tenga que escribir el
+// texto exacto).
 async function cargarFiltrosDisponiblesClubes() {
   try {
     const data = await apiFetch('/liga/clubes/filtros-disponibles');
-    const selCiudad = document.getElementById('filtroClubesCiudad');
-    const selProvincia = document.getElementById('filtroClubesProvincia');
-    selCiudad.innerHTML = data.ciudades.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    selProvincia.innerHTML = data.provincias.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+    armarDropdownMultiple('ciudad', data.ciudades);
+    armarDropdownMultiple('provincia', data.provincias);
   } catch (err) {
     // si falla, los filtros quedan vacíos (no bloquea el resto de la pantalla)
   }
-}
-
-function valoresSeleccionados(select) {
-  return Array.from(select.selectedOptions).map((o) => o.value);
 }
 
 async function cargarClubes() {
   const tbody = document.getElementById('tablaClubes');
   tbody.innerHTML = '<tr><td colspan="10">Cargando...</td></tr>';
   const texto = document.getElementById('buscadorClubes').value.trim();
-  const ciudades = valoresSeleccionados(document.getElementById('filtroClubesCiudad'));
-  const provincias = valoresSeleccionados(document.getElementById('filtroClubesProvincia'));
+  const ciudades = valoresDropdown('ciudad');
+  const provincias = valoresDropdown('provincia');
   const canchaTecho = document.getElementById('filtroClubesCancha').value;
   const incluirInactivos = document.getElementById('filtroClubesInactivos').checked;
   const soloReglamentaria = document.getElementById('filtroClubesReglamentaria').checked;
@@ -561,9 +624,12 @@ async function cargarClubes() {
 
     const desde = clubesCache.length ? (paginaClubesActual - 1) * CLUBES_POR_PAGINA + 1 : 0;
     const hasta = (paginaClubesActual - 1) * CLUBES_POR_PAGINA + clubesCache.length;
-    document.getElementById('paginacionClubesInfo').textContent = `Mostrando ${desde}-${hasta} de ${totalClubesActual} clubes`;
-    document.getElementById('btnClubesPaginaAnterior').disabled = paginaClubesActual <= 1;
-    document.getElementById('btnClubesPaginaSiguiente').disabled = paginaClubesActual * CLUBES_POR_PAGINA >= totalClubesActual;
+    const textoPaginacion = `Mostrando ${desde}-${hasta} de ${totalClubesActual} clubes`;
+    const deshabilitarAnterior = paginaClubesActual <= 1;
+    const deshabilitarSiguiente = paginaClubesActual * CLUBES_POR_PAGINA >= totalClubesActual;
+    ['paginacionClubesInfo', 'paginacionClubesInfoTop'].forEach((id) => { document.getElementById(id).textContent = textoPaginacion; });
+    ['btnClubesPaginaAnterior', 'btnClubesPaginaAnteriorTop'].forEach((id) => { document.getElementById(id).disabled = deshabilitarAnterior; });
+    ['btnClubesPaginaSiguiente', 'btnClubesPaginaSiguienteTop'].forEach((id) => { document.getElementById(id).disabled = deshabilitarSiguiente; });
 
     renderFilasClubes();
     actualizarBarraAccionesMasivas();
@@ -828,6 +894,7 @@ function limpiarFormClub() {
   document.getElementById('clubCanchaTamanio').value = '';
   document.getElementById('clubCanchaPiso').value = '';
   document.getElementById('clubCanchaReglamentaria').checked = false;
+  document.getElementById('clubCanchaTamanio').disabled = false;
   document.getElementById('clubFormError').classList.add('oculto');
   document.getElementById('btnGestionarCanchas').classList.add('oculto');
   document.getElementById('panelCanchasClub').classList.add('oculto');
@@ -864,6 +931,7 @@ function editarClub(clubId) {
   document.getElementById('clubCanchaTamanio').value = club.cancha_tamanio || '';
   document.getElementById('clubCanchaPiso').value = club.cancha_piso || '';
   document.getElementById('clubCanchaReglamentaria').checked = !!club.cancha_reglamentaria;
+  document.getElementById('clubCanchaTamanio').disabled = !!club.cancha_reglamentaria;
   document.getElementById('clubFormError').classList.add('oculto');
   document.getElementById('formClub').classList.remove('oculto');
   document.getElementById('btnGestionarCanchas').classList.remove('oculto');
@@ -1888,28 +1956,38 @@ async function inscribirClub() {
   errorEl.classList.add('oculto');
   const select = document.getElementById('selectClubInscribir');
   const selectSub = document.getElementById('selectSubcategoriaInscribir');
-  const clubId = select.value;
-  if (!clubId) {
+  const clubIds = Array.from(select.selectedOptions).map((o) => o.value).filter(Boolean);
+  if (!clubIds.length) {
     errorEl.textContent = 'No hay ningún club seleccionado para inscribir.';
     errorEl.classList.remove('oculto');
     return;
   }
   const tieneSubcategorias = categoriaActualTieneSubcategorias();
   if (tieneSubcategorias && !selectSub.value) {
-    errorEl.textContent = 'Esta categoría tiene subcategorías: elegí en cuál inscribir al club.';
+    errorEl.textContent = 'Esta categoría tiene subcategorías: elegí en cuál inscribir a los clubes.';
     errorEl.classList.remove('oculto');
     return;
   }
-  try {
-    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/equipos`, {
-      method: 'POST',
-      body: JSON.stringify({ club_id: clubId, subcategoria_id: tieneSubcategorias ? selectSub.value : undefined })
-    });
-    cargarEquipos();
-  } catch (err) {
-    errorEl.textContent = err.message;
+  // Inscribimos club por club (el backend valida cada uno por separado);
+  // si alguno falla (ej: ya estaba inscripto en otra categoría del mismo
+  // torneo) seguimos con el resto y mostramos qué pasó al final.
+  const fallidos = [];
+  for (const clubId of clubIds) {
+    try {
+      await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/equipos`, {
+        method: 'POST',
+        body: JSON.stringify({ club_id: clubId, subcategoria_id: tieneSubcategorias ? selectSub.value : undefined })
+      });
+    } catch (err) {
+      const club = clubesCache.find((c) => c.id === clubId);
+      fallidos.push(`${club ? club.nombre : clubId}: ${err.message}`);
+    }
+  }
+  if (fallidos.length) {
+    errorEl.innerHTML = `No se pudieron inscribir ${fallidos.length} club(es):<br>` + fallidos.map((f) => escapeHtml(f)).join('<br>');
     errorEl.classList.remove('oculto');
   }
+  cargarEquipos();
 }
 
 async function cargarPartidos() {

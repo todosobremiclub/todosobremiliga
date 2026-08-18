@@ -794,6 +794,20 @@ router.post('/inscribir-multiple', async (req, res) => {
         resultados.push({ club_id: clubId, ok: false, error: 'No pertenece a tu Liga' });
         continue;
       }
+      // Dentro de un mismo torneo, un club no puede quedar inscripto en dos
+      // categorías DISTINTAS (sí puede tener equipo en varias subcategorías
+      // de la MISMA categoría, ej: Primera y Reserva).
+      const otraCategoria = await query(
+        `SELECT c.nombre AS categoria_nombre FROM equipos_torneo et
+         JOIN categorias c ON c.id = et.categoria_id
+         WHERE et.torneo_id = $1 AND et.club_id = $2 AND et.categoria_id != $3
+         LIMIT 1`,
+        [torneo_id, clubId, categoria_id]
+      );
+      if (otraCategoria.rows[0]) {
+        resultados.push({ club_id: clubId, ok: false, error: `Ya está inscripto en la categoría "${otraCategoria.rows[0].categoria_nombre}" de este torneo` });
+        continue;
+      }
       try {
         await query(
           `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id, grupo)
