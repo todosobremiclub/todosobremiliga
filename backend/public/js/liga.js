@@ -1985,13 +1985,13 @@ async function rechazarPostulacion(id) {
 
 async function cargarTorneos() {
   const tbody = document.getElementById('tablaTorneos');
-  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/liga/torneos');
     torneosCache = data.torneos;
     renderTorneos();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -2005,17 +2005,18 @@ function renderTorneos() {
       );
 
   if (!torneosCache.length) {
-    tbody.innerHTML = '<tr><td colspan="4">Todavía no cargaste ningún torneo.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún torneo.</td></tr>';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="4">No se encontraron torneos.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">No se encontraron torneos.</td></tr>';
     return;
   }
   tbody.innerHTML = lista.map((t) => `
     <tr>
       <td>${escapeHtml(t.nombre)}</td>
       <td>${escapeHtml(t.deporte)}</td>
+      <td>${t.precio_inscripcion != null ? `$${Number(t.precio_inscripcion).toLocaleString('es-AR')}` : '-'}</td>
       <td><span class="badge badge-activo">${escapeHtml(t.estado || 'planificado')}</span></td>
       <td>
         <button class="btn btn-secundario btn-pequeno" onclick="editarTorneo('${t.id}')">Editar</button>
@@ -2049,6 +2050,7 @@ function editarTorneo(torneoId) {
   const sp = torneo.sistema_puntaje || {};
   document.getElementById('torneoPtsVictoria').value = sp.victoria != null ? sp.victoria : 3;
   document.getElementById('torneoPtsEmpate').value = sp.empate != null ? sp.empate : 1;
+  document.getElementById('torneoPrecioInscripcion').value = torneo.precio_inscripcion != null ? torneo.precio_inscripcion : '';
   document.getElementById('torneoFormError').classList.add('oculto');
   document.getElementById('formTorneo').classList.remove('oculto');
   mostrarFondoModal();
@@ -2072,7 +2074,8 @@ async function guardarTorneo(e) {
       victoria: ptsVictoria,
       empate: ptsEmpate,
       derrota: 0
-    }
+    },
+    precio_inscripcion: document.getElementById('torneoPrecioInscripcion').value || undefined
   };
 
   try {

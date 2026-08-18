@@ -170,7 +170,7 @@
             <input type="checkbox" id="filtroClubesInactivos"> Ver inactivos
           </label>
           <label class="check-inline">
-            <input type="checkbox" id="filtroClubesReglamentaria"> Solo cancha reglamentaria (40x20)
+            <input type="checkbox" id="filtroClubesReglamentaria"> Solo cancha reglamentaria
           </label>
         </div>
 
@@ -531,8 +531,13 @@
               <label for="torneoPtsEmpate">Puntos por empate</label>
               <input type="number" id="torneoPtsEmpate" value="1">
             </div>
+            <div>
+              <label for="torneoPrecioInscripcion">Precio de inscripción al torneo</label>
+              <input type="number" id="torneoPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
+            </div>
           </div>
           <p class="texto-ayuda">Para deportes sin empate (como vóley), dejá los puntos de empate en 0 — el sistema calcula igual quién gana según el resultado cargado.</p>
+          <p class="texto-ayuda">El precio de inscripción es lo que le cobrás a un club por anotarse a este torneo (distinto del precio "por partido" de las categorías de torneo, que se configura en Configuración).</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormTorneo">Cancelar</button>
           <p class="mensaje-error oculto" id="torneoFormError"></p>
@@ -540,9 +545,9 @@
 
         <table>
           <thead>
-            <tr><th>Nombre</th><th>Deporte</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Nombre</th><th>Deporte</th><th>Precio de inscripción</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaTorneos"><tr><td colspan="4">Cargando...</td></tr></tbody>
+          <tbody id="tablaTorneos"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -1017,14 +1022,14 @@
             <input type="hidden" id="modalidadIdEdicion">
             <div class="form-grid">
               <div><label for="modalidadNombre">Nombre *</label><input type="text" id="modalidadNombre" required placeholder="ej: Senior"></div>
-              <div><label for="modalidadPrecio">Precio</label><input type="number" id="modalidadPrecio" step="0.01" min="0"></div>
+              <div><label for="modalidadPrecio">Precio por partido</label><input type="number" id="modalidadPrecio" step="0.01" min="0"></div>
             </div>
             <button type="submit" class="btn">Guardar</button>
             <button type="button" class="btn btn-secundario" id="btnCancelarFormModalidad">Cancelar</button>
             <p class="mensaje-error oculto" id="modalidadFormError"></p>
           </form>
           <table>
-            <thead><tr><th>Nombre</th><th>Precio</th><th>Clubes anotados</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Precio por partido</th><th>Clubes anotados</th><th>Acciones</th></tr></thead>
             <tbody id="tablaModalidades"><tr><td colspan="4">Cargando...</td></tr></tbody>
           </table>
         </div>

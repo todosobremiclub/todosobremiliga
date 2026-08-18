@@ -62,7 +62,7 @@ router.get('/:torneoId', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, deporte, temporada, formato_juego,
-    sistema_puntaje, config_extra, fecha_inicio, fecha_fin
+    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, precio_inscripcion
   } = req.body;
 
   const deportesValidos = ['futbol', 'voley', 'handball', 'basquet', 'futsal', 'otro'];
@@ -83,13 +83,14 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
     }
     const { rows } = await query(
-      `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9)
+      `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin, precio_inscripcion)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9, $10)
        RETURNING *`,
       [req.ligaId, nombre.trim(), deporte, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
-       fecha_inicio || null, fecha_fin || null]
+       fecha_inicio || null, fecha_fin || null,
+       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null]
     );
     res.status(201).json({ ok: true, torneo: rows[0] });
   } catch (err) {
@@ -102,7 +103,7 @@ router.post('/', async (req, res) => {
 router.put('/:torneoId', async (req, res) => {
   const {
     nombre, deporte, temporada, formato_juego,
-    sistema_puntaje, config_extra, fecha_inicio, fecha_fin
+    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, precio_inscripcion
   } = req.body;
 
   try {
@@ -122,13 +123,16 @@ router.put('/:torneoId', async (req, res) => {
          sistema_puntaje = COALESCE($5, sistema_puntaje),
          config_extra = COALESCE($6, config_extra),
          fecha_inicio = COALESCE($7, fecha_inicio),
-         fecha_fin = COALESCE($8, fecha_fin)
-       WHERE id = $9
+         fecha_fin = COALESCE($8, fecha_fin),
+         precio_inscripcion = $9
+       WHERE id = $10
        RETURNING *`,
       [nombre || null, deporte || null, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
-       fecha_inicio || null, fecha_fin || null, req.params.torneoId]
+       fecha_inicio || null, fecha_fin || null,
+       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
+       req.params.torneoId]
     );
     res.json({ ok: true, torneo: rows[0] });
   } catch (err) {
