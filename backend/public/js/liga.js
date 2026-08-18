@@ -328,7 +328,9 @@ function conectarEventos() {
   });
   document.getElementById('btnMostrarFormCategoria').addEventListener('click', () => {
     document.getElementById('formCategoria').reset();
+    document.getElementById('categoriaIdEdicion').value = '';
     document.getElementById('categoriaTorneoId').value = torneoActualId;
+    document.getElementById('categoriaSumaTablaGeneral').checked = true;
     document.getElementById('categoriaFormError').classList.add('oculto');
     document.getElementById('formCategoria').classList.remove('oculto');
   });
@@ -2594,6 +2596,13 @@ async function eliminarCategoria(categoriaId, nombreCategoria) {
   }
   try {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaId}`, { method: 'DELETE' });
+    // Si el formulario de edición estaba abierto justo para esta categoría,
+    // lo cerramos: de lo contrario quedaría un "Guardar" apuntando a un id
+    // que ya no existe y el próximo submit fallaría con 404.
+    if (document.getElementById('categoriaIdEdicion').value === categoriaId) {
+      document.getElementById('formCategoria').classList.add('oculto');
+      document.getElementById('categoriaIdEdicion').value = '';
+    }
     cargarCategorias(torneoActualId);
   } catch (err) {
     alert('Error: ' + err.message);
