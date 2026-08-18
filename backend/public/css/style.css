@@ -532,6 +532,30 @@ button.btn-peligro:hover { background: #fee2e2; }
   gap: 4px;
 }
 
+/* Variante más grande para el listado de Torneos: el nombre del torneo es
+   lo más importante que hay en el Panel de Liga, así que su tarjeta tiene
+   que notarse mucho más que una Categoría o Subcategoría. */
+.grid-torneos {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.boton-grande-torneo {
+  padding: 24px;
+  gap: 10px;
+}
+
+.boton-grande-torneo h3 {
+  font-size: 22px;
+  font-weight: 800;
+  padding-right: 64px;
+  line-height: 1.15;
+}
+
+.boton-grande-torneo p {
+  font-size: 13px;
+}
+
 .sitio-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
 
 .sitio-vacio {

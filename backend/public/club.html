@@ -14,6 +14,9 @@
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
   .carnet-info { font-size: 12px; color: var(--gris-600); }
   .carnet-codigo { font-family: monospace; background: var(--gris-100); padding: 2px 6px; border-radius: 4px; }
+  .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -68,8 +71,12 @@
               <input type="number" id="jugadorNumero">
             </div>
             <div>
-              <label for="jugadorFotoUrl">URL de la foto</label>
-              <input type="text" id="jugadorFotoUrl">
+              <label for="jugadorFotoArchivo">Foto (elegir desde la computadora)</label>
+              <div class="logo-preview-wrap">
+                <img id="jugadorFotoPreview" class="oculto" alt="Foto">
+                <input type="file" id="jugadorFotoArchivo" accept="image/*">
+              </div>
+              <input type="hidden" id="jugadorFotoUrl">
             </div>
           </div>
           <button type="submit" class="btn">Guardar</button>
@@ -79,9 +86,9 @@
 
         <table>
           <thead>
-            <tr><th>Nombre</th><th>DNI</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Foto</th><th>Nombre</th><th>DNI</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaJugadores"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <tbody id="tablaJugadores"><tr><td colspan="6">Cargando...</td></tr></tbody>
         </table>
       </div>
 

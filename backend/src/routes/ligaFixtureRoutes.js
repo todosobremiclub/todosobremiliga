@@ -678,13 +678,29 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     // formato "Apertura y Clausura".
     const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
     const subcategoriaId = req.query.subcategoria_id || null;
+    // LEFT JOIN desde equipos_torneo (no desde tabla_posiciones): así todos
+    // los equipos inscriptos aparecen en la tabla desde el primer momento,
+    // en 0, aunque todavía no se haya cargado ningún resultado (antes solo
+    // aparecían los equipos que YA tenían una fila calculada en
+    // tabla_posiciones, así que una categoría sin partidos jugados no
+    // mostraba tabla). El orden A-Z de club queda como desempate final, que
+    // es justamente lo que se ve cuando todos los equipos están en 0.
     const { rows } = await query(
-      `SELECT tp.*, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario
-       FROM tabla_posiciones tp
-       JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
+      `SELECT et.id AS equipo_torneo_id, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
+              COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
+              COALESCE(tp.ganados, 0) AS ganados,
+              COALESCE(tp.empatados, 0) AS empatados,
+              COALESCE(tp.perdidos, 0) AS perdidos,
+              COALESCE(tp.a_favor, 0) AS a_favor,
+              COALESCE(tp.en_contra, 0) AS en_contra,
+              COALESCE(tp.diferencia, 0) AS diferencia,
+              COALESCE(tp.puntos, 0) AS puntos
+       FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
-       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = $3 AND et.subcategoria_id IS NOT DISTINCT FROM $4::uuid
-       ORDER BY tp.puntos DESC, tp.diferencia DESC, tp.a_favor DESC`,
+       LEFT JOIN tabla_posiciones tp
+         ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = $3
+       WHERE et.torneo_id = $1 AND et.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $4::uuid
+       ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC, c.nombre ASC`,
       [req.params.torneoId, req.params.categoriaId, ronda, subcategoriaId]
     );
     res.json({ ok: true, tabla: rows, formato_juego: contexto.formato_juego });

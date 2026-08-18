@@ -20,12 +20,15 @@ function conectarEventos() {
 
   document.getElementById('btnMostrarFormJugador').addEventListener('click', () => {
     document.getElementById('formJugador').reset();
+    document.getElementById('jugadorFotoUrl').value = '';
+    document.getElementById('jugadorFotoPreview').classList.add('oculto');
     document.getElementById('jugadorFormError').classList.add('oculto');
     document.getElementById('formJugador').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormJugador').addEventListener('click', () => {
     document.getElementById('formJugador').classList.add('oculto');
   });
+  document.getElementById('jugadorFotoArchivo').addEventListener('change', onElegirFotoJugador);
   document.getElementById('formJugador').addEventListener('submit', guardarJugador);
 
   document.getElementById('btnCerrarSolicitarFichaje').addEventListener('click', () => {
@@ -123,16 +126,17 @@ async function eliminarDocumentoClub(documentoId) {
 
 async function cargarJugadores() {
   const tbody = document.getElementById('tablaJugadores');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/club/jugadores');
     jugadoresCache = data.jugadores;
     if (!jugadoresCache.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún jugador.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Todavía no cargaste ningún jugador.</td></tr>';
       return;
     }
     tbody.innerHTML = jugadoresCache.map((j) => `
       <tr>
+        <td>${j.foto_url ? `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
         <td>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</td>
         <td>${escapeHtml(j.dni)}</td>
         <td>${j.numero_camiseta != null ? j.numero_camiseta : '-'}</td>
@@ -144,8 +148,22 @@ async function cargarJugadores() {
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function onElegirFotoJugador(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    const base64 = lector.result;
+    const preview = document.getElementById('jugadorFotoPreview');
+    preview.src = base64;
+    preview.classList.remove('oculto');
+    document.getElementById('jugadorFotoUrl').value = base64;
+  };
+  lector.readAsDataURL(archivo);
 }
 
 async function guardarJugador(e) {
@@ -160,7 +178,7 @@ async function guardarJugador(e) {
     fecha_nacimiento: document.getElementById('jugadorFechaNacimiento').value || undefined,
     posicion: document.getElementById('jugadorPosicion').value.trim() || undefined,
     numero_camiseta: document.getElementById('jugadorNumero').value || undefined,
-    foto_url: document.getElementById('jugadorFotoUrl').value.trim() || undefined
+    foto_url: document.getElementById('jugadorFotoUrl').value || undefined
   };
 
   try {

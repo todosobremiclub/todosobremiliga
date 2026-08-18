@@ -72,6 +72,7 @@ function init() {
   cargarFiltrosDisponiblesClubes();
   cargarClubes();
   actualizarBadgePostulacionesPendientes();
+  actualizarBadgeFichajesPendientes();
 }
 
 // Trae los datos de marca (nombre/logo/colores) de la propia Liga y pinta el
@@ -1267,6 +1268,21 @@ async function cargarFichajesLiga() {
     `).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+  actualizarBadgeFichajesPendientes();
+}
+
+// Cuenta cuántos fichajes están pendientes y pinta (o esconde) el globito
+// rojo en la pestaña "Fichajes", se vea o no esa sección ahora.
+async function actualizarBadgeFichajesPendientes() {
+  try {
+    const data = await apiFetch('/liga/fichajes?estado=pendiente');
+    const cantidad = data.fichajes.length;
+    const badge = document.getElementById('badgeFichajesPendientes');
+    badge.textContent = cantidad > 99 ? '99+' : String(cantidad);
+    badge.classList.toggle('oculto', cantidad === 0);
+  } catch (err) {
+    // si falla, dejamos el badge como estaba
   }
 }
 
@@ -2483,7 +2499,7 @@ function renderTorneos() {
     return;
   }
   cont.innerHTML = lista.map((t) => `
-    <div class="boton-grande" onclick="verCategorias('${t.id}', '${escapeHtml(t.nombre)}')">
+    <div class="boton-grande boton-grande-torneo" onclick="verCategorias('${t.id}', '${escapeHtml(t.nombre)}')">
       <div class="acciones-boton-grande">
         <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarTorneo('${t.id}')">${ICONO_LAPIZ}</button>
         <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarTorneo('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
@@ -3163,10 +3179,10 @@ function renderJornadaFixture(jornadasDisponibles) {
     `).join('');
     const bloqueArbitros = `
       <div>
-        <label style="font-size:12px;">Asignar árbitro</label>
-        <div style="display:flex; gap:6px;">
-          <select data-partido-id="${p.id}" class="select-arbitro-disponible-partido" style="flex:1; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;" ${!disponibles.length ? 'disabled' : ''}>
-            ${disponibles.length ? `<option value="">Elegir árbitro...</option>${opcionesArbitrosDisponibles}` : '<option value="">Sin más árbitros disponibles</option>'}
+        <label style="font-size:12px;">Asignar árbitro(s) — mantené Ctrl (o Cmd) apretado para elegir varios</label>
+        <div style="display:flex; gap:6px; align-items:flex-start;">
+          <select data-partido-id="${p.id}" class="select-arbitro-disponible-partido" multiple size="${Math.min(4, Math.max(2, disponibles.length || 1))}" style="flex:1; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;" ${!disponibles.length ? 'disabled' : ''}>
+            ${disponibles.length ? opcionesArbitrosDisponibles : '<option value="">Sin más árbitros disponibles</option>'}
           </select>
           <button type="button" class="btn btn-secundario btn-pequeno" onclick="agregarArbitroPartido('${p.id}')">Agregar</button>
         </div>
@@ -3208,10 +3224,12 @@ function renderJornadaFixture(jornadasDisponibles) {
 
 async function agregarArbitroPartido(partidoId) {
   const select = document.querySelector(`.select-arbitro-disponible-partido[data-partido-id="${partidoId}"]`);
-  if (!select || !select.value) return;
+  if (!select) return;
+  const nuevos = Array.from(select.selectedOptions).map((o) => o.value).filter(Boolean);
+  if (!nuevos.length) return;
   const partido = partidosCache.find((p) => p.id === partidoId);
   const idsActuales = ((partido && partido.arbitros) || []).map((a) => a.id);
-  await guardarArbitrosPartido(partidoId, [...idsActuales, select.value]);
+  await guardarArbitrosPartido(partidoId, [...idsActuales, ...nuevos]);
 }
 
 async function quitarArbitroPartido(partidoId, arbitroId) {
