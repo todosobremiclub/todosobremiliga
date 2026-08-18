@@ -486,6 +486,52 @@ button.btn-peligro:hover { background: #fee2e2; }
   color: var(--gris-600);
 }
 
+/* Botones grandes del Panel de Liga (Torneos, Categorías) */
+.grid-botones-grandes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.boton-grande {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--blanco);
+  border: 1px solid var(--gris-200);
+  border-radius: var(--radio);
+  padding: 16px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.boton-grande:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.14); border-color: var(--azul); }
+
+.boton-grande h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--gris-900);
+  padding-right: 56px;
+}
+
+.boton-grande p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--gris-600);
+}
+
+.boton-grande .acciones-boton-grande {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+}
+
 .sitio-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
 
 .sitio-vacio {

@@ -211,9 +211,57 @@ router.get('/:torneoId/categorias', async (req, res) => {
   }
 });
 
+// GET /liga/torneos/:torneoId/tabla-general — para torneos con varias
+// categorías (y/o subcategorías), suma en una sola tabla por club los
+// puntos de todas las categorías/subcategorías marcadas con
+// "suma_tabla_general" (ej: Baby Fútbol Categorías A-E, cada una con
+// subcategorías 2018/2019/2020: la tabla general ordena a los clubes por la
+// suma de puntos de todos sus equipos en las subcategorías que sumen).
+router.get('/:torneoId/tabla-general', async (req, res) => {
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
+
+    const { rows } = await query(
+      `WITH unidades AS (
+         SELECT c.id AS categoria_id, cs.id AS subcategoria_id
+         FROM categorias c
+         LEFT JOIN categoria_subcategorias cs ON cs.categoria_id = c.id
+         WHERE c.torneo_id = $1
+           AND (
+             (cs.id IS NOT NULL AND cs.suma_tabla_general = TRUE)
+             OR (cs.id IS NULL AND c.suma_tabla_general = TRUE)
+           )
+       )
+       SELECT et.club_id, cl.nombre AS club_nombre, cl.logo_url AS club_logo_url, cl.color_primario AS club_color_primario,
+              SUM(tp.partidos_jugados)::int AS partidos_jugados,
+              SUM(tp.ganados)::int AS ganados,
+              SUM(tp.empatados)::int AS empatados,
+              SUM(tp.perdidos)::int AS perdidos,
+              SUM(tp.a_favor)::int AS a_favor,
+              SUM(tp.en_contra)::int AS en_contra,
+              SUM(tp.diferencia)::int AS diferencia,
+              SUM(tp.puntos)::int AS puntos,
+              COUNT(DISTINCT tp.categoria_id)::int AS categorias_sumadas
+       FROM tabla_posiciones tp
+       JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
+       JOIN clubes cl ON cl.id = et.club_id
+       JOIN unidades u ON u.categoria_id = tp.categoria_id AND u.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+       WHERE tp.torneo_id = $1 AND tp.ronda = 'general'
+       GROUP BY et.club_id, cl.nombre, cl.logo_url, cl.color_primario
+       ORDER BY puntos DESC, diferencia DESC, club_nombre ASC`,
+      [req.params.torneoId]
+    );
+    res.json({ ok: true, tabla: rows });
+  } catch (err) {
+    console.error('Error en GET tabla-general:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/torneos/:torneoId/categorias — alta de una categoría
 router.post('/:torneoId/categorias', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general } = req.body;
   const generosValidos = ['masculino', 'femenino', 'mixto'];
 
   if (!nombre || !nombre.trim()) {
@@ -228,11 +276,12 @@ router.post('/:torneoId/categorias', async (req, res) => {
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
 
     const { rows } = await query(
-      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7)
+      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7, COALESCE($8, TRUE))
        RETURNING *`,
       [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
-       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null]
+       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null]
     );
     res.status(201).json({ ok: true, categoria: { ...rows[0], subcategorias: [] } });
   } catch (err) {
@@ -243,7 +292,7 @@ router.post('/:torneoId/categorias', async (req, res) => {
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId — edición
 router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general } = req.body;
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
@@ -255,11 +304,13 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
          edad_minima = COALESCE($3, edad_minima),
          edad_maxima = COALESCE($4, edad_maxima),
          orden = COALESCE($5, orden),
-         precio_inscripcion = $6
-       WHERE id = $7 AND torneo_id = $8
+         precio_inscripcion = $6,
+         suma_tabla_general = COALESCE($7, suma_tabla_general)
+       WHERE id = $8 AND torneo_id = $9
        RETURNING *`,
       [nombre || null, genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
        precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null,
        req.params.categoriaId, req.params.torneoId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
@@ -310,7 +361,7 @@ async function buscarCategoriaDeMiLiga(categoriaId, torneoId, ligaId) {
 
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias
 router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res) => {
-  const { nombre, orden, precio_inscripcion } = req.body;
+  const { nombre, orden, precio_inscripcion, suma_tabla_general } = req.body;
   if (!nombre || !nombre.trim()) {
     return res.status(400).json({ ok: false, error: 'El nombre de la subcategoría es obligatorio' });
   }
@@ -319,11 +370,12 @@ router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res)
     if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
 
     const { rows } = await query(
-      `INSERT INTO categoria_subcategorias (categoria_id, nombre, orden, precio_inscripcion)
-       VALUES ($1, $2, COALESCE($3, 0), $4)
+      `INSERT INTO categoria_subcategorias (categoria_id, nombre, orden, precio_inscripcion, suma_tabla_general)
+       VALUES ($1, $2, COALESCE($3, 0), $4, COALESCE($5, TRUE))
        RETURNING *`,
       [req.params.categoriaId, nombre.trim(), orden ?? null,
-       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null]
+       precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null]
     );
     res.status(201).json({ ok: true, subcategoria: rows[0] });
   } catch (err) {
@@ -337,7 +389,7 @@ router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res)
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId
 router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', async (req, res) => {
-  const { nombre, orden, precio_inscripcion } = req.body;
+  const { nombre, orden, precio_inscripcion, suma_tabla_general } = req.body;
   try {
     const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
     if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
@@ -346,11 +398,13 @@ router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', a
       `UPDATE categoria_subcategorias SET
          nombre = COALESCE($1, nombre),
          orden = COALESCE($2, orden),
-         precio_inscripcion = $3
-       WHERE id = $4 AND categoria_id = $5
+         precio_inscripcion = $3,
+         suma_tabla_general = COALESCE($4, suma_tabla_general)
+       WHERE id = $5 AND categoria_id = $6
        RETURNING *`,
       [nombre && nombre.trim() ? nombre.trim() : null, orden ?? null,
        precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null,
        req.params.subcategoriaId, req.params.categoriaId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Subcategoría no encontrada en esa categoría' });
