@@ -1248,7 +1248,7 @@ async function guardarArbitro(e) {
 
 async function cargarFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
-  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
     const params = estado ? `?estado=${estado}` : '';
@@ -1258,7 +1258,7 @@ async function cargarFichajesLiga() {
     poblarFiltroCategoriaFichajesLiga();
     renderFichajesLiga();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
   actualizarBadgeFichajesPendientes();
 }
@@ -1316,17 +1316,18 @@ function renderFichajesLiga() {
   });
 
   if (!fichajesLigaCache.length) {
-    tbody.innerHTML = '<tr><td colspan="7">No hay solicitudes de fichaje en este estado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No hay solicitudes de fichaje en este estado.</td></tr>';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="7">No se encontraron fichajes con ese filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No se encontraron fichajes con ese filtro.</td></tr>';
     return;
   }
 
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
   tbody.innerHTML = lista.map((f) => `
     <tr>
+      <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
       <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
       <td>${escapeHtml(f.club_nombre)}</td>
       <td>${escapeHtml(f.torneo_nombre || '-')}</td>

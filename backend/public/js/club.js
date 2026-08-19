@@ -434,7 +434,7 @@ async function enviarSolicitudFichaje(e) {
 
 async function cargarFichajes() {
   const tbody = document.getElementById('tablaFichajes');
-  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/club/fichajes');
     fichajesCache = data.fichajes;
@@ -442,7 +442,7 @@ async function cargarFichajes() {
     poblarFiltroCategoriaFichajes();
     renderFichajes();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -499,11 +499,11 @@ function renderFichajes() {
   });
 
   if (!fichajesCache.length) {
-    tbody.innerHTML = '<tr><td colspan="6">Todavía no pediste ningún fichaje.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Todavía no pediste ningún fichaje.</td></tr>';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="6">No se encontraron fichajes con ese filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">No se encontraron fichajes con ese filtro.</td></tr>';
     return;
   }
 
@@ -517,6 +517,7 @@ function renderFichajes() {
     }
     return `
       <tr>
+        <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
         <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</td>
         <td>${escapeHtml(f.liga_nombre)}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
