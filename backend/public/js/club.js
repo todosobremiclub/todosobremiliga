@@ -2,6 +2,9 @@
 
 let jugadoresCache = [];
 let ligasClubCache = [];
+let fichajesCache = [];
+let jugadoresSeleccionados = new Set();
+let fichajeJugadorIdsActual = [];
 
 function init() {
   const usuario = requerirRol(['club_admin', 'super_admin']);
@@ -31,12 +34,31 @@ function conectarEventos() {
   document.getElementById('jugadorFotoArchivo').addEventListener('change', onElegirFotoJugador);
   document.getElementById('formJugador').addEventListener('submit', guardarJugador);
 
+  document.getElementById('buscadorJugadores').addEventListener('input', renderJugadores);
+  document.getElementById('filtroAnioNacimientoJugadores').addEventListener('change', renderJugadores);
+  document.getElementById('checkTodosJugadores').addEventListener('change', (e) => {
+    const marcar = e.target.checked;
+    document.querySelectorAll('.check-jugador').forEach((chk) => {
+      chk.checked = marcar;
+      toggleSeleccionJugador(chk.dataset.jugadorId, marcar);
+    });
+  });
+  document.getElementById('btnMostrarFichajeMasivo').addEventListener('click', abrirFichajeMasivo);
+
   document.getElementById('btnCerrarSolicitarFichaje').addEventListener('click', () => {
     document.getElementById('panelSolicitarFichaje').classList.add('oculto');
   });
   document.getElementById('fichajeLiga').addEventListener('change', onCambioLigaFichaje);
   document.getElementById('fichajeTorneo').addEventListener('change', onCambioTorneoFichaje);
   document.getElementById('formSolicitarFichaje').addEventListener('submit', enviarSolicitudFichaje);
+
+  document.getElementById('buscadorFichajes').addEventListener('input', renderFichajes);
+  document.getElementById('filtroTorneoFichajes').addEventListener('change', () => {
+    poblarFiltroCategoriaFichajes();
+    renderFichajes();
+  });
+  document.getElementById('filtroCategoriaFichajes').addEventListener('change', renderFichajes);
+  document.getElementById('btnCerrarVerCarnet').addEventListener('click', cerrarCarnet);
 }
 
 function cambiarTab(nombre) {
@@ -126,30 +148,74 @@ async function eliminarDocumentoClub(documentoId) {
 
 async function cargarJugadores() {
   const tbody = document.getElementById('tablaJugadores');
-  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/club/jugadores');
     jugadoresCache = data.jugadores;
-    if (!jugadoresCache.length) {
-      tbody.innerHTML = '<tr><td colspan="6">Todavía no cargaste ningún jugador.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = jugadoresCache.map((j) => `
-      <tr>
-        <td>${j.foto_url ? `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
-        <td>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</td>
-        <td>${escapeHtml(j.dni)}</td>
-        <td>${j.numero_camiseta != null ? j.numero_camiseta : '-'}</td>
-        <td><span class="badge ${j.activo ? 'badge-activo' : 'badge-inactivo'}">${j.activo ? 'Activo' : 'Inactivo'}</span></td>
-        <td>
-          <button class="btn btn-secundario btn-pequeno" onclick="abrirSolicitarFichaje('${j.id}', '${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}')">Pedir fichaje</button>
-          <button class="btn ${j.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoJugador('${j.id}', ${!j.activo})">${j.activo ? 'Desactivar' : 'Activar'}</button>
-        </td>
-      </tr>
-    `).join('');
+    jugadoresSeleccionados.clear();
+    poblarFiltroAnioNacimiento();
+    renderJugadores();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function poblarFiltroAnioNacimiento() {
+  const select = document.getElementById('filtroAnioNacimientoJugadores');
+  const anioActual = select.value;
+  const anios = Array.from(new Set(jugadoresCache.map((j) => j.anio_nacimiento).filter(Boolean))).sort((a, b) => b - a);
+  select.innerHTML = '<option value="">Todos los años de nacimiento</option>' +
+    anios.map((a) => `<option value="${a}">${a}</option>`).join('');
+  if (anios.includes(Number(anioActual))) select.value = anioActual;
+}
+
+function formatearFecha(fecha) {
+  if (!fecha) return '-';
+  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR');
+}
+
+function renderJugadores() {
+  const tbody = document.getElementById('tablaJugadores');
+  const texto = (document.getElementById('buscadorJugadores').value || '').trim().toLowerCase();
+  const anio = document.getElementById('filtroAnioNacimientoJugadores').value;
+
+  const lista = jugadoresCache.filter((j) => {
+    if (texto) {
+      const nombreCompleto = `${j.nombre} ${j.apellido}`.toLowerCase();
+      if (!nombreCompleto.includes(texto)) return false;
+    }
+    if (anio && String(j.anio_nacimiento || '') !== anio) return false;
+    return true;
+  });
+
+  if (!jugadoresCache.length) {
+    tbody.innerHTML = '<tr><td colspan="8">Todavía no cargaste ningún jugador.</td></tr>';
+    return;
+  }
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="8">No se encontraron jugadores con ese filtro.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map((j) => `
+    <tr>
+      <td><input type="checkbox" class="check-jugador" data-jugador-id="${j.id}" onchange="toggleSeleccionJugador('${j.id}', this.checked)" ${jugadoresSeleccionados.has(j.id) ? 'checked' : ''}></td>
+      <td>${j.foto_url ? `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+      <td>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</td>
+      <td>${escapeHtml(j.dni)}</td>
+      <td>${formatearFecha(j.fecha_nacimiento)}</td>
+      <td>${j.numero_camiseta != null ? j.numero_camiseta : '-'}</td>
+      <td><span class="badge ${j.activo ? 'badge-activo' : 'badge-inactivo'}">${j.activo ? 'Activo' : 'Inactivo'}</span></td>
+      <td>
+        <button class="btn btn-secundario btn-pequeno" onclick="abrirSolicitarFichaje('${j.id}', '${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}')">Pedir fichaje</button>
+        <button class="btn ${j.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoJugador('${j.id}', ${!j.activo})">${j.activo ? 'Desactivar' : 'Activar'}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function toggleSeleccionJugador(jugadorId, marcado) {
+  if (marcado) jugadoresSeleccionados.add(jugadorId);
+  else jugadoresSeleccionados.delete(jugadorId);
 }
 
 function onElegirFotoJugador(e) {
@@ -206,13 +272,26 @@ async function toggleActivoJugador(jugadorId, nuevoValor) {
 // ===================== SOLICITAR FICHAJE =====================
 
 async function abrirSolicitarFichaje(jugadorId, nombreCompleto) {
+  await abrirPopupFichaje(`Pedir fichaje de "${nombreCompleto}"`, [jugadorId]);
+}
+
+function abrirFichajeMasivo() {
+  const ids = Array.from(jugadoresSeleccionados);
+  if (!ids.length) {
+    alert('Tildá al menos un jugador en el listado para pedir un fichaje masivo.');
+    return;
+  }
+  const nombres = jugadoresCache.filter((j) => ids.includes(j.id)).map((j) => `${j.nombre} ${j.apellido}`);
+  abrirPopupFichaje(`Fichaje masivo para ${ids.length} jugador(es): ${nombres.join(', ')}`, ids);
+}
+
+async function abrirPopupFichaje(titulo, jugadorIds) {
+  fichajeJugadorIdsActual = jugadorIds;
   document.getElementById('panelSolicitarFichaje').classList.remove('oculto');
-  document.getElementById('tituloSolicitarFichaje').textContent = `Pedir fichaje de "${nombreCompleto}"`;
-  document.getElementById('fichajeJugadorId').value = jugadorId;
+  document.getElementById('tituloSolicitarFichaje').textContent = titulo;
   document.getElementById('fichajeFormError').classList.add('oculto');
   document.getElementById('fichajeFormOk').classList.add('oculto');
   document.getElementById('formSolicitarFichaje').reset();
-  document.getElementById('fichajeJugadorId').value = jugadorId;
 
   const selectTorneo = document.getElementById('fichajeTorneo');
   const selectCategoria = document.getElementById('fichajeCategoria');
@@ -305,7 +384,6 @@ async function enviarSolicitudFichaje(e) {
   errorEl.classList.add('oculto');
   okEl.classList.add('oculto');
 
-  const jugadorId = document.getElementById('fichajeJugadorId').value;
   const ligaId = document.getElementById('fichajeLiga').value;
   const torneoId = document.getElementById('fichajeTorneo').value;
   const categoriaId = document.getElementById('fichajeCategoria').value;
@@ -315,21 +393,40 @@ async function enviarSolicitudFichaje(e) {
     errorEl.classList.remove('oculto');
     return;
   }
-
-  try {
-    await apiFetch(`/club/jugadores/${jugadorId}/fichajes`, {
-      method: 'POST',
-      body: JSON.stringify({
-        liga_id: ligaId,
-        torneo_id: torneoId,
-        categoria_id: categoriaId
-      })
-    });
-    okEl.textContent = 'Solicitud de fichaje enviada correctamente. Quedó pendiente de aprobación de la Liga.';
-    okEl.classList.remove('oculto');
-  } catch (err) {
-    errorEl.textContent = err.message;
+  if (!fichajeJugadorIdsActual.length) {
+    errorEl.textContent = 'No hay ningún jugador seleccionado.';
     errorEl.classList.remove('oculto');
+    return;
+  }
+
+  // Uno o varios jugadores (fichaje masivo), todos a la misma Liga/Torneo/
+  // Categoría; si alguno falla (ej: ya estaba fichado) seguimos con el resto
+  // y avisamos al final quiénes no se pudieron mandar.
+  const fallidos = [];
+  for (const jugadorId of fichajeJugadorIdsActual) {
+    try {
+      await apiFetch(`/club/jugadores/${jugadorId}/fichajes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          liga_id: ligaId,
+          torneo_id: torneoId,
+          categoria_id: categoriaId
+        })
+      });
+    } catch (err) {
+      const jugador = jugadoresCache.find((j) => j.id === jugadorId);
+      fallidos.push(`${jugador ? `${jugador.nombre} ${jugador.apellido}` : jugadorId}: ${err.message}`);
+    }
+  }
+
+  if (fallidos.length) {
+    errorEl.innerHTML = `No se pudieron enviar ${fallidos.length} solicitud(es):<br>` + fallidos.map((f) => escapeHtml(f)).join('<br>');
+    errorEl.classList.remove('oculto');
+  }
+  const exitosos = fichajeJugadorIdsActual.length - fallidos.length;
+  if (exitosos > 0) {
+    okEl.textContent = `Se envió correctamente la solicitud de fichaje para ${exitosos} jugador(es). Queda(n) pendiente(s) de aprobación de la Liga.`;
+    okEl.classList.remove('oculto');
   }
 }
 
@@ -340,36 +437,149 @@ async function cargarFichajes() {
   tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/club/fichajes');
-    const fichajes = data.fichajes;
-    if (!fichajes.length) {
-      tbody.innerHTML = '<tr><td colspan="6">Todavía no pediste ningún fichaje.</td></tr>';
-      return;
-    }
-    const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
-    tbody.innerHTML = fichajes.map((f) => {
-      let carnetHtml = '-';
-      if (f.carnet_codigo_qr) {
-        const vigenteBadge = f.carnet_activo
-          ? '<span class="badge badge-activo">Vigente</span>'
-          : '<span class="badge badge-inactivo">No vigente</span>';
-        carnetHtml = `<div class="carnet-info"><span class="carnet-codigo">${escapeHtml(f.carnet_codigo_qr)}</span><br>${vigenteBadge}</div>`;
-      } else if (f.estado === 'rechazado' && f.motivo_rechazo) {
-        carnetHtml = `<span class="carnet-info">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>`;
-      }
-      return `
-        <tr>
-          <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</td>
-          <td>${escapeHtml(f.liga_nombre)}</td>
-          <td>${escapeHtml(f.torneo_nombre || '-')}</td>
-          <td>${escapeHtml(f.categoria_nombre || '-')}</td>
-          <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
-          <td>${carnetHtml}</td>
-        </tr>
-      `;
-    }).join('');
+    fichajesCache = data.fichajes;
+    poblarFiltroTorneoFichajes();
+    poblarFiltroCategoriaFichajes();
+    renderFichajes();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+function poblarFiltroTorneoFichajes() {
+  const select = document.getElementById('filtroTorneoFichajes');
+  const actual = select.value;
+  const torneos = [];
+  const vistos = new Set();
+  fichajesCache.forEach((f) => {
+    if (f.torneo_id && !vistos.has(f.torneo_id)) {
+      vistos.add(f.torneo_id);
+      torneos.push({ id: f.torneo_id, nombre: f.torneo_nombre });
+    }
+  });
+  torneos.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  select.innerHTML = '<option value="">Todos los torneos</option>' +
+    torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre || '-')}</option>`).join('');
+  if (torneos.some((t) => t.id === actual)) select.value = actual;
+}
+
+function poblarFiltroCategoriaFichajes() {
+  const select = document.getElementById('filtroCategoriaFichajes');
+  const torneoId = document.getElementById('filtroTorneoFichajes').value;
+  const actual = select.value;
+  const categorias = [];
+  const vistos = new Set();
+  fichajesCache.forEach((f) => {
+    if (torneoId && f.torneo_id !== torneoId) return;
+    if (f.categoria_id && !vistos.has(f.categoria_id)) {
+      vistos.add(f.categoria_id);
+      categorias.push({ id: f.categoria_id, nombre: f.categoria_nombre });
+    }
+  });
+  categorias.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  select.innerHTML = '<option value="">Todas las categorías</option>' +
+    categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre || '-')}</option>`).join('');
+  if (categorias.some((c) => c.id === actual)) select.value = actual;
+}
+
+function renderFichajes() {
+  const tbody = document.getElementById('tablaFichajes');
+  const texto = (document.getElementById('buscadorFichajes').value || '').trim().toLowerCase();
+  const torneoId = document.getElementById('filtroTorneoFichajes').value;
+  const categoriaId = document.getElementById('filtroCategoriaFichajes').value;
+
+  const lista = fichajesCache.filter((f) => {
+    if (texto) {
+      const nombreCompleto = `${f.jugador_nombre} ${f.jugador_apellido}`.toLowerCase();
+      if (!nombreCompleto.includes(texto)) return false;
+    }
+    if (torneoId && f.torneo_id !== torneoId) return false;
+    if (categoriaId && f.categoria_id !== categoriaId) return false;
+    return true;
+  });
+
+  if (!fichajesCache.length) {
+    tbody.innerHTML = '<tr><td colspan="6">Todavía no pediste ningún fichaje.</td></tr>';
+    return;
+  }
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="6">No se encontraron fichajes con ese filtro.</td></tr>';
+    return;
+  }
+
+  const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
+  tbody.innerHTML = lista.map((f) => {
+    let carnetHtml = '-';
+    if (f.carnet_codigo_qr) {
+      carnetHtml = `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnet('${f.id}')">Ver carnet</button>`;
+    } else if (f.estado === 'rechazado' && f.motivo_rechazo) {
+      carnetHtml = `<span class="carnet-info">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>`;
+    }
+    return `
+      <tr>
+        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</td>
+        <td>${escapeHtml(f.liga_nombre)}</td>
+        <td>${escapeHtml(f.torneo_nombre || '-')}</td>
+        <td>${escapeHtml(f.categoria_nombre || '-')}</td>
+        <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
+        <td>${carnetHtml}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function esCarnetVigente(f) {
+  if (!f.carnet_activo) return false;
+  if (!f.carnet_vigente_hasta) return true;
+  return new Date(f.carnet_vigente_hasta) >= new Date();
+}
+
+function abrirCarnet(fichajeId) {
+  const f = fichajesCache.find((x) => x.id === fichajeId);
+  if (!f) return;
+
+  const vigente = esCarnetVigente(f);
+  const colorClub = f.club_color_primario || '#1a73e8';
+  const vigenteBadge = vigente
+    ? '<span class="badge badge-activo">Vigente</span>'
+    : '<span class="badge badge-inactivo">Vencido</span>';
+
+  document.getElementById('tarjetaCarnet').innerHTML = `
+    <div class="tarjeta-carnet">
+      <div class="carnet-header" style="background:${colorClub};">
+        ${f.club_logo_url ? `<img src="${f.club_logo_url}" alt="">` : ''}
+        <strong>${escapeHtml(f.club_nombre || '-')}</strong>
+      </div>
+      <div class="carnet-cuerpo">
+        ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="carnet-foto">` : ''}
+        <p class="carnet-nombre">${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</p>
+        <div class="carnet-datos">
+          <div><span>DNI</span><span>${escapeHtml(f.jugador_dni || '-')}</span></div>
+          <div><span>Fecha de nacimiento</span><span>${formatearFecha(f.jugador_fecha_nacimiento)}</span></div>
+          <div><span>Liga</span><span>${escapeHtml(f.liga_nombre || '-')}</span></div>
+          <div><span>Torneo</span><span>${escapeHtml(f.torneo_nombre || '-')}</span></div>
+          <div><span>Categoría</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
+        </div>
+        <div class="carnet-qr" id="carnetQrContainer"></div>
+        <p class="carnet-codigo-texto">${escapeHtml(f.carnet_codigo_qr)}</p>
+        <p>${vigenteBadge}</p>
+      </div>
+    </div>
+  `;
+
+  const qrContainer = document.getElementById('carnetQrContainer');
+  qrContainer.innerHTML = '';
+  if (window.QRCode && f.carnet_codigo_qr) {
+    new QRCode(qrContainer, { text: f.carnet_codigo_qr, width: 140, height: 140 });
+  }
+
+  document.getElementById('panelVerCarnet').classList.remove('oculto');
+  document.getElementById('fondoModalVerCarnet').classList.remove('oculto');
+}
+
+function cerrarCarnet() {
+  document.getElementById('panelVerCarnet').classList.add('oculto');
+  document.getElementById('fondoModalVerCarnet').classList.add('oculto');
 }
 
 // ===================== NOTIFICACIONES =====================

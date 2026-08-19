@@ -18,6 +18,7 @@ let modalidadesLigaCache = [];
 let tiposGastoCache = [];
 let tiposIngresoCache = [];
 let cuentasLigaCache = [];
+let fichajesLigaCache = [];
 
 // ----- Íconos SVG reutilizados en botones de acciones (evitan depender de
 // librerías externas de íconos y quedan livianos). -----
@@ -423,6 +424,13 @@ function conectarEventos() {
 
   // ---- Fichajes ----
   document.getElementById('filtroEstadoFichaje').addEventListener('change', cargarFichajesLiga);
+  document.getElementById('buscadorFichajesLiga').addEventListener('input', renderFichajesLiga);
+  document.getElementById('filtroTorneoFichajesLiga').addEventListener('change', () => {
+    poblarFiltroCategoriaFichajesLiga();
+    renderFichajesLiga();
+  });
+  document.getElementById('filtroCategoriaFichajesLiga').addEventListener('change', renderFichajesLiga);
+  document.getElementById('btnCerrarVerCarnetLiga').addEventListener('click', cerrarCarnetLiga);
 
   // ---- Noticias ----
   document.getElementById('btnMostrarFormNoticia').addEventListener('click', () => {
@@ -1240,36 +1248,157 @@ async function guardarArbitro(e) {
 
 async function cargarFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
-  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
     const params = estado ? `?estado=${estado}` : '';
     const data = await apiFetch(`/liga/fichajes${params}`);
-    const fichajes = data.fichajes;
-    if (!fichajes.length) {
-      tbody.innerHTML = '<tr><td colspan="6">No hay solicitudes de fichaje en este estado.</td></tr>';
-      return;
-    }
-    const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
-    tbody.innerHTML = fichajes.map((f) => `
-      <tr>
-        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
-        <td>${escapeHtml(f.club_nombre)}</td>
-        <td>${escapeHtml(f.torneo_nombre || '-')}</td>
-        <td>${escapeHtml(f.categoria_nombre || '-')}</td>
-        <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
-        <td>
-          ${f.estado === 'pendiente' ? `
-            <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
-            <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
-          ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '-')}
-        </td>
-      </tr>
-    `).join('');
+    fichajesLigaCache = data.fichajes;
+    poblarFiltroTorneoFichajesLiga();
+    poblarFiltroCategoriaFichajesLiga();
+    renderFichajesLiga();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
   actualizarBadgeFichajesPendientes();
+}
+
+function poblarFiltroTorneoFichajesLiga() {
+  const select = document.getElementById('filtroTorneoFichajesLiga');
+  const actual = select.value;
+  const torneos = [];
+  const vistos = new Set();
+  fichajesLigaCache.forEach((f) => {
+    if (f.torneo_id && !vistos.has(f.torneo_id)) {
+      vistos.add(f.torneo_id);
+      torneos.push({ id: f.torneo_id, nombre: f.torneo_nombre });
+    }
+  });
+  torneos.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  select.innerHTML = '<option value="">Todos los torneos</option>' +
+    torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre || '-')}</option>`).join('');
+  if (torneos.some((t) => t.id === actual)) select.value = actual;
+}
+
+function poblarFiltroCategoriaFichajesLiga() {
+  const select = document.getElementById('filtroCategoriaFichajesLiga');
+  const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
+  const actual = select.value;
+  const categorias = [];
+  const vistos = new Set();
+  fichajesLigaCache.forEach((f) => {
+    if (torneoId && f.torneo_id !== torneoId) return;
+    if (f.categoria_id && !vistos.has(f.categoria_id)) {
+      vistos.add(f.categoria_id);
+      categorias.push({ id: f.categoria_id, nombre: f.categoria_nombre });
+    }
+  });
+  categorias.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  select.innerHTML = '<option value="">Todas las categorías</option>' +
+    categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre || '-')}</option>`).join('');
+  if (categorias.some((c) => c.id === actual)) select.value = actual;
+}
+
+function renderFichajesLiga() {
+  const tbody = document.getElementById('tablaFichajesLiga');
+  const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
+  const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
+  const categoriaId = document.getElementById('filtroCategoriaFichajesLiga').value;
+
+  const lista = fichajesLigaCache.filter((f) => {
+    if (texto) {
+      const nombreCompleto = `${f.jugador_nombre} ${f.jugador_apellido}`.toLowerCase();
+      if (!nombreCompleto.includes(texto)) return false;
+    }
+    if (torneoId && f.torneo_id !== torneoId) return false;
+    if (categoriaId && f.categoria_id !== categoriaId) return false;
+    return true;
+  });
+
+  if (!fichajesLigaCache.length) {
+    tbody.innerHTML = '<tr><td colspan="7">No hay solicitudes de fichaje en este estado.</td></tr>';
+    return;
+  }
+  if (!lista.length) {
+    tbody.innerHTML = '<tr><td colspan="7">No se encontraron fichajes con ese filtro.</td></tr>';
+    return;
+  }
+
+  const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
+  tbody.innerHTML = lista.map((f) => `
+    <tr>
+      <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
+      <td>${escapeHtml(f.club_nombre)}</td>
+      <td>${escapeHtml(f.torneo_nombre || '-')}</td>
+      <td>${escapeHtml(f.categoria_nombre || '-')}</td>
+      <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
+      <td>${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : '-'}</td>
+      <td>
+        ${f.estado === 'pendiente' ? `
+          <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
+          <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
+        ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '-')}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function formatearFecha(fecha) {
+  if (!fecha) return '-';
+  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR');
+}
+
+function esCarnetVigenteLiga(f) {
+  if (!f.carnet_activo) return false;
+  if (!f.carnet_vigente_hasta) return true;
+  return new Date(f.carnet_vigente_hasta) >= new Date();
+}
+
+function abrirCarnetLiga(fichajeId) {
+  const f = fichajesLigaCache.find((x) => x.id === fichajeId);
+  if (!f) return;
+
+  const vigente = esCarnetVigenteLiga(f);
+  const colorClub = f.club_color_primario || '#1a73e8';
+  const vigenteBadge = vigente
+    ? '<span class="badge badge-activo">Vigente</span>'
+    : '<span class="badge badge-inactivo">Vencido</span>';
+
+  document.getElementById('tarjetaCarnetLiga').innerHTML = `
+    <div class="tarjeta-carnet">
+      <div class="carnet-header" style="background:${colorClub};">
+        ${f.club_logo_url ? `<img src="${f.club_logo_url}" alt="">` : ''}
+        <strong>${escapeHtml(f.club_nombre || '-')}</strong>
+      </div>
+      <div class="carnet-cuerpo">
+        ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="carnet-foto">` : ''}
+        <p class="carnet-nombre">${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</p>
+        <div class="carnet-datos">
+          <div><span>DNI</span><span>${escapeHtml(f.jugador_dni || '-')}</span></div>
+          <div><span>Fecha de nacimiento</span><span>${formatearFecha(f.jugador_fecha_nacimiento)}</span></div>
+          <div><span>Torneo</span><span>${escapeHtml(f.torneo_nombre || '-')}</span></div>
+          <div><span>Categoría</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
+        </div>
+        <div class="carnet-qr" id="carnetLigaQrContainer"></div>
+        <p class="carnet-codigo-texto">${escapeHtml(f.carnet_codigo_qr)}</p>
+        <p>${vigenteBadge}</p>
+      </div>
+    </div>
+  `;
+
+  const qrContainer = document.getElementById('carnetLigaQrContainer');
+  qrContainer.innerHTML = '';
+  if (window.QRCode && f.carnet_codigo_qr) {
+    new QRCode(qrContainer, { text: f.carnet_codigo_qr, width: 140, height: 140 });
+  }
+
+  document.getElementById('panelVerCarnetLiga').classList.remove('oculto');
+  document.getElementById('fondoModalVerCarnetLiga').classList.remove('oculto');
+}
+
+function cerrarCarnetLiga() {
+  document.getElementById('panelVerCarnetLiga').classList.add('oculto');
+  document.getElementById('fondoModalVerCarnetLiga').classList.add('oculto');
 }
 
 // Cuenta cuántos fichajes están pendientes y pinta (o esconde) el globito

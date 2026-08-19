@@ -17,6 +17,17 @@
   .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
   .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
   .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
+  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: var(--blanco); }
+  .tarjeta-carnet .carnet-header { padding: 12px 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .tarjeta-carnet .carnet-header img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.3); }
+  .tarjeta-carnet .carnet-header strong { font-size: 14px; }
+  .tarjeta-carnet .carnet-cuerpo { padding: 16px; text-align: center; }
+  .tarjeta-carnet .carnet-foto { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 3px solid var(--gris-200); margin-bottom: 10px; }
+  .tarjeta-carnet .carnet-nombre { font-size: 17px; font-weight: 800; color: var(--gris-900); margin: 0; }
+  .tarjeta-carnet .carnet-datos { text-align: left; font-size: 13px; color: var(--gris-700); margin: 12px 0; }
+  .tarjeta-carnet .carnet-datos div { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--gris-200); }
+  .tarjeta-carnet .carnet-qr { display: flex; justify-content: center; margin: 10px 0; }
+  .tarjeta-carnet .carnet-codigo-texto { font-family: monospace; font-size: 11px; color: var(--gris-600); word-break: break-all; }
 </style>
 </head>
 <body>
@@ -41,7 +52,17 @@
       <div class="panel">
         <div class="panel-header">
           <h2>Jugadores / Socios</h2>
-          <button class="btn" id="btnMostrarFormJugador">+ Nuevo Jugador</button>
+          <div>
+            <button class="btn btn-secundario" id="btnMostrarFichajeMasivo">Fichaje masivo</button>
+            <button class="btn" id="btnMostrarFormJugador">+ Nuevo Jugador</button>
+          </div>
+        </div>
+
+        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="buscadorJugadores" placeholder="Buscar por apellido o nombre..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <select id="filtroAnioNacimientoJugadores" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todos los años de nacimiento</option>
+          </select>
         </div>
 
         <form id="formJugador" class="oculto">
@@ -86,20 +107,20 @@
 
         <table>
           <thead>
-            <tr><th>Foto</th><th>Nombre</th><th>DNI</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th><input type="checkbox" id="checkTodosJugadores"></th><th>Foto</th><th>Nombre</th><th>DNI</th><th>Fecha de nacimiento</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaJugadores"><tr><td colspan="6">Cargando...</td></tr></tbody>
+          <tbody id="tablaJugadores"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
       </div>
 
-      <!-- Solicitar fichaje para un jugador puntual -->
+      <!-- Solicitar fichaje para uno o varios jugadores (fichaje masivo:
+           mismo torneo + categoría para todos los tildados) -->
       <div class="panel oculto" id="panelSolicitarFichaje">
         <div class="panel-header">
           <h2 id="tituloSolicitarFichaje">Pedir fichaje</h2>
           <button class="btn btn-secundario" id="btnCerrarSolicitarFichaje">Cerrar</button>
         </div>
         <form id="formSolicitarFichaje">
-          <input type="hidden" id="fichajeJugadorId">
           <div class="form-grid">
             <div>
               <label for="fichajeLiga">Liga *</label>
@@ -126,6 +147,15 @@
     <div id="seccionFichajes" class="oculto">
       <div class="panel">
         <h2>Fichajes solicitados</h2>
+        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="buscadorFichajes" placeholder="Buscar por apellido o nombre..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <select id="filtroTorneoFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todos los torneos</option>
+          </select>
+          <select id="filtroCategoriaFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todas las categorías</option>
+          </select>
+        </div>
         <table>
           <thead>
             <tr><th>Jugador</th><th>Liga</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th></tr>
@@ -134,6 +164,17 @@
         </table>
       </div>
     </div>
+
+    <!-- Carnet: tarjeta con todos los datos del socio, pensada para mostrar
+         en el celular el día de partido. -->
+    <div class="panel oculto" id="panelVerCarnet" style="position:fixed; top:8%; left:50%; transform:translateX(-50%); width:340px; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+      <div class="panel-header">
+        <h2>Carnet</h2>
+        <button class="btn btn-secundario" id="btnCerrarVerCarnet">Cerrar</button>
+      </div>
+      <div id="tarjetaCarnet"></div>
+    </div>
+    <div class="oculto" id="fondoModalVerCarnet" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
 
     <!-- ===== SECCIÓN NOTIFICACIONES ===== -->
     <div id="seccionNotificaciones" class="oculto">
@@ -175,6 +216,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/club.js"></script>
 </body>

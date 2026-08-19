@@ -25,6 +25,17 @@
   .logo-preview-wrap { display: flex; align-items: center; gap: 12px; }
   .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
   .logo-miniatura { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: var(--blanco); }
+  .tarjeta-carnet .carnet-header { padding: 12px 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
+  .tarjeta-carnet .carnet-header img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.3); }
+  .tarjeta-carnet .carnet-header strong { font-size: 14px; }
+  .tarjeta-carnet .carnet-cuerpo { padding: 16px; text-align: center; }
+  .tarjeta-carnet .carnet-foto { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 3px solid var(--gris-200); margin-bottom: 10px; }
+  .tarjeta-carnet .carnet-nombre { font-size: 17px; font-weight: 800; color: var(--gris-900); margin: 0; }
+  .tarjeta-carnet .carnet-datos { text-align: left; font-size: 13px; color: var(--gris-700); margin: 12px 0; }
+  .tarjeta-carnet .carnet-datos div { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--gris-200); }
+  .tarjeta-carnet .carnet-qr { display: flex; justify-content: center; margin: 10px 0; }
+  .tarjeta-carnet .carnet-codigo-texto { font-family: monospace; font-size: 11px; color: var(--gris-600); word-break: break-all; }
   #headerLiga {
     display: flex; align-items: center; gap: 16px; padding: 20px 24px; border-radius: var(--radio);
     margin-bottom: 20px; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
@@ -853,22 +864,39 @@
         <div class="panel-header">
           <h2>Solicitudes de fichaje</h2>
         </div>
-        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:16px;">
+        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
           <select id="filtroEstadoFichaje" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
             <option value="pendiente">Pendientes</option>
             <option value="aprobado">Aprobados</option>
             <option value="rechazado">Rechazados</option>
             <option value="">Todos</option>
           </select>
+          <input type="text" id="buscadorFichajesLiga" placeholder="Buscar por apellido o nombre..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <select id="filtroTorneoFichajesLiga" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todos los torneos</option>
+          </select>
+          <select id="filtroCategoriaFichajesLiga" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todas las categorías</option>
+          </select>
         </div>
         <table>
           <thead>
-            <tr><th>Jugador</th><th>Club</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Jugador</th><th>Club</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaFichajesLiga"><tr><td colspan="6">Cargando...</td></tr></tbody>
+          <tbody id="tablaFichajesLiga"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
+
+    <!-- Carnet: tarjeta con todos los datos del socio (vista Liga). -->
+    <div class="panel oculto" id="panelVerCarnetLiga" style="position:fixed; top:8%; left:50%; transform:translateX(-50%); width:340px; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+      <div class="panel-header">
+        <h2>Carnet</h2>
+        <button class="btn btn-secundario" id="btnCerrarVerCarnetLiga">Cerrar</button>
+      </div>
+      <div id="tarjetaCarnetLiga"></div>
+    </div>
+    <div class="oculto" id="fondoModalVerCarnetLiga" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
 
     <!-- ===== SECCIÓN NOTICIAS ===== -->
     <div id="seccionNoticias" class="oculto">

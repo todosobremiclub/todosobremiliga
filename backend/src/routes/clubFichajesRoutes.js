@@ -5,24 +5,39 @@ const { query } = require('../db');
 
 // Todas las rutas usan req.clubId (calculado por resolveClubId en app.js).
 
-// GET /club/fichajes — todas las solicitudes de fichaje de MI club
-// (para ver el estado: pendiente / aprobado / rechazado)
+// GET /club/fichajes?torneo_id=...&categoria_id=... — todas las solicitudes
+// de fichaje de MI club (para ver el estado: pendiente / aprobado /
+// rechazado), opcionalmente filtradas por torneo y/o categoría
 router.get('/', async (req, res) => {
+  const { torneo_id, categoria_id } = req.query;
   try {
+    const params = [req.clubId];
+    let filtros = '';
+    if (torneo_id) {
+      params.push(torneo_id);
+      filtros += ` AND f.torneo_id = $${params.length}`;
+    }
+    if (categoria_id) {
+      params.push(categoria_id);
+      filtros += ` AND f.categoria_id = $${params.length}`;
+    }
     const { rows } = await query(
       `SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
+              j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento,
+              cl.nombre AS club_nombre, cl.logo_url AS club_logo_url, cl.color_primario AS club_color_primario,
               l.nombre AS liga_nombre, t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre,
               c.codigo_qr AS carnet_codigo_qr, c.vigente_desde AS carnet_vigente_desde,
               c.vigente_hasta AS carnet_vigente_hasta, c.activo AS carnet_activo
        FROM fichajes f
        JOIN jugadores j ON j.id = f.jugador_id
+       JOIN clubes cl ON cl.id = f.club_id
        JOIN ligas l ON l.id = f.liga_id
        LEFT JOIN torneos t ON t.id = f.torneo_id
        LEFT JOIN categorias cat ON cat.id = f.categoria_id
        LEFT JOIN carnets c ON c.fichaje_id = f.id
-       WHERE f.club_id = $1
+       WHERE f.club_id = $1${filtros}
        ORDER BY f.fecha_solicitud DESC`,
-      [req.clubId]
+      params
     );
     res.json({ ok: true, fichajes: rows });
   } catch (err) {

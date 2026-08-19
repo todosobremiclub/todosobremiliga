@@ -6,25 +6,39 @@ const { query } = require('../db');
 
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
-// GET /liga/fichajes?estado=pendiente — solicitudes de fichaje de MI liga
-// (por defecto trae todas; se puede filtrar por estado)
+// GET /liga/fichajes?estado=pendiente&torneo_id=...&categoria_id=... —
+// solicitudes de fichaje de MI liga (por defecto trae todas; se puede
+// filtrar por estado, torneo y/o categoría)
 router.get('/', async (req, res) => {
-  const { estado } = req.query;
+  const { estado, torneo_id, categoria_id } = req.query;
   try {
     let sql = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
-             c.nombre AS club_nombre, t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre
+             j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento,
+             c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
+             t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre,
+             car.codigo_qr AS carnet_codigo_qr, car.vigente_desde AS carnet_vigente_desde,
+             car.vigente_hasta AS carnet_vigente_hasta, car.activo AS carnet_activo
       FROM fichajes f
       JOIN jugadores j ON j.id = f.jugador_id
       JOIN clubes c ON c.id = f.club_id
       LEFT JOIN torneos t ON t.id = f.torneo_id
       LEFT JOIN categorias cat ON cat.id = f.categoria_id
+      LEFT JOIN carnets car ON car.fichaje_id = f.id
       WHERE f.liga_id = $1
     `;
     const params = [req.ligaId];
     if (estado) {
       params.push(estado);
       sql += ` AND f.estado = $${params.length}`;
+    }
+    if (torneo_id) {
+      params.push(torneo_id);
+      sql += ` AND f.torneo_id = $${params.length}`;
+    }
+    if (categoria_id) {
+      params.push(categoria_id);
+      sql += ` AND f.categoria_id = $${params.length}`;
     }
     sql += ' ORDER BY f.fecha_solicitud DESC';
 
