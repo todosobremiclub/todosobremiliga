@@ -22,6 +22,7 @@
   .tabs-categorias-liga { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
   .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
   .tab-btn-categoria { padding: 10px 16px; }
+  .foto-mini-tab-categoria { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
   .tab-btn-general { border-style: dashed; }
   .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; }
   .link-club-fichajes:hover { color: var(--azul); text-decoration: underline; }
@@ -36,6 +37,8 @@
   .logo-preview-wrap img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
   .logo-miniatura { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
   .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
+  .foto-jugador-mini.sin-foto, .carnet-foto.sin-foto { display: inline-flex; align-items: center; justify-content: center; }
+  .foto-jugador-mini.sin-foto svg, .carnet-foto.sin-foto svg { width: 60%; height: 60%; color: var(--gris-300); }
   .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: var(--blanco); }
   .tarjeta-carnet .carnet-header { padding: 12px 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
   .tarjeta-carnet .carnet-header img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.3); }
@@ -493,29 +496,18 @@
       <div id="listaFichajesPorTorneoClub"><p class="texto-ayuda">Cargando...</p></div>
     </div>
 
-    <!-- Popup de asignación masiva: elegir un torneo/categoría (y subcategoría,
-         si tiene) para inscribir de una a todos los clubes tildados en el Home. -->
-    <div class="oculto panel popup-modal" id="modalAsignarCategoriaMasivo">
+    <!-- Popup de asignación masiva: tildar una o varias categorías/subcategorías
+         (de uno o varios torneos) para inscribir de una a todos los clubes
+         tildados en el Home en TODAS las que se elijan. -->
+    <div class="oculto panel popup-modal popup-modal-ancho" id="modalAsignarCategoriaMasivo">
       <div class="panel-header">
-        <h2>Asignar clubes a una categoría</h2>
+        <h2>Asignar clubes a categorías</h2>
         <button class="btn btn-secundario" id="btnCerrarAsignarMasivo">Cerrar</button>
       </div>
       <p class="texto-ayuda" id="resumenClubesAsignarMasivo"></p>
-      <div class="form-grid">
-        <div>
-          <label for="masivoTorneo">Torneo *</label>
-          <select id="masivoTorneo"></select>
-        </div>
-        <div>
-          <label for="masivoCategoria">Categoría *</label>
-          <select id="masivoCategoria"></select>
-        </div>
-        <div id="grupoMasivoSubcategoria" class="oculto">
-          <label for="masivoSubcategoria">Subcategoría *</label>
-          <select id="masivoSubcategoria"></select>
-        </div>
-      </div>
-      <button class="btn" id="btnConfirmarAsignarMasivo">Asignar</button>
+      <p class="texto-ayuda">Tildá una o varias categorías (o subcategorías, si las tiene) — de uno o varios torneos — y los clubes seleccionados quedarán inscriptos en todas las que elijas. Dentro de un mismo torneo, un club solo puede tener una categoría (pero sí puede estar en varias subcategorías de esa misma categoría).</p>
+      <div id="listaAsignarMasivoTorneos"><p class="texto-ayuda">Cargando...</p></div>
+      <button class="btn" id="btnConfirmarAsignarMasivo" style="margin-top:12px;">Asignar</button>
       <p class="mensaje-error oculto" id="asignarMasivoError"></p>
       <p class="mensaje-ok oculto" id="asignarMasivoOk"></p>
     </div>
@@ -530,6 +522,9 @@
 
         <div class="barra-filtros">
           <input type="text" id="buscadorTorneos" placeholder="Buscar por Nombre o Deporte...">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400; white-space:nowrap;">
+            <input type="checkbox" id="checkVerTorneosHistoricos"> Ver históricos
+          </label>
         </div>
 
         <form id="formTorneo" class="oculto popup-modal">
@@ -587,6 +582,15 @@
               <input type="date" id="torneoFechaInicio">
             </div>
             <div>
+              <label for="torneoGolesWalkoverGanador">Resultado por incomparecencia — gana</label>
+              <input type="number" id="torneoGolesWalkoverGanador" value="3" min="0">
+              <p class="texto-ayuda" style="margin:4px 0 0;">Cuando un equipo no se presenta a un partido, el otro se lo lleva con este resultado (ej: 3 a 0). Se puede tildar desde la carga de resultado del partido.</p>
+            </div>
+            <div>
+              <label for="torneoGolesWalkoverPerdedor">Resultado por incomparecencia — pierde</label>
+              <input type="number" id="torneoGolesWalkoverPerdedor" value="0" min="0">
+            </div>
+            <div>
               <label for="torneoCanchaJuego">¿Dónde se juega?</label>
               <select id="torneoCanchaJuego">
                 <option value="clubes">En las canchas de los clubes</option>
@@ -638,6 +642,16 @@
           <label class="check-inline" style="margin:8px 0;">
             <input type="checkbox" id="categoriaSumaTablaGeneral" checked> Suma a la tabla general del torneo
           </label>
+          <div class="form-grid una-columna">
+            <div>
+              <label for="categoriaFotoArchivo">Foto de la categoría (se muestra en el panel de Liga y en el sitio público)</label>
+              <div class="logo-preview-wrap">
+                <img id="categoriaFotoPreview" class="oculto" alt="Foto">
+                <input type="file" id="categoriaFotoArchivo" accept="image/*">
+              </div>
+              <input type="hidden" id="categoriaFotoUrl">
+            </div>
+          </div>
           <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, eligiendo la categoría ya creada abajo. Si la categoría tiene subcategorías, el precio de inscripción y el tilde de tabla general se definen en cada subcategoría en lugar de acá.</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
@@ -824,6 +838,15 @@
           <div><label for="resultadoLocalScore" id="labelResultadoLocal">Goles local</label><input type="number" id="resultadoLocalScore" min="0" required></div>
           <div><label for="resultadoVisitanteScore" id="labelResultadoVisitante">Goles visitante</label><input type="number" id="resultadoVisitanteScore" min="0" required></div>
         </div>
+        <div class="form-grid">
+          <label class="check-inline" id="grupoNoPresentoLocal">
+            <input type="checkbox" id="resultadoNoPresentoLocal"> <span id="labelNoPresentoLocal">El equipo local no se presentó</span>
+          </label>
+          <label class="check-inline" id="grupoNoPresentoVisitante">
+            <input type="checkbox" id="resultadoNoPresentoVisitante"> <span id="labelNoPresentoVisitante">El equipo visitante no se presentó</span>
+          </label>
+        </div>
+        <p class="texto-ayuda oculto" id="ayudaWalkover">Si tildás que un equipo no se presentó, el resultado se completa solo con la configuración de "incomparecencia" del torneo. Si tildás los dos, el partido queda como perdido para ambos.</p>
         <div id="contenedorEstadisticasJugadores"></div>
         <button type="submit" class="btn">Guardar resultado</button>
         <button type="button" class="btn btn-secundario" id="btnCancelarResultado">Cancelar</button>

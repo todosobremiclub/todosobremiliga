@@ -29,6 +29,15 @@ const ICONO_WEB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICONO_COPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a1 1 0 0 0-1 1 5 5 0 0 0 4 5"/><path d="M17 5h3a1 1 0 0 1 1 1 5 5 0 0 1-4 5"/></svg>';
 const ICONO_WHATSAPP = '<svg viewBox="0 0 32 32"><path fill="#fff" d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.23.6 4.36 1.75 6.24L4 29l7.94-1.7a12.9 12.9 0 0 0 4.08.65h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3Zm0 21.98h-.01a10 10 0 0 1-3.5-.62l-.5-.18-4.71 1.01 1.03-4.58-.2-.53a9.9 9.9 0 0 1-1.6-5.06c0-5.5 4.48-9.98 9.99-9.98 5.5 0 9.98 4.48 9.98 9.98s-4.48 9.96-9.98 9.96Zm5.47-7.47c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg>';
 
+// Foto de un jugador/socio en listados y en el carnet digital: si no tiene
+// foto cargada, en vez de dejar el círculo vacío se simula una foto de
+// carnet (silueta genérica de persona) para que se vea como un carnet real
+// al que todavía no se le subió la fotito.
+function fotoJugadorHtml(fotoUrl, clase) {
+  if (fotoUrl) return `<img src="${fotoUrl}" alt="" class="${clase}">`;
+  return `<span class="${clase} sin-foto">${ICONO_PERSONA}</span>`;
+}
+
 let torneoActualId = null;
 let torneoActualNombre = '';
 let categoriaActualId = null;
@@ -264,8 +273,6 @@ function conectarEventos() {
     document.getElementById('modalAsignarCategoriaMasivo').classList.add('oculto');
     ocultarFondoModal();
   });
-  document.getElementById('masivoTorneo').addEventListener('change', poblarCategoriasAsignarMasivo);
-  document.getElementById('masivoCategoria').addEventListener('change', poblarSubcategoriaAsignarMasivo);
   document.getElementById('btnConfirmarAsignarMasivo').addEventListener('click', confirmarAsignarCategoriaMasivo);
   document.getElementById('clubActivoEnLiga').addEventListener('change', async (e) => {
     const clubId = document.getElementById('clubIdEdicion').value;
@@ -335,6 +342,7 @@ function conectarEventos() {
   });
   document.getElementById('formTorneo').addEventListener('submit', guardarTorneo);
   document.getElementById('buscadorTorneos').addEventListener('input', () => renderTorneos());
+  document.getElementById('checkVerTorneosHistoricos').addEventListener('change', () => renderTorneos());
 
   // ---- Categorías ----
   document.getElementById('checkTorneoHistorico').addEventListener('change', (e) => {
@@ -354,9 +362,13 @@ function conectarEventos() {
     document.getElementById('categoriaIdEdicion').value = '';
     document.getElementById('categoriaTorneoId').value = torneoActualId;
     document.getElementById('categoriaSumaTablaGeneral').checked = true;
+    document.getElementById('categoriaFotoUrl').value = '';
+    document.getElementById('categoriaFotoArchivo').value = '';
+    document.getElementById('categoriaFotoPreview').classList.add('oculto');
     document.getElementById('categoriaFormError').classList.add('oculto');
     document.getElementById('formCategoria').classList.remove('oculto');
   });
+  document.getElementById('categoriaFotoArchivo').addEventListener('change', onElegirFotoCategoria);
   document.getElementById('btnCancelarFormCategoria').addEventListener('click', () => {
     document.getElementById('formCategoria').classList.add('oculto');
   });
@@ -411,6 +423,8 @@ function conectarEventos() {
   document.getElementById('btnCerrarCargarResultado').addEventListener('click', cerrarModalResultado);
   document.getElementById('btnCancelarResultado').addEventListener('click', cerrarModalResultado);
   document.getElementById('formResultado').addEventListener('submit', guardarResultadoConEstadisticas);
+  document.getElementById('resultadoNoPresentoLocal').addEventListener('change', actualizarUiWalkover);
+  document.getElementById('resultadoNoPresentoVisitante').addEventListener('change', actualizarUiWalkover);
 
   // ---- Fichajes ----
   document.getElementById('filtroEstadoFichaje').addEventListener('change', cargarFichajesLiga);
@@ -1350,7 +1364,7 @@ function renderFichajesLiga() {
     if (!expandido) return filaGrupo;
     const filasJugadores = fichajesClub.map((f) => `
       <tr class="${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}">
-        <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+        <td>${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}</td>
         <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}</td>
         <td>${escapeHtml(f.jugador_dni || '-')}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
@@ -1403,7 +1417,7 @@ function abrirCarnetLiga(fichajeId) {
         <strong>${escapeHtml(f.club_nombre || '-')}</strong>
       </div>
       <div class="carnet-cuerpo">
-        ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="carnet-foto">` : ''}
+        ${fotoJugadorHtml(f.jugador_foto_url, 'carnet-foto')}
         <p class="carnet-nombre">${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</p>
         <div class="carnet-datos">
           <div><span>DNI</span><span>${escapeHtml(f.jugador_dni || '-')}</span></div>
@@ -1681,62 +1695,72 @@ function actualizarBarraAccionesMasivas() {
 
 // ----- Asignación masiva de clubes a una categoría/subcategoría -----
 
-let categoriasAsignarMasivoCache = [];
+let torneosAsignarMasivoCache = [];
 
 async function abrirAsignarCategoriaMasivo() {
   if (!clubesSeleccionadosIds.size) return;
   document.getElementById('modalAsignarCategoriaMasivo').classList.remove('oculto');
   mostrarFondoModal();
   document.getElementById('resumenClubesAsignarMasivo').textContent =
-    `Vas a inscribir ${clubesSeleccionadosIds.size} club(es) seleccionado(s) en la categoría que elijas.`;
+    `Vas a inscribir ${clubesSeleccionadosIds.size} club(es) seleccionado(s) en las categorías/subcategorías que tildes.`;
   document.getElementById('asignarMasivoError').classList.add('oculto');
   document.getElementById('asignarMasivoOk').classList.add('oculto');
-  document.getElementById('masivoTorneo').innerHTML = '<option value="">Cargando...</option>';
+  const cont = document.getElementById('listaAsignarMasivoTorneos');
+  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   try {
-    const data = await apiFetch('/liga/torneos');
-    const torneos = data.torneos;
-    if (!torneos.length) {
-      document.getElementById('masivoTorneo').innerHTML = '<option value="">No hay torneos creados</option>';
+    const dataTorneos = await apiFetch('/liga/torneos');
+    if (!dataTorneos.torneos.length) {
+      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay torneos creados en tu Liga.</p>';
+      torneosAsignarMasivoCache = [];
       return;
     }
-    document.getElementById('masivoTorneo').innerHTML = torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
-    await poblarCategoriasAsignarMasivo();
+    const categoriasPorTorneo = await Promise.all(
+      dataTorneos.torneos.map((t) => apiFetch(`/liga/torneos/${t.id}/categorias`))
+    );
+    torneosAsignarMasivoCache = dataTorneos.torneos.map((t, i) => ({ ...t, categorias: categoriasPorTorneo[i].categorias }));
+    renderAsignarMasivoTorneos();
   } catch (err) {
-    document.getElementById('masivoTorneo').innerHTML = '<option value="">Error al cargar torneos</option>';
+    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-async function poblarCategoriasAsignarMasivo() {
-  const torneoId = document.getElementById('masivoTorneo').value;
-  const selectCategoria = document.getElementById('masivoCategoria');
-  if (!torneoId) { selectCategoria.innerHTML = ''; return; }
-  selectCategoria.innerHTML = '<option value="">Cargando...</option>';
-  try {
-    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
-    categoriasAsignarMasivoCache = data.categorias;
-    if (!categoriasAsignarMasivoCache.length) {
-      selectCategoria.innerHTML = '<option value="">Este torneo no tiene categorías</option>';
-      return;
-    }
-    selectCategoria.innerHTML = categoriasAsignarMasivoCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-    poblarSubcategoriaAsignarMasivo();
-  } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Error al cargar categorías</option>';
-  }
-}
-
-function poblarSubcategoriaAsignarMasivo() {
-  const categoriaId = document.getElementById('masivoCategoria').value;
-  const categoria = categoriasAsignarMasivoCache.find((c) => c.id === categoriaId);
-  const grupo = document.getElementById('grupoMasivoSubcategoria');
-  const select = document.getElementById('masivoSubcategoria');
-  if (categoria && categoria.subcategorias && categoria.subcategorias.length) {
-    grupo.classList.remove('oculto');
-    select.innerHTML = categoria.subcategorias.map((s) => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('');
-  } else {
-    grupo.classList.add('oculto');
-    select.innerHTML = '';
-  }
+function renderAsignarMasivoTorneos() {
+  const cont = document.getElementById('listaAsignarMasivoTorneos');
+  // Igual que en "Participaciones del club": si la categoría tiene
+  // subcategorías cargadas, se tilda a nivel subcategoría (no tiene sentido
+  // dejar al club en la categoría "pelada"); si no tiene, se tilda la
+  // categoría directamente.
+  cont.innerHTML = torneosAsignarMasivoCache.map((t) => `
+    <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
+      <strong>${escapeHtml(t.nombre)}</strong> <span class="texto-ayuda" style="margin:0;">(${escapeHtml(t.deporte)})</span>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; margin-left:12px;">
+        ${t.categorias.length ? t.categorias.map((c) => {
+          if (c.subcategorias.length) {
+            return `
+              <div>
+                <span style="font-size:13px; font-weight:600;">${escapeHtml(c.nombre)}</span>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; margin-left:14px;">
+                  ${c.subcategorias.map((s) => `
+                    <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
+                      <input type="checkbox" class="chk-categoria-asignar-masivo" data-torneo-id="${t.id}"
+                        data-categoria-id="${c.id}" data-subcategoria-id="${s.id}">
+                      ${escapeHtml(s.nombre)}
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `;
+          }
+          return `
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
+              <input type="checkbox" class="chk-categoria-asignar-masivo" data-torneo-id="${t.id}" data-categoria-id="${c.id}">
+              ${escapeHtml(c.nombre)}
+            </label>
+          `;
+        }).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
+      </div>
+    </div>
+  `).join('');
 }
 
 async function confirmarAsignarCategoriaMasivo() {
@@ -1745,34 +1769,51 @@ async function confirmarAsignarCategoriaMasivo() {
   errorEl.classList.add('oculto');
   okEl.classList.add('oculto');
 
-  const torneoId = document.getElementById('masivoTorneo').value;
-  const categoriaId = document.getElementById('masivoCategoria').value;
-  const subcategoriaSelect = document.getElementById('masivoSubcategoria');
-  const tieneSubcategorias = !document.getElementById('grupoMasivoSubcategoria').classList.contains('oculto');
-  if (!torneoId || !categoriaId) {
-    errorEl.textContent = 'Elegí un torneo y una categoría.';
+  const seleccionadas = Array.from(
+    document.querySelectorAll('#listaAsignarMasivoTorneos .chk-categoria-asignar-masivo:checked')
+  ).map((el) => ({
+    torneo_id: el.dataset.torneoId,
+    categoria_id: el.dataset.categoriaId,
+    subcategoria_id: el.dataset.subcategoriaId || undefined
+  }));
+
+  if (!seleccionadas.length) {
+    errorEl.textContent = 'Tildá al menos una categoría o subcategoría.';
     errorEl.classList.remove('oculto');
     return;
   }
-  if (tieneSubcategorias && !subcategoriaSelect.value) {
-    errorEl.textContent = 'Esta categoría tiene subcategorías: elegí una.';
-    errorEl.classList.remove('oculto');
-    return;
-  }
+
+  const clubIds = [...clubesSeleccionadosIds];
+  let totalAgregados = 0;
+  let totalIntentos = 0;
+  const erroresPorSeleccion = [];
+
   try {
-    const data = await apiFetch('/liga/clubes/inscribir-multiple', {
-      method: 'POST',
-      body: JSON.stringify({
-        club_ids: [...clubesSeleccionadosIds],
-        torneo_id: torneoId,
-        categoria_id: categoriaId,
-        subcategoria_id: tieneSubcategorias ? subcategoriaSelect.value : undefined
-      })
-    });
-    const fallidos = data.resultados.filter((r) => !r.ok);
-    okEl.textContent = `Se inscribieron ${data.agregados} de ${data.resultados.length} club(es).` +
-      (fallidos.length ? ` No se pudieron inscribir ${fallidos.length} (ya estaban inscriptos o no pertenecen a tu Liga).` : '');
+    // Se inscribe una selección (torneo+categoría+subcategoría) por vez —
+    // el endpoint ya valida por su cuenta la regla de "una sola categoría
+    // por torneo", así que si se tildaron dos categorías distintas de un
+    // mismo torneo, esa combinación puntual queda reportada como error por
+    // club en vez de romper el resto de las inscripciones.
+    for (const sel of seleccionadas) {
+      const data = await apiFetch('/liga/clubes/inscribir-multiple', {
+        method: 'POST',
+        body: JSON.stringify({
+          club_ids: clubIds,
+          torneo_id: sel.torneo_id,
+          categoria_id: sel.categoria_id,
+          subcategoria_id: sel.subcategoria_id
+        })
+      });
+      totalAgregados += data.agregados;
+      totalIntentos += data.resultados.length;
+      const fallidos = data.resultados.filter((r) => !r.ok);
+      if (fallidos.length) erroresPorSeleccion.push(fallidos.length);
+    }
+    const totalFallidos = erroresPorSeleccion.reduce((a, b) => a + b, 0);
+    okEl.textContent = `Se hicieron ${totalAgregados} de ${totalIntentos} inscripción(es) (${clubIds.length} club(es) × ${seleccionadas.length} categoría(s)/subcategoría(s)).` +
+      (totalFallidos ? ` ${totalFallidos} no se pudieron hacer (ya estaban inscriptos, no pertenecen a tu Liga, o ya tenían otra categoría en ese torneo).` : '');
     okEl.classList.remove('oculto');
+    cargarClubes();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -2461,7 +2502,7 @@ function renderFichajesPorTorneoClub(fichajes) {
         .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
       const filas = fichajesCategoria.map((f) => `
         <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
-          ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}
+          ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
           <span style="flex:1;">
             ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
             ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
@@ -2738,14 +2779,21 @@ async function cargarTorneos() {
 function renderTorneos() {
   const cont = document.getElementById('gridTorneos');
   const texto = (document.getElementById('buscadorTorneos').value || '').trim().toLowerCase();
+  const verHistoricos = document.getElementById('checkVerTorneosHistoricos').checked;
+
+  const base = verHistoricos ? torneosCache : torneosCache.filter((t) => t.estado !== 'historico');
   const lista = !texto
-    ? torneosCache
-    : torneosCache.filter((t) =>
+    ? base
+    : base.filter((t) =>
         (t.nombre || '').toLowerCase().includes(texto) || (t.deporte || '').toLowerCase().includes(texto)
       );
 
   if (!torneosCache.length) {
     cont.innerHTML = '<p class="texto-ayuda">Todavía no cargaste ningún torneo.</p>';
+    return;
+  }
+  if (!base.length) {
+    cont.innerHTML = '<p class="texto-ayuda">No tenés torneos activos. Tildá "Ver históricos" para ver los archivados.</p>';
     return;
   }
   if (!lista.length) {
@@ -2761,7 +2809,7 @@ function renderTorneos() {
       </div>
       <h3>${escapeHtml(t.nombre)}</h3>
       <p>${escapeHtml(t.deporte)} · ${escapeHtml(NOMBRES_FORMATO_TORNEO[t.formato_juego] || t.formato_juego || '-')}</p>
-      <p><span class="badge badge-activo">${escapeHtml(t.estado || 'planificado')}</span></p>
+      <p><span class="badge ${t.estado === 'historico' ? 'badge-inactivo' : 'badge-activo'}">${escapeHtml(t.estado || 'planificado')}</span></p>
     </div>
   `).join('');
 }
@@ -2792,6 +2840,8 @@ function editarTorneo(torneoId) {
   document.getElementById('torneoPtsDerrota').value = sp.derrota != null ? sp.derrota : 0;
   document.getElementById('torneoFechaInicio').value = torneo.fecha_inicio ? String(torneo.fecha_inicio).slice(0, 10) : '';
   document.getElementById('torneoCanchaJuego').value = torneo.cancha_juego || 'clubes';
+  document.getElementById('torneoGolesWalkoverGanador').value = torneo.goles_walkover_ganador != null ? torneo.goles_walkover_ganador : 3;
+  document.getElementById('torneoGolesWalkoverPerdedor').value = torneo.goles_walkover_perdedor != null ? torneo.goles_walkover_perdedor : 0;
   document.getElementById('torneoFormError').classList.add('oculto');
   document.getElementById('formTorneo').classList.remove('oculto');
   mostrarFondoModal();
@@ -2818,7 +2868,9 @@ async function guardarTorneo(e) {
       derrota: ptsDerrota
     },
     fecha_inicio: document.getElementById('torneoFechaInicio').value || undefined,
-    cancha_juego: document.getElementById('torneoCanchaJuego').value || undefined
+    cancha_juego: document.getElementById('torneoCanchaJuego').value || undefined,
+    goles_walkover_ganador: document.getElementById('torneoGolesWalkoverGanador').value || undefined,
+    goles_walkover_perdedor: document.getElementById('torneoGolesWalkoverPerdedor').value || undefined
   };
 
   try {
@@ -2921,7 +2973,7 @@ function renderTabsCategoriasLiga() {
   const cont = document.getElementById('tabsCategoriasLiga');
   const gruposCategorias = categoriasCache.map((c) => `
     <span class="tab-btn-categoria-grupo">
-      <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneralLiga && categoriaActualId === c.id ? 'activo' : ''}" onclick="seleccionarCategoriaLiga('${c.id}')">${escapeHtml(c.nombre)}</button>
+      <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneralLiga && categoriaActualId === c.id ? 'activo' : ''}" onclick="seleccionarCategoriaLiga('${c.id}')">${c.foto_url ? `<img src="${c.foto_url}" alt="" class="foto-mini-tab-categoria">` : ''}${escapeHtml(c.nombre)}</button>
       <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarCategoria('${c.id}')">${ICONO_LAPIZ}</button>
       <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarCategoria('${c.id}', '${escapeHtml(c.nombre)}')">${ICONO_BASURA}</button>
     </span>
@@ -2959,8 +3011,30 @@ function editarCategoria(categoriaId) {
   document.getElementById('categoriaNombre').value = categoria.nombre || '';
   document.getElementById('categoriaPrecioInscripcion').value = categoria.precio_inscripcion != null ? categoria.precio_inscripcion : '';
   document.getElementById('categoriaSumaTablaGeneral').checked = categoria.suma_tabla_general !== false;
+  document.getElementById('categoriaFotoUrl').value = categoria.foto_url || '';
+  document.getElementById('categoriaFotoArchivo').value = '';
+  const previewFoto = document.getElementById('categoriaFotoPreview');
+  if (categoria.foto_url) {
+    previewFoto.src = categoria.foto_url;
+    previewFoto.classList.remove('oculto');
+  } else {
+    previewFoto.classList.add('oculto');
+  }
   document.getElementById('categoriaFormError').classList.add('oculto');
   document.getElementById('formCategoria').classList.remove('oculto');
+}
+
+function onElegirFotoCategoria(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    const preview = document.getElementById('categoriaFotoPreview');
+    preview.src = lector.result;
+    preview.classList.remove('oculto');
+    document.getElementById('categoriaFotoUrl').value = lector.result;
+  };
+  lector.readAsDataURL(archivo);
 }
 
 async function eliminarCategoria(categoriaId, nombreCategoria) {
@@ -2991,7 +3065,8 @@ async function guardarCategoria(e) {
   const cuerpo = {
     nombre: document.getElementById('categoriaNombre').value.trim(),
     precio_inscripcion: document.getElementById('categoriaPrecioInscripcion').value || undefined,
-    suma_tabla_general: document.getElementById('categoriaSumaTablaGeneral').checked
+    suma_tabla_general: document.getElementById('categoriaSumaTablaGeneral').checked,
+    foto_url: document.getElementById('categoriaFotoUrl').value || undefined
   };
 
   try {
@@ -3529,6 +3604,7 @@ function renderJornadaFixture(jornadasDisponibles) {
             <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_id)}</strong>${logoVisitante}
           </div>
           <span class="badge ${p.estado === 'jugado' ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(p.estado || 'programado')}</span>
+          ${(p.no_presento_local || p.no_presento_visitante) ? `<span class="badge badge-pendiente" title="${p.no_presento_local ? escapeHtml(p.club_local_nombre) : ''}${p.no_presento_local && p.no_presento_visitante ? ' y ' : ''}${p.no_presento_visitante ? escapeHtml(p.club_visitante_nombre) : ''} no se presentó">W.O.</span>` : ''}
           <button class="btn btn-secundario btn-pequeno" onclick="abrirModalResultado('${p.id}')">Cargar resultado</button>
         </div>
         <div class="form-grid" style="margin-top:10px;">
@@ -3679,10 +3755,15 @@ async function abrirModalResultado(partidoId) {
   document.getElementById('resultadoFormError').classList.add('oculto');
   document.getElementById('resultadoLocalScore').value = partido && partido.resultado_local != null ? partido.resultado_local : '';
   document.getElementById('resultadoVisitanteScore').value = partido && partido.resultado_visitante != null ? partido.resultado_visitante : '';
+  document.getElementById('resultadoNoPresentoLocal').checked = !!(partido && partido.no_presento_local);
+  document.getElementById('resultadoNoPresentoVisitante').checked = !!(partido && partido.no_presento_visitante);
   if (partido) {
     document.getElementById('labelResultadoLocal').textContent = `Goles ${partido.club_local_nombre}`;
     document.getElementById('labelResultadoVisitante').textContent = `Goles ${partido.club_visitante_nombre}`;
+    document.getElementById('labelNoPresentoLocal').textContent = `${partido.club_local_nombre} no se presentó`;
+    document.getElementById('labelNoPresentoVisitante').textContent = `${partido.club_visitante_nombre} no se presentó`;
   }
+  actualizarUiWalkover();
 
   const contenedor = document.getElementById('contenedorEstadisticasJugadores');
   contenedor.innerHTML = 'Cargando jugadores...';
@@ -3725,6 +3806,22 @@ function cerrarModalResultado() {
   estadisticasPartidoActualId = null;
 }
 
+// Si se tilda que un equipo no se presentó, el marcador de ESE equipo deja
+// de pedirse a mano (lo completa el backend con la configuración de
+// incomparecencia del torneo) — se deshabilita el campo para que no
+// confunda con un resultado real.
+function actualizarUiWalkover() {
+  const ausenteLocal = document.getElementById('resultadoNoPresentoLocal').checked;
+  const ausenteVisitante = document.getElementById('resultadoNoPresentoVisitante').checked;
+  const inputLocal = document.getElementById('resultadoLocalScore');
+  const inputVisitante = document.getElementById('resultadoVisitanteScore');
+  inputLocal.disabled = ausenteLocal || ausenteVisitante;
+  inputVisitante.disabled = ausenteLocal || ausenteVisitante;
+  inputLocal.required = !ausenteLocal && !ausenteVisitante;
+  inputVisitante.required = !ausenteLocal && !ausenteVisitante;
+  document.getElementById('ayudaWalkover').classList.toggle('oculto', !ausenteLocal && !ausenteVisitante);
+}
+
 async function guardarResultadoConEstadisticas(e) {
   e.preventDefault();
   const errorEl = document.getElementById('resultadoFormError');
@@ -3733,6 +3830,8 @@ async function guardarResultadoConEstadisticas(e) {
   const partidoId = document.getElementById('resultadoPartidoId').value;
   const resultadoLocal = document.getElementById('resultadoLocalScore').value;
   const resultadoVisitante = document.getElementById('resultadoVisitanteScore').value;
+  const noPresentoLocal = document.getElementById('resultadoNoPresentoLocal').checked;
+  const noPresentoVisitante = document.getElementById('resultadoNoPresentoVisitante').checked;
 
   const estadisticas = [];
   document.querySelectorAll('#contenedorEstadisticasJugadores .fila-jugador-stats').forEach((fila) => {
@@ -3749,8 +3848,10 @@ async function guardarResultadoConEstadisticas(e) {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}/resultado`, {
       method: 'PUT',
       body: JSON.stringify({
-        resultado_local: Number(resultadoLocal),
-        resultado_visitante: Number(resultadoVisitante),
+        resultado_local: (noPresentoLocal || noPresentoVisitante) ? undefined : Number(resultadoLocal),
+        resultado_visitante: (noPresentoLocal || noPresentoVisitante) ? undefined : Number(resultadoVisitante),
+        no_presento_local: noPresentoLocal,
+        no_presento_visitante: noPresentoVisitante,
         estadisticas_jugadores: estadisticas
       })
     });
