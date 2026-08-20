@@ -35,6 +35,11 @@ let categoriaActualId = null;
 let categoriaActualNombre = '';
 let subcategoriaActualId = null;
 let subcategoriaActualNombre = '';
+// Estado de la vista "Categorías" del torneo (fusiona lo que antes eran 3
+// pop-ups: Categorías, Subcategorías y Detalle, en una sola pantalla con
+// categorías arriba como botones — ver verCategorias más abajo).
+let mostrandoTablaGeneralLiga = false;
+let hayTablaGeneralLiga = false;
 let rondaTablaActual = 'general';
 let tiposCanchaCache = [];
 let prediosLigaCache = [];
@@ -179,13 +184,14 @@ function conectarEventos() {
   document.getElementById('fondoModalGenerico').addEventListener('click', () => {
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
-     'modalParticipacionesClub', 'formTorneo', 'panelCategorias', 'panelSubcategorias', 'panelDetalleCategoria'
+     'modalParticipacionesClub', 'formTorneo', 'panelCategorias'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
     torneoActualId = null;
     categoriaActualId = null;
     subcategoriaActualId = null;
     subcategoriaActualNombre = '';
+    mostrandoTablaGeneralLiga = false;
   });
   document.getElementById('btnGuardarParticipaciones').addEventListener('click', guardarParticipaciones);
 
@@ -332,12 +338,11 @@ function conectarEventos() {
   });
   document.getElementById('btnCerrarCategorias').addEventListener('click', () => {
     document.getElementById('panelCategorias').classList.add('oculto');
-    document.getElementById('panelSubcategorias').classList.add('oculto');
-    document.getElementById('panelDetalleCategoria').classList.add('oculto');
     torneoActualId = null;
     categoriaActualId = null;
     subcategoriaActualId = null;
     subcategoriaActualNombre = '';
+    mostrandoTablaGeneralLiga = false;
     ocultarFondoModal();
   });
   document.getElementById('btnMostrarFormCategoria').addEventListener('click', () => {
@@ -353,40 +358,17 @@ function conectarEventos() {
   });
   document.getElementById('formCategoria').addEventListener('submit', guardarCategoria);
 
-  // ---- Subcategorías (pantalla intermedia, solo si la categoría las tiene) ----
-  document.getElementById('btnCerrarSubcategorias').addEventListener('click', () => {
-    document.getElementById('panelSubcategorias').classList.add('oculto');
-    document.getElementById('panelCategorias').classList.remove('oculto');
-    categoriaActualId = null;
-  });
-  document.getElementById('btnMostrarFormSubcategoria').addEventListener('click', () => {
-    document.getElementById('formSubcategoria').reset();
-    document.getElementById('subcategoriaIdEdicion').value = '';
-    document.getElementById('subcategoriaSumaTablaGeneral').checked = true;
-    document.getElementById('subcategoriaFormError').classList.add('oculto');
-    document.getElementById('formSubcategoria').classList.remove('oculto');
-  });
+  // ---- Subcategorías de la categoría elegida (el botón "+ Subcategoría" se
+  // agrega dinámicamente en renderTabsSubcategoriasLiga, junto a las
+  // subcategorías ya cargadas) ----
   document.getElementById('btnCancelarFormSubcategoria').addEventListener('click', () => {
     document.getElementById('formSubcategoria').classList.add('oculto');
   });
   document.getElementById('formSubcategoria').addEventListener('submit', guardarSubcategoria);
 
   // ---- Detalle de categoría/subcategoría (fixture/tabla/goleadores/tarjetas) ----
-  document.getElementById('btnCerrarDetalleCategoria').addEventListener('click', () => {
-    document.getElementById('panelDetalleCategoria').classList.add('oculto');
-    if (subcategoriaActualId) {
-      document.getElementById('panelSubcategorias').classList.remove('oculto');
-    } else {
-      document.getElementById('panelCategorias').classList.remove('oculto');
-      categoriaActualId = null;
-    }
-    subcategoriaActualId = null;
-    subcategoriaActualNombre = '';
-  });
   document.getElementById('btnAbrirGestionarEquipos').addEventListener('click', abrirGestionarEquipos);
   document.getElementById('btnCerrarGestionarEquipos').addEventListener('click', cerrarGestionarEquipos);
-  document.getElementById('btnVerTablaGeneral').addEventListener('click', abrirTablaGeneral);
-  document.getElementById('btnCerrarTablaGeneral').addEventListener('click', cerrarTablaGeneral);
   document.getElementById('tabBtnFixture').addEventListener('click', () => cambiarTabDetalle('fixture'));
   document.getElementById('tabBtnTabla').addEventListener('click', () => cambiarTabDetalle('tabla'));
   document.getElementById('tabBtnGoleadores').addEventListener('click', () => cambiarTabDetalle('goleadores'));
@@ -2764,12 +2746,13 @@ function verCategorias(torneoId, nombreTorneo) {
   mostrarFondoModal();
   torneoActualNombre = nombreTorneo;
   document.getElementById('panelCategorias').classList.remove('oculto');
-  document.getElementById('panelSubcategorias').classList.add('oculto');
-  document.getElementById('panelDetalleCategoria').classList.add('oculto');
   document.getElementById('tituloCategorias').textContent = `Categorías de "${nombreTorneo}"`;
   document.getElementById('formCategoria').classList.add('oculto');
+  document.getElementById('formSubcategoria').classList.add('oculto');
+  categoriaActualId = null;
   subcategoriaActualId = null;
   subcategoriaActualNombre = '';
+  mostrandoTablaGeneralLiga = false;
   const torneo = torneosCache.find((t) => t.id === torneoId);
   document.getElementById('checkTorneoHistorico').checked = !!(torneo && torneo.estado === 'historico');
   cargarCategorias(torneoId);
@@ -2795,34 +2778,80 @@ async function toggleTorneoHistorico(marcado) {
   }
 }
 
+// Carga (o recarga, ej. después de guardar/borrar una categoría o
+// subcategoría) las categorías del torneo y decide qué mostrar debajo de los
+// botones: mantiene la categoría/subcategoría elegida si sigue existiendo,
+// si no vuelve a la primera categoría del torneo.
 async function cargarCategorias(torneoId) {
-  const cont = document.getElementById('gridCategorias');
+  const cont = document.getElementById('tabsCategoriasLiga');
   cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   try {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
     categoriasCache = data.categorias;
 
-    const unidadesSumables = categoriasCache.reduce((acc, c) => acc + (c.subcategorias && c.subcategorias.length ? c.subcategorias.length : 1), 0);
-    document.getElementById('btnVerTablaGeneral').classList.toggle('oculto', unidadesSumables <= 1);
+    // Una unidad (categoría sin subcategorías, o cada subcategoría) suma a
+    // la tabla general salvo que se haya destildado explícitamente.
+    const unidadesSumables = categoriasCache.reduce((acc, c) => {
+      if (c.subcategorias && c.subcategorias.length) {
+        return acc + c.subcategorias.filter((s) => s.suma_tabla_general !== false).length;
+      }
+      return acc + (c.suma_tabla_general !== false ? 1 : 0);
+    }, 0);
+    hayTablaGeneralLiga = unidadesSumables >= 2;
 
     if (!categoriasCache.length) {
       cont.innerHTML = '<p class="texto-ayuda">Todavía no hay categorías en este torneo.</p>';
+      categoriaActualId = null;
+      document.getElementById('tabsSubcategoriasLiga').classList.add('oculto');
+      document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
+      document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+      document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
       return;
     }
-    cont.innerHTML = categoriasCache.map((c) => `
-      <div class="boton-grande" onclick="abrirCategoria('${c.id}', '${escapeHtml(c.nombre)}')">
-        <div class="acciones-boton-grande">
-          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarCategoria('${c.id}')">${ICONO_LAPIZ}</button>
-          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarCategoria('${c.id}', '${escapeHtml(c.nombre)}')">${ICONO_BASURA}</button>
-        </div>
-        <h3>${escapeHtml(c.nombre)}</h3>
-        <p>${c.precio_inscripcion != null ? `$${Number(c.precio_inscripcion).toLocaleString('es-AR')}` : 'Sin precio de inscripción'}</p>
-        <p>${c.subcategorias && c.subcategorias.length ? escapeHtml(c.subcategorias.map((s) => s.nombre).join(', ')) : 'Sin subcategorías'}</p>
-      </div>
-    `).join('');
+
+    if (mostrandoTablaGeneralLiga) {
+      renderTabsCategoriasLiga();
+      return;
+    }
+    const categoriaAConservar = categoriasCache.find((c) => c.id === categoriaActualId);
+    seleccionarCategoriaLiga(categoriaAConservar ? categoriaAConservar.id : categoriasCache[0].id, subcategoriaActualId);
   } catch (err) {
     cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+function renderTabsCategoriasLiga() {
+  const cont = document.getElementById('tabsCategoriasLiga');
+  const gruposCategorias = categoriasCache.map((c) => `
+    <span class="tab-btn-categoria-grupo">
+      <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneralLiga && categoriaActualId === c.id ? 'activo' : ''}" onclick="seleccionarCategoriaLiga('${c.id}')">${escapeHtml(c.nombre)}</button>
+      <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarCategoria('${c.id}')">${ICONO_LAPIZ}</button>
+      <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarCategoria('${c.id}', '${escapeHtml(c.nombre)}')">${ICONO_BASURA}</button>
+    </span>
+  `).join('');
+  const grupoGeneral = hayTablaGeneralLiga
+    ? `<span class="tab-btn-categoria-grupo"><button class="tab-btn tab-btn-categoria tab-btn-general ${mostrandoTablaGeneralLiga ? 'activo' : ''}" onclick="seleccionarTablaGeneralLiga()">Tabla general</button></span>`
+    : '';
+  cont.innerHTML = gruposCategorias + grupoGeneral;
+}
+
+function renderTabsSubcategoriasLiga() {
+  const cont = document.getElementById('tabsSubcategoriasLiga');
+  if (mostrandoTablaGeneralLiga || !categoriaActualId) {
+    cont.classList.add('oculto');
+    cont.innerHTML = '';
+    return;
+  }
+  cont.classList.remove('oculto');
+  const subcategorias = subcategoriasDeCategoriaActual();
+  const gruposSubcategorias = subcategorias.map((s) => `
+    <span class="tab-btn-categoria-grupo">
+      <button class="tab-btn ${subcategoriaActualId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoriaLiga('${s.id}')">${escapeHtml(s.nombre)}</button>
+      <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarSubcategoria('${s.id}')">${ICONO_LAPIZ}</button>
+      <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">${ICONO_BASURA}</button>
+    </span>
+  `).join('');
+  cont.innerHTML = gruposSubcategorias + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Subcategoría</button>`;
 }
 
 function editarCategoria(categoriaId) {
@@ -2882,55 +2911,23 @@ async function guardarCategoria(e) {
   }
 }
 
-// ===================== SUBCATEGORÍAS (pantalla intermedia entre Categoría y Detalle) =====================
+// ===================== SUBCATEGORÍAS =====================
 // Nivel extra y opcional atado a la categoría principal (ej: "2018", "2019",
 // "2020" dentro de la categoría "Baby Fútbol A"). Cuando una categoría tiene
-// subcategorías cargadas, tocarla en el grid de Categorías NO entra directo
-// al fixture: primero muestra este grid de subcategorías (ver abrirCategoria
-// más abajo), y recién al elegir una se abre el fixture/tabla/goleadores/
-// tarjetas de ESA subcategoría puntual.
+// subcategorías cargadas, hay que elegir una (ver seleccionarCategoriaLiga)
+// antes de ver su fixture/tabla/goleadores/tarjetas.
 
 function subcategoriasDeCategoriaActual() {
   const cat = categoriasCache.find((c) => c.id === categoriaActualId);
   return (cat && cat.subcategorias) || [];
 }
 
-function abrirSubcategorias(categoriaId, nombreCategoria) {
-  categoriaActualId = categoriaId;
-  categoriaActualNombre = nombreCategoria;
-  document.getElementById('panelCategorias').classList.add('oculto');
-  document.getElementById('panelSubcategorias').classList.remove('oculto');
-  document.getElementById('tituloSubcategorias').textContent = `Subcategorías de "${nombreCategoria}"`;
-  document.getElementById('formSubcategoria').classList.add('oculto');
-  cargarSubcategorias();
-}
-
-async function cargarSubcategorias() {
-  const cont = document.getElementById('gridSubcategorias');
-  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
-  try {
-    // Refresca categoriasCache para tener las subcategorías al día.
-    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias`);
-    categoriasCache = data.categorias;
-    const subcategorias = subcategoriasDeCategoriaActual();
-    if (!subcategorias.length) {
-      cont.innerHTML = '<p class="texto-ayuda">Todavía no cargaste subcategorías.</p>';
-      return;
-    }
-    cont.innerHTML = subcategorias.map((s) => `
-      <div class="boton-grande" onclick="abrirDetalleCategoria('${categoriaActualId}', '${escapeHtml(categoriaActualNombre)}', '${s.id}', '${escapeHtml(s.nombre)}')">
-        <div class="acciones-boton-grande">
-          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarSubcategoria('${s.id}')">${ICONO_LAPIZ}</button>
-          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">${ICONO_BASURA}</button>
-        </div>
-        <h3>${escapeHtml(s.nombre)}</h3>
-        <p>${s.precio_inscripcion != null ? `$${Number(s.precio_inscripcion).toLocaleString('es-AR')}` : 'Sin precio de inscripción'}</p>
-        <p>${s.suma_tabla_general !== false ? 'Suma a la tabla general' : 'No suma a la tabla general'}</p>
-      </div>
-    `).join('');
-  } catch (err) {
-    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
-  }
+function mostrarFormNuevaSubcategoria() {
+  document.getElementById('formSubcategoria').reset();
+  document.getElementById('subcategoriaIdEdicion').value = '';
+  document.getElementById('subcategoriaSumaTablaGeneral').checked = true;
+  document.getElementById('subcategoriaFormError').classList.add('oculto');
+  document.getElementById('formSubcategoria').classList.remove('oculto');
 }
 
 function editarSubcategoria(subcategoriaId) {
@@ -2967,7 +2964,7 @@ async function guardarSubcategoria(e) {
       });
     }
     document.getElementById('formSubcategoria').classList.add('oculto');
-    await cargarSubcategorias();
+    await cargarCategorias(torneoActualId);
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -2980,41 +2977,83 @@ async function eliminarSubcategoria(subcategoriaId, nombre) {
   }
   try {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/subcategorias/${subcategoriaId}`, { method: 'DELETE' });
-    await cargarSubcategorias();
+    await cargarCategorias(torneoActualId);
   } catch (err) {
     alert('Error: ' + err.message);
   }
 }
 
-// ===================== DETALLE DE CATEGORÍA/SUBCATEGORÍA (fixture / tabla / goleadores / tarjetas) =====================
+// ===================== SELECCIÓN: CATEGORÍA / SUBCATEGORÍA / TABLA GENERAL =====================
+// Un solo panel con las categorías del torneo como botones arriba de todo:
+// si la categoría elegida no tiene subcategorías, muestra directo su
+// fixture/tabla/goleadores/tarjetas; si tiene, primero hay que elegir una
+// subcategoría (no se auto-selecciona ninguna). Si el torneo suma 2 o más
+// unidades marcadas con "suma a tabla general", el último botón de la fila
+// de categorías es "Tabla general".
 
-// Punto de entrada al tocar una tarjeta de Categoría: si tiene subcategorías
-// cargadas, primero hay que elegir una (abrirSubcategorias); si no tiene,
-// entra directo al detalle (fixture/tabla/etc.) de la categoría "pelada".
-function abrirCategoria(categoriaId, nombreCategoria) {
-  const cat = categoriasCache.find((c) => c.id === categoriaId);
-  if (cat && cat.subcategorias && cat.subcategorias.length) {
-    abrirSubcategorias(categoriaId, nombreCategoria);
+function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
+  mostrandoTablaGeneralLiga = false;
+  categoriaActualId = categoriaId;
+  const categoria = categoriasCache.find((c) => c.id === categoriaId);
+  categoriaActualNombre = categoria ? categoria.nombre : '';
+  document.getElementById('formCategoria').classList.add('oculto');
+  document.getElementById('formSubcategoria').classList.add('oculto');
+
+  const subcategorias = subcategoriasDeCategoriaActual();
+  const subcategoriaValida = subcategoriaIdPreferida && subcategorias.find((s) => s.id === subcategoriaIdPreferida);
+  subcategoriaActualId = subcategoriaValida ? subcategoriaIdPreferida : null;
+  subcategoriaActualNombre = subcategoriaValida ? subcategoriaValida.nombre : '';
+
+  renderTabsCategoriasLiga();
+  renderTabsSubcategoriasLiga();
+
+  if (subcategorias.length && !subcategoriaActualId) {
+    mostrarMensajeSinSeleccionLiga('Elegí una subcategoría para ver su información.');
   } else {
-    abrirDetalleCategoria(categoriaId, nombreCategoria, null, null);
+    mostrarBloqueDetalleCategoriaLiga();
   }
 }
 
-function abrirDetalleCategoria(categoriaId, nombreCategoria, subcategoriaId, nombreSubcategoria) {
-  categoriaActualId = categoriaId;
-  categoriaActualNombre = nombreCategoria;
-  subcategoriaActualId = subcategoriaId || null;
-  subcategoriaActualNombre = nombreSubcategoria || '';
+function seleccionarSubcategoriaLiga(subcategoriaId) {
+  const sub = subcategoriasDeCategoriaActual().find((s) => s.id === subcategoriaId);
+  subcategoriaActualId = subcategoriaId;
+  subcategoriaActualNombre = sub ? sub.nombre : '';
+  document.getElementById('formSubcategoria').classList.add('oculto');
+  renderTabsSubcategoriasLiga();
+  mostrarBloqueDetalleCategoriaLiga();
+}
+
+function seleccionarTablaGeneralLiga() {
+  mostrandoTablaGeneralLiga = true;
+  document.getElementById('formCategoria').classList.add('oculto');
+  document.getElementById('formSubcategoria').classList.add('oculto');
+  renderTabsCategoriasLiga();
+  document.getElementById('tabsSubcategoriasLiga').classList.add('oculto');
+  document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
+  document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
+  document.getElementById('bloqueTablaGeneralLiga').classList.remove('oculto');
+  cargarTablaGeneral(torneoActualId);
+}
+
+function mostrarMensajeSinSeleccionLiga(texto) {
+  document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
+  document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+  const mensaje = document.getElementById('mensajeSinSeleccionLiga');
+  mensaje.textContent = texto;
+  mensaje.classList.toggle('oculto', !texto);
+}
+
+function mostrarBloqueDetalleCategoriaLiga() {
+  document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
+  document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+  document.getElementById('bloqueDetalleCategoriaLiga').classList.remove('oculto');
+  document.getElementById('tituloDetalleCategoria').textContent = subcategoriaActualNombre
+    ? `${categoriaActualNombre} — ${subcategoriaActualNombre}`
+    : categoriaActualNombre;
   // Los equipos y partidos son de la categoría/subcategoría anterior: se
   // vuelven a pedir al servidor para esta, así no arrastramos datos viejos.
   equiposCache = [];
   partidosCache = [];
-  document.getElementById('panelCategorias').classList.add('oculto');
-  document.getElementById('panelSubcategorias').classList.add('oculto');
-  document.getElementById('panelDetalleCategoria').classList.remove('oculto');
-  document.getElementById('tituloDetalleCategoria').textContent = subcategoriaActualNombre
-    ? `${nombreCategoria} — ${subcategoriaActualNombre} · ${torneoActualNombre}`
-    : `${nombreCategoria} — ${torneoActualNombre}`;
   document.getElementById('formGenerarFixture').classList.add('oculto');
   document.getElementById('formPartido').classList.add('oculto');
   document.getElementById('fixtureIdaVuelta').checked = false;
@@ -3050,7 +3089,7 @@ function cambiarTabDetalle(nombre) {
   if (nombre === 'tarjetas') cargarTarjetas();
 }
 
-// ----- Gestionar equipos: popup encima de panelDetalleCategoria -----
+// ----- Gestionar equipos: popup encima de panelCategorias -----
 
 function abrirGestionarEquipos() {
   document.getElementById('tituloGestionarEquipos').textContent = subcategoriaActualNombre
@@ -3066,18 +3105,8 @@ function cerrarGestionarEquipos() {
   document.getElementById('fondoModalGestionarEquipos').classList.add('oculto');
 }
 
-// ----- Tabla general del torneo: popup encima de panelCategorias -----
-
-function abrirTablaGeneral() {
-  document.getElementById('panelTablaGeneral').classList.remove('oculto');
-  document.getElementById('fondoModalTablaGeneral').classList.remove('oculto');
-  cargarTablaGeneral(torneoActualId);
-}
-
-function cerrarTablaGeneral() {
-  document.getElementById('panelTablaGeneral').classList.add('oculto');
-  document.getElementById('fondoModalTablaGeneral').classList.add('oculto');
-}
+// ----- Tabla general del torneo: se muestra dentro de panelCategorias al
+// tocar el botón "Tabla general" (ver seleccionarTablaGeneralLiga) -----
 
 async function cargarTablaGeneral(torneoId) {
   const tbody = document.getElementById('tablaGeneralTorneo');
@@ -3106,6 +3135,7 @@ async function cargarTablaGeneral(torneoId) {
     tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
+
 
 function cambiarRondaTabla(ronda) {
   rondaTablaActual = ronda;

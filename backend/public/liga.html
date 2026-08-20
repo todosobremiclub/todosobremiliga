@@ -19,6 +19,10 @@
     padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
   }
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+  .tabs-categorias-liga { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
+  .tab-btn-categoria { padding: 10px 16px; }
+  .tab-btn-general { border-style: dashed; }
   .campo-color { display: flex; align-items: center; gap: 8px; }
   .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
   .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
@@ -583,12 +587,13 @@
         </div>
       </div>
 
-      <!-- Detalle de un torneo: sus categorías -->
-      <div class="panel oculto popup-modal" id="panelCategorias">
+      <!-- Detalle de un torneo: sus categorías arriba como botones, y debajo
+           (según lo que esté elegido) subcategorías, el detalle de
+           fixture/tabla/goleadores/tarjetas, o la tabla general del torneo. -->
+      <div class="panel oculto popup-modal popup-modal-ancho" id="panelCategorias">
         <div class="panel-header">
           <h2 id="tituloCategorias">Categorías</h2>
           <div>
-            <button class="btn btn-secundario oculto" id="btnVerTablaGeneral">Ver tabla general</button>
             <button class="btn btn-secundario" id="btnMostrarFormCategoria">+ Nueva Categoría</button>
             <button class="btn btn-secundario" id="btnCerrarCategorias">Cerrar</button>
           </div>
@@ -614,178 +619,160 @@
           <label class="check-inline" style="margin:8px 0;">
             <input type="checkbox" id="categoriaSumaTablaGeneral" checked> Suma a la tabla general del torneo
           </label>
-          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, entrando a "Ver detalle" de la categoría ya creada. Si la categoría tiene subcategorías, el precio de inscripción y el tilde de tabla general se definen en cada subcategoría (ver más abajo) en lugar de acá.</p>
+          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, eligiendo la categoría ya creada abajo. Si la categoría tiene subcategorías, el precio de inscripción y el tilde de tabla general se definen en cada subcategoría en lugar de acá.</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
           <p class="mensaje-error oculto" id="categoriaFormError"></p>
         </form>
 
-        <div id="gridCategorias" class="grid-botones-grandes">
+        <!-- Categorías del torneo, como botones. El último botón de esta fila
+             es "Tabla general" cuando el torneo suma 2 o más unidades
+             (categorías sin subcategorías, o subcategorías) marcadas con el
+             tilde "Suma a la tabla general". -->
+        <div id="tabsCategoriasLiga" class="tabs-categorias-liga">
           <p class="texto-ayuda">Cargando...</p>
         </div>
-      </div>
 
-      <!-- Tabla general del torneo: suma puntos de todas las categorías/subcategorías
-           marcadas como "suma_tabla_general" en una sola tabla por club.
-           Se abre encima de panelCategorias (que ya es un popup-modal), por
-           eso tiene su propio z-index más alto y su propio fondo. -->
-      <div class="panel oculto" id="panelTablaGeneral" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
-        <div class="panel-header">
-          <h2 id="tituloTablaGeneral">Tabla general</h2>
-          <button class="btn btn-secundario" id="btnCerrarTablaGeneral">Cerrar</button>
-        </div>
-        <p class="texto-ayuda">Suma los puntos de todas las categorías y subcategorías marcadas con el tilde "Suma a la tabla general".</p>
-        <table>
-          <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
-          <tbody id="tablaGeneralTorneo"><tr><td colspan="9">Cargando...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="oculto" id="fondoModalTablaGeneral" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
+        <!-- Subcategorías de la categoría elegida (si tiene, o para cargarle
+             la primera): siempre incluye el botón "+ Subcategoría" al final. -->
+        <div id="tabsSubcategoriasLiga" class="tabs-categorias-liga oculto"></div>
 
-      <!-- Detalle de una categoría: equipos / fixture / tabla -->
-      <div class="panel oculto popup-modal popup-modal-ancho" id="panelDetalleCategoria">
-        <div class="panel-header">
-          <h2 id="tituloDetalleCategoria">Categoría</h2>
-          <div>
-            <button class="btn btn-secundario" id="btnAbrirGestionarEquipos">Gestionar equipos</button>
-            <button class="btn btn-secundario" id="btnCerrarDetalleCategoria">Cerrar</button>
-          </div>
-        </div>
-
-        <div class="tabs">
-          <button class="tab-btn activo" id="tabBtnFixture">Fixture</button>
-          <button class="tab-btn" id="tabBtnTabla">Tabla de posiciones</button>
-          <button class="tab-btn" id="tabBtnGoleadores">Goleadores</button>
-          <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
-        </div>
-
-        <!-- Fixture -->
-        <div id="subSeccionFixture" class="oculto">
-          <div class="panel-header">
-            <span></span>
+        <form id="formSubcategoria" class="oculto">
+          <input type="hidden" id="subcategoriaIdEdicion">
+          <div class="form-grid">
             <div>
-              <button class="btn btn-secundario" id="btnGenerarFixture">Generar automático</button>
-              <button class="btn btn-secundario" id="btnVaciarFixture">Vaciar fixture</button>
-              <button class="btn" id="btnMostrarFormPartido">+ Programar partido</button>
+              <label for="subcategoriaNombre">Nombre *</label>
+              <input type="text" id="subcategoriaNombre" placeholder="ej: 2018" required>
+            </div>
+            <div>
+              <label for="subcategoriaPrecioInscripcion">Precio de inscripción</label>
+              <input type="number" id="subcategoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
             </div>
           </div>
-          <p class="mensaje-error oculto" id="fixtureAccionError"></p>
+          <label class="check-inline" style="margin:8px 0;">
+            <input type="checkbox" id="subcategoriaSumaTablaGeneral" checked> Suma a la tabla general del torneo
+          </label>
+          <button type="submit" class="btn">Guardar</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormSubcategoria">Cancelar</button>
+          <p class="mensaje-error oculto" id="subcategoriaFormError"></p>
+        </form>
 
-          <form id="formGenerarFixture" class="oculto">
-            <div class="form-grid">
-              <div>
-                <label><input type="checkbox" id="fixtureIdaVuelta" style="width:auto; margin-right:6px;">Ida y vuelta</label>
-              </div>
-            </div>
-            <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta categoría, sin que ningún equipo juegue dos veces en la misma jornada.</p>
-            <button type="submit" class="btn">Confirmar generación</button>
-            <button type="button" class="btn btn-secundario" id="btnCancelarGenerarFixture">Cancelar</button>
-          </form>
+        <p class="texto-ayuda oculto" id="mensajeSinSeleccionLiga"></p>
 
-          <form id="formPartido" class="oculto">
-            <div class="form-grid">
-              <div>
-                <label for="partidoLocal">Equipo local *</label>
-                <select id="partidoLocal" required></select>
-              </div>
-              <div>
-                <label for="partidoVisitante">Equipo visitante *</label>
-                <select id="partidoVisitante" required></select>
-              </div>
-              <div><label for="partidoJornada">Jornada</label><input type="number" id="partidoJornada"></div>
-              <div><label for="partidoFecha">Fecha</label><input type="date" id="partidoFecha"></div>
-            </div>
-            <button type="submit" class="btn">Guardar</button>
-            <button type="button" class="btn btn-secundario" id="btnCancelarFormPartido">Cancelar</button>
-            <p class="mensaje-error oculto" id="partidoFormError"></p>
-          </form>
-
-          <!-- Navegador de jornadas: muestra una fecha (jornada) a la vez -->
-          <div id="navegadorJornadas" class="oculto" style="display:flex; align-items:center; justify-content:center; gap:16px; margin:12px 0;">
-            <button class="btn btn-secundario btn-pequeno" id="btnJornadaAnterior">← Anterior</button>
-            <span id="tituloJornadaActual" style="font-weight:700;"></span>
-            <button class="btn btn-secundario btn-pequeno" id="btnJornadaSiguiente">Siguiente →</button>
-          </div>
-          <div id="bloqueDescripcionJornada" class="oculto" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:12px;">
-            <label for="inputDescripcionJornada" style="font-size:13px;">Descripción de la fecha:</label>
-            <input type="text" id="inputDescripcionJornada" placeholder="ej: Sábado 8 de Agosto, Semana del 1 al 8" style="flex:1; max-width:340px; padding:6px 10px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
-            <button class="btn btn-secundario btn-pequeno" id="btnGuardarDescripcionJornada">Guardar</button>
-          </div>
-          <div id="contenedorPartidosJornada"></div>
-        </div>
-
-        <!-- Tabla de posiciones -->
-        <div id="subSeccionTabla" class="oculto">
-          <div class="tabs oculto" id="tabsRondaTabla">
-            <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
-            <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
-            <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
-          </div>
+        <!-- Tabla general del torneo: suma puntos de todas las categorías/
+             subcategorías marcadas como "suma_tabla_general" en una sola
+             tabla por club. -->
+        <div id="bloqueTablaGeneralLiga" class="oculto">
+          <p class="texto-ayuda">Suma los puntos de todas las categorías y subcategorías marcadas con el tilde "Suma a la tabla general".</p>
           <table>
-            <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
-            <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
+            <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+            <tbody id="tablaGeneralTorneo"><tr><td colspan="9">Cargando...</td></tr></tbody>
           </table>
         </div>
 
-        <!-- Goleadores -->
-        <div id="subSeccionGoleadores" class="oculto">
-          <table>
-            <thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
-            <tbody id="tablaGoleadores"><tr><td colspan="3">Cargando...</td></tr></tbody>
-          </table>
-        </div>
+        <!-- Detalle de la categoría/subcategoría elegida: equipos / fixture / tabla -->
+        <div id="bloqueDetalleCategoriaLiga" class="oculto">
+          <div class="panel-header">
+            <h3 id="tituloDetalleCategoria" style="margin:0;">Categoría</h3>
+            <button class="btn btn-secundario" id="btnAbrirGestionarEquipos">Gestionar equipos</button>
+          </div>
 
-        <!-- Tarjetas -->
-        <div id="subSeccionTarjetas" class="oculto">
-          <table>
-            <thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
-            <tbody id="tablaTarjetas"><tr><td colspan="4">Cargando...</td></tr></tbody>
-          </table>
+          <div class="tabs">
+            <button class="tab-btn activo" id="tabBtnFixture">Fixture</button>
+            <button class="tab-btn" id="tabBtnTabla">Tabla de posiciones</button>
+            <button class="tab-btn" id="tabBtnGoleadores">Goleadores</button>
+            <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
+          </div>
+
+          <!-- Fixture -->
+          <div id="subSeccionFixture" class="oculto">
+            <div class="panel-header">
+              <span></span>
+              <div>
+                <button class="btn btn-secundario" id="btnGenerarFixture">Generar automático</button>
+                <button class="btn btn-secundario" id="btnVaciarFixture">Vaciar fixture</button>
+                <button class="btn" id="btnMostrarFormPartido">+ Programar partido</button>
+              </div>
+            </div>
+            <p class="mensaje-error oculto" id="fixtureAccionError"></p>
+
+            <form id="formGenerarFixture" class="oculto">
+              <div class="form-grid">
+                <div>
+                  <label><input type="checkbox" id="fixtureIdaVuelta" style="width:auto; margin-right:6px;">Ida y vuelta</label>
+                </div>
+              </div>
+              <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta categoría, sin que ningún equipo juegue dos veces en la misma jornada.</p>
+              <button type="submit" class="btn">Confirmar generación</button>
+              <button type="button" class="btn btn-secundario" id="btnCancelarGenerarFixture">Cancelar</button>
+            </form>
+
+            <form id="formPartido" class="oculto">
+              <div class="form-grid">
+                <div>
+                  <label for="partidoLocal">Equipo local *</label>
+                  <select id="partidoLocal" required></select>
+                </div>
+                <div>
+                  <label for="partidoVisitante">Equipo visitante *</label>
+                  <select id="partidoVisitante" required></select>
+                </div>
+                <div><label for="partidoJornada">Jornada</label><input type="number" id="partidoJornada"></div>
+                <div><label for="partidoFecha">Fecha</label><input type="date" id="partidoFecha"></div>
+              </div>
+              <button type="submit" class="btn">Guardar</button>
+              <button type="button" class="btn btn-secundario" id="btnCancelarFormPartido">Cancelar</button>
+              <p class="mensaje-error oculto" id="partidoFormError"></p>
+            </form>
+
+            <!-- Navegador de jornadas: muestra una fecha (jornada) a la vez -->
+            <div id="navegadorJornadas" class="oculto" style="display:flex; align-items:center; justify-content:center; gap:16px; margin:12px 0;">
+              <button class="btn btn-secundario btn-pequeno" id="btnJornadaAnterior">← Anterior</button>
+              <span id="tituloJornadaActual" style="font-weight:700;"></span>
+              <button class="btn btn-secundario btn-pequeno" id="btnJornadaSiguiente">Siguiente →</button>
+            </div>
+            <div id="bloqueDescripcionJornada" class="oculto" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:12px;">
+              <label for="inputDescripcionJornada" style="font-size:13px;">Descripción de la fecha:</label>
+              <input type="text" id="inputDescripcionJornada" placeholder="ej: Sábado 8 de Agosto, Semana del 1 al 8" style="flex:1; max-width:340px; padding:6px 10px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
+              <button class="btn btn-secundario btn-pequeno" id="btnGuardarDescripcionJornada">Guardar</button>
+            </div>
+            <div id="contenedorPartidosJornada"></div>
+          </div>
+
+          <!-- Tabla de posiciones -->
+          <div id="subSeccionTabla" class="oculto">
+            <div class="tabs oculto" id="tabsRondaTabla">
+              <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
+              <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
+              <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
+            </div>
+            <table>
+              <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
+              <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+
+          <!-- Goleadores -->
+          <div id="subSeccionGoleadores" class="oculto">
+            <table>
+              <thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
+              <tbody id="tablaGoleadores"><tr><td colspan="3">Cargando...</td></tr></tbody>
+            </table>
+          </div>
+
+          <!-- Tarjetas -->
+          <div id="subSeccionTarjetas" class="oculto">
+            <table>
+              <thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
+              <tbody id="tablaTarjetas"><tr><td colspan="4">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- Subcategorías de una categoría: pantalla intermedia que solo aparece
-         si la categoría tiene subcategorías cargadas (ej: 2018/2019/2020
-         dentro de "Baby Fútbol A"). Se abre encima de panelCategorias, y al
-         tocar una subcategoría se entra recién ahí al fixture/tabla/etc. -->
-    <div class="panel oculto" id="panelSubcategorias" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
-      <div class="panel-header">
-        <h2 id="tituloSubcategorias">Subcategorías</h2>
-        <div>
-          <button class="btn btn-secundario" id="btnMostrarFormSubcategoria">+ Nueva Subcategoría</button>
-          <button class="btn btn-secundario" id="btnCerrarSubcategorias">Cerrar</button>
-        </div>
-      </div>
-
-      <form id="formSubcategoria" class="oculto">
-        <input type="hidden" id="subcategoriaIdEdicion">
-        <div class="form-grid">
-          <div>
-            <label for="subcategoriaNombre">Nombre *</label>
-            <input type="text" id="subcategoriaNombre" placeholder="ej: 2018" required>
-          </div>
-          <div>
-            <label for="subcategoriaPrecioInscripcion">Precio de inscripción</label>
-            <input type="number" id="subcategoriaPrecioInscripcion" step="0.01" min="0" placeholder="ej: 50000">
-          </div>
-        </div>
-        <label class="check-inline" style="margin:8px 0;">
-          <input type="checkbox" id="subcategoriaSumaTablaGeneral" checked> Suma a la tabla general del torneo
-        </label>
-        <button type="submit" class="btn">Guardar</button>
-        <button type="button" class="btn btn-secundario" id="btnCancelarFormSubcategoria">Cancelar</button>
-        <p class="mensaje-error oculto" id="subcategoriaFormError"></p>
-      </form>
-
-      <div id="gridSubcategorias" class="grid-botones-grandes">
-        <p class="texto-ayuda">Cargando...</p>
-      </div>
-    </div>
-    <div class="oculto" id="fondoModalSubcategorias" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
 
     <!-- Gestionar equipos de una categoría/subcategoría: inscribir/dar de
-         baja clubes. Se abre encima de panelDetalleCategoria (que ya es un
+         baja clubes. Se abre encima de panelCategorias (que ya es un
          popup-modal), por eso tiene su propio z-index más alto y su propio
          fondo. -->
     <div class="panel oculto" id="panelGestionarEquipos" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
