@@ -31,7 +31,7 @@ async function init() {
     return;
   }
 
-  document.getElementById('linkVolverCategoria').href = `/sitio/categoria.html?torneoId=${torneoId}&categoriaId=${categoriaId}`;
+  document.getElementById('linkVolverCategoria').href = `/sitio/torneo.html?id=${torneoId}&categoriaId=${categoriaId}`;
 
   document.getElementById('tabBtnProximos').addEventListener('click', () => cambiarTab('proximos'));
   document.getElementById('tabBtnResultados').addEventListener('click', () => cambiarTab('resultados'));
