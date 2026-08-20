@@ -171,7 +171,12 @@ function poblarFiltroAnioNacimiento() {
 
 function formatearFecha(fecha) {
   if (!fecha) return '-';
-  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR');
+  // Idem liga.js: el backend puede devolver "YYYY-MM-DD" o fecha/hora ISO
+  // completa según la consulta; sólo agregamos la hora si todavía no la
+  // tiene, para no generar una fecha inválida.
+  const fechaObj = String(fecha).includes('T') ? new Date(fecha) : new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(fechaObj.getTime())) return '-';
+  return fechaObj.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
 function renderJugadores() {

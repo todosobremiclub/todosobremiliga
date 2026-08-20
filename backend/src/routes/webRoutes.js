@@ -220,7 +220,7 @@ router.get('/clubes/:clubId/jugadores', async (req, res) => {
   try {
     const { rows } = await query(
       `SELECT j.id, j.nombre, j.apellido, j.posicion, j.numero_camiseta,
-              j.fecha_nacimiento, j.anio_nacimiento, j.foto_url
+              j.fecha_nacimiento, j.anio_nacimiento, j.foto_url, c.logo_url AS club_logo_url
        FROM jugadores j
        JOIN clubes c ON c.id = j.club_id
        WHERE j.club_id = $1 AND j.activo = TRUE

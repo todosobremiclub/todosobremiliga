@@ -73,6 +73,19 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   padding-bottom: 8px;
 }
 
+/* Jugador retirado/inactivo dentro de un listado agrupado por club (ej.
+   Fichajes de Liga): se ve atenuado, pero sigue mostrándose junto al resto. */
+.fila-jugador-retirado {
+  opacity: 0.6;
+}
+
+/* Fallback de foto de jugador: cuando no tiene foto propia se usa el
+   escudo del club en su lugar (mismo círculo, sin recortar el logo). */
+.escudo-jugador-mini {
+  object-fit: contain;
+  background: var(--blanco);
+}
+
 /* ===== Login — estilo "cancha de noche": fondo oscuro con reflectores y
    líneas de cancha, tarjeta tipo vestuario/tablero, tipografía condensada en
    mayúsculas igual que el resto de la plataforma. ===== */

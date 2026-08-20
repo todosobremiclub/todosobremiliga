@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
   try {
     let sql = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
-             j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento,
+             j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento, j.activo AS jugador_activo,
              c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
              t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre,
              car.codigo_qr AS carnet_codigo_qr, car.vigente_desde AS carnet_vigente_desde,

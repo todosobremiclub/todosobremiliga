@@ -1252,7 +1252,7 @@ async function guardarArbitro(e) {
 
 async function cargarFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
-  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
     const params = estado ? `?estado=${estado}` : '';
@@ -1312,7 +1312,8 @@ function renderFichajesLiga() {
   const lista = fichajesLigaCache.filter((f) => {
     if (texto) {
       const nombreCompleto = `${f.jugador_nombre} ${f.jugador_apellido}`.toLowerCase();
-      if (!nombreCompleto.includes(texto)) return false;
+      const dni = (f.jugador_dni || '').toLowerCase();
+      if (!nombreCompleto.includes(texto) && !dni.includes(texto)) return false;
     }
     if (torneoId && f.torneo_id !== torneoId) return false;
     if (categoriaId && f.categoria_id !== categoriaId) return false;
@@ -1320,11 +1321,11 @@ function renderFichajesLiga() {
   });
 
   if (!fichajesLigaCache.length) {
-    tbody.innerHTML = '<tr><td colspan="7">No hay solicitudes de fichaje en este estado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No hay solicitudes de fichaje en este estado.</td></tr>';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="7">No se encontraron fichajes con ese filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No se encontraron fichajes con ese filtro.</td></tr>';
     return;
   }
 
@@ -1340,13 +1341,14 @@ function renderFichajesLiga() {
       .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
     const filaGrupo = `
       <tr class="fila-grupo-club">
-        <td colspan="7">${escapeHtml(clubNombre)}</td>
+        <td colspan="8">${escapeHtml(clubNombre)}</td>
       </tr>
     `;
     const filasJugadores = fichajesClub.map((f) => `
-      <tr>
+      <tr class="${f.jugador_activo === false ? 'fila-jugador-retirado' : ''}">
         <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
-        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
+        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retirado</span>' : ''}</td>
+        <td>${escapeHtml(f.jugador_dni || '-')}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
         <td>${escapeHtml(f.categoria_nombre || '-')}</td>
         <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
@@ -1365,7 +1367,13 @@ function renderFichajesLiga() {
 
 function formatearFecha(fecha) {
   if (!fecha) return '-';
-  return new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR');
+  // El backend puede devolver la fecha como "YYYY-MM-DD" o como fecha/hora
+  // ISO completa (ej. "1990-05-14T00:00:00.000Z") según la consulta; sólo
+  // hay que agregar la hora cuando todavía no la tiene, si no queda una
+  // fecha inválida ("Invalid Date").
+  const fechaObj = String(fecha).includes('T') ? new Date(fecha) : new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(fechaObj.getTime())) return '-';
+  return fechaObj.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
 function esCarnetVigenteLiga(f) {

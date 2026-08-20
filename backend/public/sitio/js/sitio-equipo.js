@@ -178,6 +178,24 @@ function calcularEdad(anioNacimiento) {
   return anioActual - anioNacimiento;
 }
 
+// Foto del jugador si tiene una cargada; si no, el escudo del club (en vez
+// de dejar el casillero vacío).
+function fotoOEscudoJugadorHtml(j) {
+  if (j.foto_url) return `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">`;
+  if (j.club_logo_url) return `<img src="${j.club_logo_url}" alt="" class="foto-jugador-mini escudo-jugador-mini">`;
+  return '';
+}
+
+// El backend devuelve fecha_nacimiento como fecha/hora ISO completa (ej.
+// "1990-05-14T00:00:00.000Z"), así que hay que parsearla directo: si se le
+// vuelve a agregar un "T00:00:00" queda una fecha inválida ("Invalid Date").
+function formatearFechaNacimiento(fecha) {
+  if (!fecha) return '-';
+  const fechaObj = new Date(fecha);
+  if (Number.isNaN(fechaObj.getTime())) return '-';
+  return fechaObj.toLocaleDateString('es-AR', { timeZone: 'UTC' });
+}
+
 async function cargarPlantel() {
   const tbody = document.getElementById('tablaPlantel');
   tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
@@ -194,12 +212,12 @@ async function cargarPlantel() {
     }
     tbody.innerHTML = data.jugadores.map((j) => `
       <tr>
-        <td>${j.foto_url ? `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+        <td>${fotoOEscudoJugadorHtml(j)}</td>
         <td>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</td>
         <td>${escapeHtml(j.posicion || '-')}</td>
         <td>${j.numero_camiseta != null ? j.numero_camiseta : '-'}</td>
         <td>${calcularEdad(j.anio_nacimiento)}</td>
-        <td>${j.fecha_nacimiento ? new Date(j.fecha_nacimiento + 'T00:00:00').toLocaleDateString('es-AR') : '-'}</td>
+        <td>${formatearFechaNacimiento(j.fecha_nacimiento)}</td>
       </tr>
     `).join('');
   } catch (err) {
