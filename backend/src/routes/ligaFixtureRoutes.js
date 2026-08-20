@@ -694,11 +694,32 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
               COALESCE(tp.a_favor, 0) AS a_favor,
               COALESCE(tp.en_contra, 0) AS en_contra,
               COALESCE(tp.diferencia, 0) AS diferencia,
-              COALESCE(tp.puntos, 0) AS puntos
+              COALESCE(tp.puntos, 0) AS puntos,
+              COALESCE(u5.resultados, ARRAY[]::text[]) AS ultimos5
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
        LEFT JOIN tabla_posiciones tp
          ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = $3
+       LEFT JOIN LATERAL (
+         SELECT array_agg(resultado ORDER BY orden_fecha DESC, orden_jornada DESC) AS resultados
+         FROM (
+           SELECT
+             CASE
+               WHEN (p.equipo_local_id = et.id AND p.resultado_local > p.resultado_visitante)
+                 OR (p.equipo_visitante_id = et.id AND p.resultado_visitante > p.resultado_local)
+               THEN 'V'
+               WHEN p.resultado_local = p.resultado_visitante THEN 'E'
+               ELSE 'P'
+             END AS resultado,
+             p.fecha AS orden_fecha,
+             p.jornada AS orden_jornada
+           FROM partidos p
+           WHERE (p.equipo_local_id = et.id OR p.equipo_visitante_id = et.id)
+             AND p.resultado_local IS NOT NULL AND p.resultado_visitante IS NOT NULL
+           ORDER BY p.fecha DESC NULLS LAST, p.jornada DESC NULLS LAST
+           LIMIT 5
+         ) ultimos
+       ) u5 ON true
        WHERE et.torneo_id = $1 AND et.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $4::uuid
        ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC, c.nombre ASC`,
       [req.params.torneoId, req.params.categoriaId, ronda, subcategoriaId]

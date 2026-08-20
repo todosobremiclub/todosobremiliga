@@ -11,6 +11,8 @@ function getParamsDeUrl() {
 
 let torneoIdActual = null;
 let categoriaIdActual = null;
+let nombreCategoriaActual = '';
+let tablaCache = [];
 
 function init() {
   const { torneoId, categoriaId, nombre } = getParamsDeUrl();
@@ -18,6 +20,7 @@ function init() {
   categoriaIdActual = categoriaId;
 
   if (nombre) {
+    nombreCategoriaActual = nombre;
     document.getElementById('nombreCategoria').textContent = nombre;
   }
 
@@ -92,18 +95,47 @@ async function cargarTarjetasPublico() {
   }
 }
 
+function renderUltimos5Html(ultimos5) {
+  if (!ultimos5 || !ultimos5.length) return '-';
+  const clases = { V: 'badge-ultimo-v', E: 'badge-ultimo-e', P: 'badge-ultimo-p' };
+  return `<div class="ultimos5">${ultimos5.map((r) => `<span class="badge-ultimo ${clases[r] || ''}">${r}</span>`).join('')}</div>`;
+}
+
+function posicionActualEquipo(equipoTorneoId) {
+  if (!equipoTorneoId || !tablaCache.length) return null;
+  const idx = tablaCache.findIndex((f) => f.equipo_torneo_id === equipoTorneoId);
+  return idx === -1 ? null : idx + 1;
+}
+
+function posicionEntreParentesisHtml(equipoTorneoId) {
+  const pos = posicionActualEquipo(equipoTorneoId);
+  return pos ? ` (${pos}°)` : '';
+}
+
+function irAEquipo(equipoTorneoId, clubNombre) {
+  if (!equipoTorneoId) return;
+  const params = new URLSearchParams({
+    torneoId: torneoIdActual,
+    categoriaId: categoriaIdActual,
+    equipoTorneoId,
+    nombre: clubNombre || ''
+  });
+  window.location.href = `/sitio/equipo.html?${params.toString()}`;
+}
+
 async function cargarTabla() {
   const tbody = document.getElementById('tablaPosiciones');
-  tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10">Cargando...</td></tr>';
   try {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/tabla`);
     const data = await res.json();
     if (!data.ok || !data.tabla.length) {
-      tbody.innerHTML = '<tr><td colspan="9">Todavía no hay datos de tabla para esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta categoría.</td></tr>';
       return;
     }
+    tablaCache = data.tabla;
     tbody.innerHTML = data.tabla.map((fila) => `
-      <tr>
+      <tr class="fila-equipo-clickable" onclick="irAEquipo('${fila.equipo_torneo_id}', '${escapeHtml(fila.club_nombre).replace(/'/g, "\\'")}')">
         <td>${swatch(fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
         <td>${fila.partidos_jugados}</td>
         <td>${fila.ganados}</td>
@@ -113,10 +145,11 @@ async function cargarTabla() {
         <td>${fila.en_contra}</td>
         <td>${fila.diferencia}</td>
         <td>${fila.puntos}</td>
+        <td>${renderUltimos5Html(fila.ultimos5)}</td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -124,6 +157,7 @@ async function cargarFixture() {
   const tbody = document.getElementById('tablaFixture');
   tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
   try {
+    if (!tablaCache.length) await cargarTabla();
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/fixture`);
     const data = await res.json();
     if (!data.ok || !data.partidos.length) {
@@ -133,9 +167,9 @@ async function cargarFixture() {
     tbody.innerHTML = data.partidos.map((p) => `
       <tr>
         <td>${p.jornada != null ? p.jornada : '-'}</td>
-        <td>${swatch(p.club_local_color)}${escapeHtml(p.club_local_nombre)}</td>
+        <td>${swatch(p.club_local_color)}${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</td>
         <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</td>
-        <td>${swatch(p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}</td>
+        <td>${swatch(p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</td>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
       </tr>
     `).join('');

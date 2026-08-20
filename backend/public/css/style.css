@@ -45,6 +45,23 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   border: 1px solid rgba(0,0,0,0.15);
 }
 
+/* "Últimas 5" — V/E/P de los últimos partidos jugados por un equipo, el más
+   reciente a la izquierda. Se usa en la tabla de posiciones (Panel de Liga y
+   sitio público). */
+.ultimos5 { display: flex; gap: 4px; }
+.badge-ultimo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 5px; font-size: 11px; font-weight: 800; color: #fff;
+}
+.badge-ultimo-v { background: #2e9e4f; }
+.badge-ultimo-e { background: #d9a520; }
+.badge-ultimo-p { background: #d9403f; }
+
+/* Fila de club "clickeable" en la tabla de posiciones del sitio público —
+   lleva a la página pública del equipo. */
+.fila-equipo-clickable { cursor: pointer; }
+.fila-equipo-clickable:hover { background: rgba(0,0,0,0.04); }
+
 /* ===== Login — estilo "cancha de noche": fondo oscuro con reflectores y
    líneas de cancha, tarjeta tipo vestuario/tablero, tipografía condensada en
    mayúsculas igual que el resto de la plataforma. ===== */

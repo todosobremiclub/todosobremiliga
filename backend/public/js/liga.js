@@ -2952,6 +2952,11 @@ function abrirDetalleCategoria(categoriaId, nombreCategoria, subcategoriaId, nom
   document.getElementById('fixtureIdaVuelta').checked = false;
   jornadaFixtureActual = 1;
   rondaTablaActual = 'general';
+  tablaActualCache = [];
+  // Se pide la tabla ya mismo (aunque el sub-tab que se abre por defecto sea
+  // "fixture") para tener la posición actual de cada equipo lista y poder
+  // mostrarla entre paréntesis junto a cada partido.
+  cargarTabla();
   cambiarTabDetalle('fixture');
 }
 
@@ -3324,9 +3329,9 @@ function renderJornadaFixture(jornadasDisponibles) {
       <div class="panel" style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
           <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:220px;">
-            ${logoLocal}<strong>${escapeHtml(p.club_local_nombre)}</strong>
+            ${logoLocal}<strong>${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_id)}</strong>
             <span style="margin:0 8px;">${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</span>
-            <strong>${escapeHtml(p.club_visitante_nombre)}</strong>${logoVisitante}
+            <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_id)}</strong>${logoVisitante}
           </div>
           <span class="badge ${p.estado === 'jugado' ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(p.estado || 'programado')}</span>
           <button class="btn btn-secundario btn-pequeno" onclick="abrirModalResultado('${p.id}')">Cargar resultado</button>
@@ -3611,16 +3616,30 @@ async function cargarTarjetas() {
   }
 }
 
+// Cache de la última tabla de posiciones cargada (para poder mostrar la
+// posición actual de cada equipo junto al fixture, sin pedirla de nuevo).
+let tablaActualCache = [];
+
+// Arma los cuadraditos V/E/P de los últimos partidos jugados (el más
+// reciente a la izquierda), a partir del array ['V','E','P',...] que manda
+// el backend.
+function renderUltimos5Html(ultimos5) {
+  if (!ultimos5 || !ultimos5.length) return '-';
+  const clases = { V: 'badge-ultimo-v', E: 'badge-ultimo-e', P: 'badge-ultimo-p' };
+  return `<div class="ultimos5">${ultimos5.map((r) => `<span class="badge-ultimo ${clases[r] || ''}">${r}</span>`).join('')}</div>`;
+}
+
 async function cargarTabla() {
   const tbody = document.getElementById('tablaPosiciones');
-  tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10">Cargando...</td></tr>';
   try {
     const ronda = torneoActualEsAperturaClausura() ? rondaTablaActual : 'general';
     const qsSub = subcategoriaActualId ? `&subcategoria_id=${subcategoriaActualId}` : '';
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tabla?ronda=${ronda}${qsSub}`);
     const tabla = data.tabla;
+    tablaActualCache = tabla;
     if (!tabla.length) {
-      tbody.innerHTML = '<tr><td colspan="9">Todavía no hay datos de tabla para esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta categoría.</td></tr>';
       return;
     }
     tbody.innerHTML = tabla.map((fila) => `
@@ -3634,11 +3653,27 @@ async function cargarTabla() {
         <td>${fila.en_contra}</td>
         <td>${fila.diferencia}</td>
         <td>${fila.puntos}</td>
+        <td>${renderUltimos5Html(fila.ultimos5)}</td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
+}
+
+// Posición actual (1-based) de un equipo_torneo_id en la última tabla
+// cargada. Se usa para mostrar "(3°)" junto al equipo en el fixture.
+function posicionActualEquipo(equipoTorneoId) {
+  if (!equipoTorneoId || !tablaActualCache.length) return null;
+  const idx = tablaActualCache.findIndex((f) => f.equipo_torneo_id === equipoTorneoId);
+  return idx === -1 ? null : idx + 1;
+}
+
+// " (3°)" para mostrar junto al nombre del equipo en el fixture, o '' si
+// todavía no se cargó la tabla o el equipo no está en ella.
+function posicionEntreParentesisHtml(equipoTorneoId) {
+  const pos = posicionActualEquipo(equipoTorneoId);
+  return pos ? ` (${pos}°)` : '';
 }
 
 // ===================== NOTICIAS =====================

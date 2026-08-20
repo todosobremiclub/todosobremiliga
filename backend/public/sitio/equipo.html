@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equipo - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .tab-btn {
+    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
+  }
+  .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
+  .equipo-header-logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
+  .equipo-ultimas-grande .badge-ultimo { width: 26px; height: 26px; font-size: 13px; }
+  .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
+</style>
+</head>
+<body>
+  <div class="sitio-header">
+    <div class="sitio-header-inner">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <img id="equipoLogo" class="equipo-header-logo oculto" alt="">
+        <div>
+          <h1 id="nombreEquipo">Cargando...</h1>
+          <div class="sitio-breadcrumb"><a href="#" id="linkVolverCategoria">← Volver a la tabla</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sitio-contenido">
+    <div class="panel">
+      <h2 style="margin-top:0;">Últimos resultados</h2>
+      <div class="equipo-ultimas-grande" id="equipoUltimas5">-</div>
+    </div>
+
+    <div class="sitio-tabs">
+      <button class="tab-btn activo" id="tabBtnProximos">Próximos partidos</button>
+      <button class="tab-btn" id="tabBtnResultados">Resultados</button>
+      <button class="tab-btn" id="tabBtnPlantel">Plantel</button>
+      <button class="tab-btn" id="tabBtnGoleadores">Goleadores</button>
+      <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
+    </div>
+
+    <div class="panel" id="seccionProximos">
+      <table>
+        <thead><tr><th>Día</th><th>L/V</th><th>vs Equipo</th><th>Hora</th></tr></thead>
+        <tbody id="tablaProximos"><tr><td colspan="4">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionResultados">
+      <table>
+        <thead><tr><th>Día</th><th>L/V</th><th>vs Equipo</th><th>Res</th></tr></thead>
+        <tbody id="tablaResultados"><tr><td colspan="4">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionPlantel">
+      <table>
+        <thead><tr><th>Foto</th><th>Jugador</th><th>Posición</th><th>Número</th><th>Edad</th><th>Nacimiento</th></tr></thead>
+        <tbody id="tablaPlantel"><tr><td colspan="6">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionGoleadoresEquipo">
+      <p class="texto-ayuda">Goleadores de todo el torneo.</p>
+      <table>
+        <thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
+        <tbody id="tablaGoleadoresEquipo"><tr><td colspan="3">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="panel oculto" id="seccionTarjetasEquipo">
+      <p class="texto-ayuda">Tarjetas de todo el torneo.</p>
+      <table>
+        <thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
+        <tbody id="tablaTarjetasEquipo"><tr><td colspan="4">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/sitio/js/sitio-equipo.js"></script>
+</body>
+</html>
