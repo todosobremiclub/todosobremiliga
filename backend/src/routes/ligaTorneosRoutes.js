@@ -158,10 +158,11 @@ router.delete('/:torneoId', async (req, res) => {
   }
 });
 
-// PATCH /liga/torneos/:torneoId/estado — planificado -> en_curso -> finalizado (o suspendido)
+// PATCH /liga/torneos/:torneoId/estado — planificado -> en_curso -> finalizado
+// (o suspendido / historico, este último para archivar torneos viejos)
 router.patch('/:torneoId/estado', async (req, res) => {
   const { estado } = req.body;
-  const estadosValidos = ['planificado', 'en_curso', 'finalizado', 'suspendido'];
+  const estadosValidos = ['planificado', 'en_curso', 'finalizado', 'suspendido', 'historico'];
   if (!estado || !estadosValidos.includes(estado)) {
     return res.status(400).json({ ok: false, error: `Estado inválido. Válidos: ${estadosValidos.join(', ')}` });
   }

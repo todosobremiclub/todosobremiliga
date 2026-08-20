@@ -62,6 +62,17 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
 .fila-equipo-clickable { cursor: pointer; }
 .fila-equipo-clickable:hover { background: rgba(0,0,0,0.04); }
 
+/* Fila separadora que agrupa un listado por club (ej. Fichajes del Panel de
+   Liga: todos los jugadores del mismo club quedan juntos debajo de su
+   nombre). */
+.fila-grupo-club td {
+  background: var(--gris-100);
+  font-weight: 700;
+  font-size: 13px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 /* ===== Login — estilo "cancha de noche": fondo oscuro con reflectores y
    líneas de cancha, tarjeta tipo vestuario/tablero, tipografía condensada en
    mayúsculas igual que el resto de la plataforma. ===== */

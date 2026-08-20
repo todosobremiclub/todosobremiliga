@@ -25,6 +25,7 @@ let fichajesLigaCache = [];
 const ICONO_LAPIZ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const ICONO_PERSONA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
 const ICONO_BASURA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const ICONO_WEB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>';
 const ICONO_COPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a1 1 0 0 0-1 1 5 5 0 0 0 4 5"/><path d="M17 5h3a1 1 0 0 1 1 1 5 5 0 0 1-4 5"/></svg>';
 const ICONO_WHATSAPP = '<svg viewBox="0 0 32 32"><path fill="#fff" d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.23.6 4.36 1.75 6.24L4 29l7.94-1.7a12.9 12.9 0 0 0 4.08.65h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3Zm0 21.98h-.01a10 10 0 0 1-3.5-.62l-.5-.18-4.71 1.01 1.03-4.58-.2-.53a9.9 9.9 0 0 1-1.6-5.06c0-5.5 4.48-9.98 9.99-9.98 5.5 0 9.98 4.48 9.98 9.98s-4.48 9.96-9.98 9.96Zm5.47-7.47c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg>';
 
@@ -326,6 +327,9 @@ function conectarEventos() {
   document.getElementById('buscadorTorneos').addEventListener('input', () => renderTorneos());
 
   // ---- Categorías ----
+  document.getElementById('checkTorneoHistorico').addEventListener('change', (e) => {
+    toggleTorneoHistorico(e.target.checked);
+  });
   document.getElementById('btnCerrarCategorias').addEventListener('click', () => {
     document.getElementById('panelCategorias').classList.add('oculto');
     document.getElementById('panelSubcategorias').classList.add('oculto');
@@ -1248,7 +1252,7 @@ async function guardarArbitro(e) {
 
 async function cargarFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
-  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
     const params = estado ? `?estado=${estado}` : '';
@@ -1258,7 +1262,7 @@ async function cargarFichajesLiga() {
     poblarFiltroCategoriaFichajesLiga();
     renderFichajesLiga();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
   actualizarBadgeFichajesPendientes();
 }
@@ -1316,32 +1320,47 @@ function renderFichajesLiga() {
   });
 
   if (!fichajesLigaCache.length) {
-    tbody.innerHTML = '<tr><td colspan="8">No hay solicitudes de fichaje en este estado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">No hay solicitudes de fichaje en este estado.</td></tr>';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="8">No se encontraron fichajes con ese filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">No se encontraron fichajes con ese filtro.</td></tr>';
     return;
   }
 
+  // Agrupados por club (A-Z), y dentro de cada club por apellido — así se ve
+  // de un vistazo qué le falta resolver a cada club, en vez de un listado
+  // plano mezclando todos los clubes.
+  const clubesOrdenados = Array.from(new Set(lista.map((f) => f.club_nombre))).sort((a, b) => (a || '').localeCompare(b || ''));
+
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
-  tbody.innerHTML = lista.map((f) => `
-    <tr>
-      <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
-      <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
-      <td>${escapeHtml(f.club_nombre)}</td>
-      <td>${escapeHtml(f.torneo_nombre || '-')}</td>
-      <td>${escapeHtml(f.categoria_nombre || '-')}</td>
-      <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
-      <td>${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : '-'}</td>
-      <td>
-        ${f.estado === 'pendiente' ? `
-          <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
-          <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
-        ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '-')}
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = clubesOrdenados.map((clubNombre) => {
+    const fichajesClub = lista
+      .filter((f) => f.club_nombre === clubNombre)
+      .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
+    const filaGrupo = `
+      <tr class="fila-grupo-club">
+        <td colspan="7">${escapeHtml(clubNombre)}</td>
+      </tr>
+    `;
+    const filasJugadores = fichajesClub.map((f) => `
+      <tr>
+        <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_dni ? `(DNI ${escapeHtml(f.jugador_dni)})` : ''}</td>
+        <td>${escapeHtml(f.torneo_nombre || '-')}</td>
+        <td>${escapeHtml(f.categoria_nombre || '-')}</td>
+        <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
+        <td>${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : '-'}</td>
+        <td>
+          ${f.estado === 'pendiente' ? `
+            <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
+            <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
+          ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '-')}
+        </td>
+      </tr>
+    `).join('');
+    return filaGrupo + filasJugadores;
+  }).join('');
 }
 
 function formatearFecha(fecha) {
@@ -2631,6 +2650,7 @@ function renderTorneos() {
   cont.innerHTML = lista.map((t) => `
     <div class="boton-grande boton-grande-torneo" onclick="verCategorias('${t.id}', '${escapeHtml(t.nombre)}')">
       <div class="acciones-boton-grande">
+        <button class="btn btn-secundario btn-pequeno btn-icono" title="Ver en el sitio público" onclick="event.stopPropagation(); window.open('/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}', '_blank')">${ICONO_WEB}</button>
         <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarTorneo('${t.id}')">${ICONO_LAPIZ}</button>
         <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarTorneo('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
       </div>
@@ -2724,7 +2744,29 @@ function verCategorias(torneoId, nombreTorneo) {
   document.getElementById('formCategoria').classList.add('oculto');
   subcategoriaActualId = null;
   subcategoriaActualNombre = '';
+  const torneo = torneosCache.find((t) => t.id === torneoId);
+  document.getElementById('checkTorneoHistorico').checked = !!(torneo && torneo.estado === 'historico');
   cargarCategorias(torneoId);
+}
+
+// Tilda/destilda "histórico" para el torneo que se está viendo. Por ahora
+// solo archiva/desarchiva (no hay todavía una pantalla separada de estado de
+// torneo): al destildar, vuelve a "planificado".
+async function toggleTorneoHistorico(marcado) {
+  if (!torneoActualId) return;
+  const checkbox = document.getElementById('checkTorneoHistorico');
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado: marcado ? 'historico' : 'planificado' })
+    });
+    const torneo = torneosCache.find((t) => t.id === torneoActualId);
+    if (torneo) torneo.estado = data.torneo.estado;
+    renderTorneos();
+  } catch (err) {
+    checkbox.checked = !marcado;
+    alert('Error: ' + err.message);
+  }
 }
 
 async function cargarCategorias(torneoId) {
