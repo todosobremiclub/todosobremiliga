@@ -73,9 +73,19 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   padding-bottom: 8px;
 }
 
-/* Jugador retirado/inactivo dentro de un listado agrupado por club (ej.
+/* Grupo de club plegable (ej. Fichajes de Liga): arranca colapsado y se
+   expande tocando la flechita, para ver de un vistazo la lista de clubes. */
+.fila-grupo-club-clickable {
+  cursor: pointer;
+}
+.flecha-grupo-club {
+  display: inline-block;
+  width: 14px;
+}
+
+/* Jugador retraído/inactivo dentro de un listado agrupado por club (ej.
    Fichajes de Liga): se ve atenuado, pero sigue mostrándose junto al resto. */
-.fila-jugador-retirado {
+.fila-jugador-retraido {
   opacity: 0.6;
 }
 
@@ -83,6 +93,19 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
    escudo del club en su lugar (mismo círculo, sin recortar el logo). */
 .escudo-jugador-mini {
   object-fit: contain;
+  background: var(--blanco);
+}
+
+/* Escudo del club en tablas de posiciones y fixture públicos, en vez del
+   punto de color plano. */
+.club-escudo-mini {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
   background: var(--blanco);
 }
 

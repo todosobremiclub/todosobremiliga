@@ -136,7 +136,7 @@ async function cargarTabla() {
     tablaCache = data.tabla;
     tbody.innerHTML = data.tabla.map((fila) => `
       <tr class="fila-equipo-clickable" onclick="irAEquipo('${fila.equipo_torneo_id}', '${escapeHtml(fila.club_nombre).replace(/'/g, "\\'")}')">
-        <td>${swatch(fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
+        <td>${escudoClub(fila.club_logo_url, fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
         <td>${fila.partidos_jugados}</td>
         <td>${fila.ganados}</td>
         <td>${fila.empatados}</td>
@@ -167,9 +167,9 @@ async function cargarFixture() {
     tbody.innerHTML = data.partidos.map((p) => `
       <tr>
         <td>${p.jornada != null ? p.jornada : '-'}</td>
-        <td>${swatch(p.club_local_color)}${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</td>
+        <td>${escudoClub(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</td>
         <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</td>
-        <td>${swatch(p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</td>
+        <td>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</td>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
       </tr>
     `).join('');
@@ -181,6 +181,13 @@ async function cargarFixture() {
 function swatch(color) {
   if (!color) return '';
   return `<span class="club-swatch" style="background:${color};"></span>`;
+}
+
+// Escudo del club si tiene logo cargado; si no, el punto de color como
+// respaldo (mismo criterio que antes para clubes sin logo todavía).
+function escudoClub(logoUrl, color) {
+  if (logoUrl) return `<img src="${logoUrl}" alt="" class="club-escudo-mini">`;
+  return swatch(color);
 }
 
 function escapeHtml(texto) {

@@ -1303,6 +1303,17 @@ function poblarFiltroCategoriaFichajesLiga() {
   if (categorias.some((c) => c.id === actual)) select.value = actual;
 }
 
+// Nombres de los clubes cuyo grupo está expandido en la tabla de fichajes de
+// Liga (agrupada por club). Arranca vacío = todos los clubes colapsados,
+// mostrando sólo el nombre del club hasta que se toca la flechita.
+const clubesFichajesLigaExpandidos = new Set();
+
+function toggleGrupoFichajesLiga(clubNombre) {
+  if (clubesFichajesLigaExpandidos.has(clubNombre)) clubesFichajesLigaExpandidos.delete(clubNombre);
+  else clubesFichajesLigaExpandidos.add(clubNombre);
+  renderFichajesLiga();
+}
+
 function renderFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
   const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
@@ -1331,23 +1342,30 @@ function renderFichajesLiga() {
 
   // Agrupados por club (A-Z), y dentro de cada club por apellido — así se ve
   // de un vistazo qué le falta resolver a cada club, en vez de un listado
-  // plano mezclando todos los clubes.
+  // plano mezclando todos los clubes. Cada grupo arranca colapsado y se
+  // expande tocando la flechita, para ver de un vistazo la lista de clubes
+  // sin desplazarse por todos los jugadores.
   const clubesOrdenados = Array.from(new Set(lista.map((f) => f.club_nombre))).sort((a, b) => (a || '').localeCompare(b || ''));
+  window.__clubesFichajesLigaPorId = window.__clubesFichajesLigaPorId || new Map();
 
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
-  tbody.innerHTML = clubesOrdenados.map((clubNombre) => {
+  tbody.innerHTML = clubesOrdenados.map((clubNombre, idx) => {
     const fichajesClub = lista
       .filter((f) => f.club_nombre === clubNombre)
       .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
+    const expandido = clubesFichajesLigaExpandidos.has(clubNombre);
+    const clubKey = `clubFichajesLiga_${idx}`;
+    window.__clubesFichajesLigaPorId.set(clubKey, clubNombre);
     const filaGrupo = `
-      <tr class="fila-grupo-club">
-        <td colspan="8">${escapeHtml(clubNombre)}</td>
+      <tr class="fila-grupo-club fila-grupo-club-clickable" onclick="toggleGrupoFichajesLiga(window.__clubesFichajesLigaPorId.get('${clubKey}'))">
+        <td colspan="8"><span class="flecha-grupo-club">${expandido ? '▾' : '▸'}</span> ${escapeHtml(clubNombre)} <span class="texto-ayuda">(${fichajesClub.length})</span></td>
       </tr>
     `;
+    if (!expandido) return filaGrupo;
     const filasJugadores = fichajesClub.map((f) => `
-      <tr class="${f.jugador_activo === false ? 'fila-jugador-retirado' : ''}">
+      <tr class="${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}">
         <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
-        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retirado</span>' : ''}</td>
+        <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}</td>
         <td>${escapeHtml(f.jugador_dni || '-')}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
         <td>${escapeHtml(f.categoria_nombre || '-')}</td>

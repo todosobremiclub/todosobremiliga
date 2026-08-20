@@ -124,6 +124,7 @@ function nombreRival(p) {
   return {
     nombre: esLocal ? p.club_visitante_nombre : p.club_local_nombre,
     color: esLocal ? p.club_visitante_color : p.club_local_color,
+    logoUrl: esLocal ? p.club_visitante_logo_url : p.club_local_logo_url,
     lv: esLocal ? 'L' : 'V'
   };
 }
@@ -143,7 +144,7 @@ function renderProximos() {
       <tr>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
         <td>${rival.lv}</td>
-        <td>${swatch(rival.color)}${escapeHtml(rival.nombre)}</td>
+        <td>${escudoClub(rival.logoUrl, rival.color)}${escapeHtml(rival.nombre)}</td>
         <td>${p.hora ? escapeHtml(String(p.hora).slice(0, 5)) : '-'}</td>
       </tr>
     `;
@@ -165,7 +166,7 @@ function renderResultados(jugados) {
       <tr>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
         <td>${rival.lv}</td>
-        <td>${swatch(rival.color)}${escapeHtml(rival.nombre)}</td>
+        <td>${escudoClub(rival.logoUrl, rival.color)}${escapeHtml(rival.nombre)}</td>
         <td>${resultado}</td>
       </tr>
     `;
@@ -273,6 +274,13 @@ async function cargarTarjetasEquipo() {
 function swatch(color) {
   if (!color) return '';
   return `<span class="club-swatch" style="background:${color};"></span>`;
+}
+
+// Escudo del club si tiene logo cargado; si no, el punto de color como
+// respaldo (mismo criterio que antes para clubes sin logo todavía).
+function escudoClub(logoUrl, color) {
+  if (logoUrl) return `<img src="${logoUrl}" alt="" class="club-escudo-mini">`;
+  return swatch(color);
 }
 
 function escapeHtml(texto) {
