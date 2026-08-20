@@ -181,10 +181,14 @@ function conectarEventos() {
     document.getElementById('modalParticipacionesClub').classList.add('oculto');
     ocultarFondoModal();
   });
+  document.getElementById('btnCerrarFichajesClub').addEventListener('click', () => {
+    document.getElementById('modalFichajesClub').classList.add('oculto');
+    ocultarFondoModal();
+  });
   document.getElementById('fondoModalGenerico').addEventListener('click', () => {
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
-     'modalParticipacionesClub', 'formTorneo', 'panelCategorias'
+     'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'panelCategorias'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
     torneoActualId = null;
@@ -1639,7 +1643,7 @@ function renderFilasClubes() {
       <tr style="border-left: 4px solid ${club.color_primario || 'transparent'};">
         <td><input type="checkbox" class="chk-club-fila" data-club-id="${club.id}" ${seleccionado ? 'checked' : ''} onchange="toggleSeleccionClub('${club.id}', this.checked)"></td>
         <td>${club.logo_url ? `<img class="logo-miniatura" src="${club.logo_url}" alt="">` : '<span class="logo-miniatura"></span>'}</td>
-        <td>${escapeHtml(club.nombre)}</td>
+        <td><a href="#" class="link-club-fichajes" onclick="event.preventDefault(); verFichajesClub('${club.id}', '${escapeHtml(club.nombre)}')" title="Ver torneos y fichajes de este club">${escapeHtml(club.nombre)}</a></td>
         <td>${escapeHtml(club.direccion || '-')}</td>
         <td>${escapeHtml(club.ciudad || '-')}</td>
         <td>${escapeHtml(club.provincia || '-')}</td>
@@ -2389,6 +2393,99 @@ async function guardarParticipaciones() {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
   }
+}
+
+// ----- Fichajes del club: popup de solo lectura que se abre al tocar el
+// nombre del club en el listado de Clubes. Muestra en qué torneos está
+// registrado (equipos_torneo) y, agrupados por torneo y categoría, los
+// jugadores que tiene fichados en cada uno (fichajes). -----
+
+async function verFichajesClub(clubId, nombreClub) {
+  document.getElementById('modalFichajesClub').classList.remove('oculto');
+  mostrarFondoModal();
+  document.getElementById('tituloFichajesClub').textContent = `Torneos y fichajes de "${nombreClub}"`;
+  const contResumen = document.getElementById('resumenTorneosRegistradosClub');
+  const contLista = document.getElementById('listaFichajesPorTorneoClub');
+  contResumen.innerHTML = '';
+  contLista.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const [dataParticipaciones, dataFichajes] = await Promise.all([
+      apiFetch(`/liga/clubes/${clubId}/participaciones`),
+      apiFetch(`/liga/fichajes?club_id=${clubId}`)
+    ]);
+    renderResumenTorneosRegistradosClub(dataParticipaciones.participaciones || []);
+    renderFichajesPorTorneoClub(dataFichajes.fichajes || []);
+  } catch (err) {
+    contResumen.innerHTML = '';
+    contLista.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderResumenTorneosRegistradosClub(participaciones) {
+  const cont = document.getElementById('resumenTorneosRegistradosClub');
+  if (!participaciones.length) {
+    cont.innerHTML = '<p class="texto-ayuda">Este club todavía no está registrado en ningún torneo.</p>';
+    return;
+  }
+  cont.innerHTML = '<p class="texto-ayuda" style="margin-bottom:6px;">Registrado en:</p>' +
+    participaciones.map((p) => `
+      <span class="chip-torneo-registrado">
+        <strong>${escapeHtml(p.torneo_nombre || '-')}</strong>
+        · ${escapeHtml(p.categoria_nombre || '-')}${p.subcategoria_nombre ? ` (${escapeHtml(p.subcategoria_nombre)})` : ''}
+      </span>
+    `).join('');
+}
+
+function renderFichajesPorTorneoClub(fichajes) {
+  const cont = document.getElementById('listaFichajesPorTorneoClub');
+  if (!fichajes.length) {
+    cont.innerHTML = '<p class="texto-ayuda">Este club todavía no tiene jugadores fichados.</p>';
+    return;
+  }
+
+  const torneosOrdenados = Array.from(new Set(fichajes.map((f) => f.torneo_id)))
+    .map((torneoId) => fichajes.find((f) => f.torneo_id === torneoId))
+    .sort((a, b) => (a.torneo_nombre || '').localeCompare(b.torneo_nombre || ''));
+
+  const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
+
+  cont.innerHTML = torneosOrdenados.map((torneoRef) => {
+    const fichajesTorneo = fichajes.filter((f) => f.torneo_id === torneoRef.torneo_id);
+    const categoriasOrdenadas = Array.from(new Set(fichajesTorneo.map((f) => f.categoria_id || '')))
+      .map((categoriaId) => fichajesTorneo.find((f) => (f.categoria_id || '') === categoriaId))
+      .sort((a, b) => (a.categoria_nombre || '').localeCompare(b.categoria_nombre || ''));
+
+    const bloquesCategorias = categoriasOrdenadas.map((catRef) => {
+      const fichajesCategoria = fichajesTorneo
+        .filter((f) => (f.categoria_id || '') === (catRef.categoria_id || ''))
+        .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
+      const filas = fichajesCategoria.map((f) => `
+        <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
+          ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}
+          <span style="flex:1;">
+            ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
+            ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
+          </span>
+          <span class="texto-ayuda" style="min-width:90px;">DNI ${escapeHtml(f.jugador_dni || '-')}</span>
+          <span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span>
+          ${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : ''}
+        </div>
+      `).join('');
+      return `
+        <div class="bloque-categoria-fichajes-club">
+          <h4 style="margin-bottom:4px;">${escapeHtml(catRef.categoria_nombre || 'Sin categoría')} <span class="texto-ayuda">(${fichajesCategoria.length})</span></h4>
+          ${filas}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="bloque-torneo-fichajes-club">
+        <h3>${escapeHtml(torneoRef.torneo_nombre || 'Sin torneo')} <span class="texto-ayuda">(${fichajesTorneo.length} fichado(s))</span></h3>
+        ${bloquesCategorias}
+      </div>
+    `;
+  }).join('');
 }
 
 // ----- Canchas del club -----

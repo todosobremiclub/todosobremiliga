@@ -23,6 +23,12 @@
   .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
   .tab-btn-categoria { padding: 10px 16px; }
   .tab-btn-general { border-style: dashed; }
+  .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; }
+  .link-club-fichajes:hover { color: var(--azul); text-decoration: underline; }
+  .bloque-torneo-fichajes-club { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--gris-200); }
+  .bloque-torneo-fichajes-club:last-child { border-bottom: none; }
+  .bloque-categoria-fichajes-club { margin-top: 10px; margin-left: 12px; }
+  .chip-torneo-registrado { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--gris-300); border-radius: 999px; font-size: 12px; margin: 0 6px 6px 0; }
   .campo-color { display: flex; align-items: center; gap: 8px; }
   .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
   .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
@@ -472,6 +478,19 @@
       <button class="btn" id="btnGuardarParticipaciones" style="margin-top:12px;">Guardar participaciones</button>
       <p class="mensaje-error oculto" id="participacionesError"></p>
       <p class="mensaje-ok oculto" id="participacionesOk"></p>
+    </div>
+
+    <!-- Popup de Fichajes del Club: se abre al tocar el nombre del club en el
+         listado de Clubes. Es de solo lectura — muestra en qué torneos está
+         registrado el club y, agrupados por torneo y categoría, los jugadores
+         que tiene fichados en cada uno. -->
+    <div class="oculto panel popup-modal-ancho" id="modalFichajesClub">
+      <div class="panel-header">
+        <h2 id="tituloFichajesClub">Fichajes del Club</h2>
+        <button class="btn btn-secundario" id="btnCerrarFichajesClub">Cerrar</button>
+      </div>
+      <div id="resumenTorneosRegistradosClub" style="margin-bottom:16px;"></div>
+      <div id="listaFichajesPorTorneoClub"><p class="texto-ayuda">Cargando...</p></div>
     </div>
 
     <!-- Popup de asignación masiva: elegir un torneo/categoría (y subcategoría,

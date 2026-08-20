@@ -6,11 +6,11 @@ const { query } = require('../db');
 
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
-// GET /liga/fichajes?estado=pendiente&torneo_id=...&categoria_id=... —
+// GET /liga/fichajes?estado=pendiente&torneo_id=...&categoria_id=...&club_id=... —
 // solicitudes de fichaje de MI liga (por defecto trae todas; se puede
-// filtrar por estado, torneo y/o categoría)
+// filtrar por estado, torneo, categoría y/o club)
 router.get('/', async (req, res) => {
-  const { estado, torneo_id, categoria_id } = req.query;
+  const { estado, torneo_id, categoria_id, club_id } = req.query;
   try {
     let sql = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
@@ -39,6 +39,10 @@ router.get('/', async (req, res) => {
     if (categoria_id) {
       params.push(categoria_id);
       sql += ` AND f.categoria_id = $${params.length}`;
+    }
+    if (club_id) {
+      params.push(club_id);
+      sql += ` AND f.club_id = $${params.length}`;
     }
     sql += ' ORDER BY f.fecha_solicitud DESC';
 
