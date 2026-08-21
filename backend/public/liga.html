@@ -179,6 +179,7 @@
       <button class="tab-btn" id="tabBtnNoticias">Noticias</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
       <button class="tab-btn" id="tabBtnFinanzas">Finanzas</button>
+      <button class="tab-btn" id="tabBtnCobros">Cobros</button>
       <button class="tab-btn" id="tabBtnAgenda">Agenda</button>
       <button class="tab-btn" id="tabBtnConfiguracion">Configuración</button>
     </div>
@@ -1241,6 +1242,87 @@
         <table>
           <thead><tr><th>Concepto</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Comentario</th><th>Acciones</th></tr></thead>
           <tbody id="tablaGastos"><tr><td colspan="7">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN COBROS ===== -->
+    <div id="seccionCobros" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Cobros</h2>
+          <div>
+            <label for="cobrosTorneoSelect" style="margin-right:8px;">Torneo:</label>
+            <select id="cobrosTorneoSelect" style="min-width:220px;"></select>
+          </div>
+        </div>
+        <p class="texto-ayuda">Configurá qué le cobra este torneo a cada club (inscripción, cuota mensual y/o cargo por partido). Al activar un concepto, se generan automáticamente las deudas pendientes de cada club inscripto.</p>
+        <div id="cobrosSinTorneo" class="oculto"><p class="sitio-vacio">Este torneo todavía no tiene clubes inscriptos ni configuración de cobros.</p></div>
+
+        <div id="cobrosConceptos" class="oculto">
+          <table>
+            <thead><tr><th>Concepto</th><th>Monto</th><th>Activo</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaConceptosCobro"><tr><td colspan="4">Cargando...</td></tr></tbody>
+          </table>
+
+          <div class="panel-header" style="margin-top:20px;">
+            <h3 style="margin:0;">Cuota mensual</h3>
+          </div>
+          <div class="form-grid">
+            <div>
+              <label for="cobrosPeriodoMensual">Período a generar</label>
+              <input type="month" id="cobrosPeriodoMensual">
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button type="button" class="btn" id="btnGenerarCargoMensual">Generar cargo del período</button>
+            </div>
+          </div>
+          <p class="mensaje-error oculto" id="cobrosMensualError"></p>
+          <p class="texto-ayuda oculto" id="cobrosMensualExito"></p>
+        </div>
+      </div>
+
+      <div class="panel oculto" id="panelResumenCobros">
+        <div class="panel-header">
+          <h2>Qué pagó y qué adeuda cada club</h2>
+        </div>
+        <table>
+          <thead><tr><th>Club</th><th>Total adeudado</th><th>Total pagado</th><th>Saldo pendiente</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaResumenCobros"><tr><td colspan="5">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Detalle de deudas de un club + registrar pago -->
+      <div class="panel oculto" id="panelDeudasClub">
+        <div class="panel-header">
+          <h2 id="tituloDeudasClub">Deudas del club</h2>
+          <button type="button" class="btn btn-secundario" id="btnCerrarDeudasClub">Cerrar</button>
+        </div>
+        <table>
+          <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaDeudasClub"><tr><td colspan="7">Cargando...</td></tr></tbody>
+        </table>
+
+        <form id="formPagoCobro" class="oculto">
+          <input type="hidden" id="pagoDeudaId">
+          <div class="form-grid">
+            <div><label for="pagoMonto">Monto a pagar *</label><input type="number" id="pagoMonto" step="0.01" min="0.01" required></div>
+            <div><label for="pagoFecha">Fecha</label><input type="date" id="pagoFecha"></div>
+            <div><label for="pagoComentario">Comentario</label><input type="text" id="pagoComentario"></div>
+          </div>
+          <button type="submit" class="btn">Registrar pago</button>
+          <button type="button" class="btn btn-secundario" id="btnCancelarFormPagoCobro">Cancelar</button>
+          <p class="mensaje-error oculto" id="pagoFormError"></p>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Pagos registrados</h2>
+        </div>
+        <table>
+          <thead><tr><th>Fecha</th><th>Club</th><th>Concepto</th><th>Monto</th><th>Comentario</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaPagosCobros"><tr><td colspan="6">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

@@ -7,6 +7,10 @@ let equiposCache = [];
 let partidosCache = [];
 let clubLogoBase64Actual = '';
 let ligaSlugActual = null;
+let cobrosTorneoId = null;
+let cobrosResumenCache = [];
+let cobrosClubDeudasActualId = null;
+let cobrosClubDeudasActualNombre = '';
 
 let paginaClubesActual = 1;
 const CLUBES_POR_PAGINA = 25;
@@ -148,6 +152,7 @@ function conectarEventos() {
   document.getElementById('tabBtnNoticias').addEventListener('click', () => cambiarTab('noticias'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
   document.getElementById('tabBtnFinanzas').addEventListener('click', () => cambiarTab('finanzas'));
+  document.getElementById('tabBtnCobros').addEventListener('click', () => cambiarTab('cobros'));
   document.getElementById('tabBtnAgenda').addEventListener('click', () => cambiarTab('agenda'));
   document.getElementById('tabBtnConfiguracion').addEventListener('click', () => cambiarTab('configuracion'));
 
@@ -656,18 +661,32 @@ function conectarEventos() {
     document.getElementById('formArbitro').classList.add('oculto');
   });
   document.getElementById('formArbitro').addEventListener('submit', guardarArbitro);
+
+  // ---- Cobros ----
+  document.getElementById('cobrosTorneoSelect').addEventListener('change', (e) => {
+    cobrosTorneoId = e.target.value || null;
+    cargarDatosCobrosTorneo();
+  });
+  document.getElementById('btnGenerarCargoMensual').addEventListener('click', generarCargoMensual);
+  document.getElementById('btnCerrarDeudasClub').addEventListener('click', () => {
+    document.getElementById('panelDeudasClub').classList.add('oculto');
+  });
+  document.getElementById('formPagoCobro').addEventListener('submit', guardarPagoCobro);
+  document.getElementById('btnCancelarFormPagoCobro').addEventListener('click', () => {
+    document.getElementById('formPagoCobro').classList.add('oculto');
+  });
 }
 
 function cambiarTab(nombre) {
   const secciones = {
     clubes: 'seccionClubes', torneos: 'seccionTorneos', postulaciones: 'seccionPostulaciones', fichajes: 'seccionFichajes',
     noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones',
-    finanzas: 'seccionFinanzas', agenda: 'seccionAgenda', configuracion: 'seccionConfiguracion'
+    finanzas: 'seccionFinanzas', cobros: 'seccionCobros', agenda: 'seccionAgenda', configuracion: 'seccionConfiguracion'
   };
   const botones = {
     clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos', postulaciones: 'tabBtnPostulaciones', fichajes: 'tabBtnFichajes',
     noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones',
-    finanzas: 'tabBtnFinanzas', agenda: 'tabBtnAgenda', configuracion: 'tabBtnConfiguracion'
+    finanzas: 'tabBtnFinanzas', cobros: 'tabBtnCobros', agenda: 'tabBtnAgenda', configuracion: 'tabBtnConfiguracion'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -684,6 +703,7 @@ function cambiarTab(nombre) {
   if (nombre === 'noticias') cargarNoticias();
   if (nombre === 'notificaciones') cargarNotificaciones();
   if (nombre === 'finanzas') cargarFinanzas();
+  if (nombre === 'cobros') cargarCobros();
   if (nombre === 'agenda') cargarAgenda();
   if (nombre === 'configuracion') cambiarTabConfig('modalidades');
 }
@@ -5054,6 +5074,248 @@ function escudoOSwatch(logoUrl, color) {
     return `<img src="${escapeHtml(logoUrl)}" alt="" class="escudo-mini-tabla">`;
   }
   return swatch(color);
+}
+
+// ===================== COBROS =====================
+
+const NOMBRE_CONCEPTO_COBRO = {
+  inscripcion: 'Inscripción',
+  mensual: 'Cuota mensual',
+  por_partido: 'Cargo por partido'
+};
+
+async function cargarCobros() {
+  if (!torneosCache.length) {
+    await cargarTorneos();
+  }
+  poblarSelectTorneosCobros();
+  if (!cobrosTorneoId && torneosCache.length) {
+    cobrosTorneoId = torneosCache[0].id;
+    document.getElementById('cobrosTorneoSelect').value = cobrosTorneoId;
+  }
+  await cargarDatosCobrosTorneo();
+}
+
+function poblarSelectTorneosCobros() {
+  const select = document.getElementById('cobrosTorneoSelect');
+  select.innerHTML = torneosCache.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  if (cobrosTorneoId) select.value = cobrosTorneoId;
+}
+
+async function cargarDatosCobrosTorneo() {
+  document.getElementById('panelDeudasClub').classList.add('oculto');
+  if (!cobrosTorneoId) {
+    document.getElementById('cobrosConceptos').classList.add('oculto');
+    document.getElementById('panelResumenCobros').classList.add('oculto');
+    document.getElementById('cobrosSinTorneo').classList.remove('oculto');
+    return;
+  }
+  document.getElementById('cobrosSinTorneo').classList.add('oculto');
+  document.getElementById('cobrosConceptos').classList.remove('oculto');
+  document.getElementById('panelResumenCobros').classList.remove('oculto');
+  await Promise.all([cargarConceptosCobro(), cargarResumenCobros(), cargarPagosCobros()]);
+}
+
+async function cargarConceptosCobro() {
+  const tbody = document.getElementById('tablaConceptosCobro');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/conceptos`);
+    if (!data.conceptos.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Sin conceptos</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.conceptos.map((c) => `
+      <tr>
+        <td>${NOMBRE_CONCEPTO_COBRO[c.tipo]}</td>
+        <td><input type="number" step="0.01" min="0.01" value="${c.monto != null ? c.monto : ''}" id="montoConcepto_${c.tipo}" style="width:120px;"></td>
+        <td><input type="checkbox" id="activoConcepto_${c.tipo}" ${c.activo ? 'checked' : ''}></td>
+        <td><button type="button" class="btn btn-secundario btn-pequeno" onclick="guardarConceptoCobro('${c.tipo}')">Guardar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarConceptoCobro(tipo) {
+  const monto = document.getElementById(`montoConcepto_${tipo}`).value;
+  const activo = document.getElementById(`activoConcepto_${tipo}`).checked;
+  if (!monto || Number(monto) <= 0) {
+    alert('Ingresá un monto válido');
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/conceptos/${tipo}`, {
+      method: 'PUT',
+      body: JSON.stringify({ monto: Number(monto), activo })
+    });
+    let mensaje = 'Concepto guardado.';
+    if (data.deudas_generadas > 0) {
+      mensaje += ` Se generaron ${data.deudas_generadas} deuda(s) de inscripción para los clubes ya inscriptos.`;
+    }
+    alert(mensaje);
+    await Promise.all([cargarConceptosCobro(), cargarResumenCobros()]);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function generarCargoMensual() {
+  const periodoInput = document.getElementById('cobrosPeriodoMensual').value; // 'YYYY-MM'
+  const errorEl = document.getElementById('cobrosMensualError');
+  const exitoEl = document.getElementById('cobrosMensualExito');
+  errorEl.classList.add('oculto');
+  exitoEl.classList.add('oculto');
+  if (!periodoInput) {
+    errorEl.textContent = 'Elegí el período a generar';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/generar-mensual`, {
+      method: 'POST',
+      body: JSON.stringify({ periodo: periodoInput })
+    });
+    exitoEl.textContent = `Se generaron ${data.deudas_generadas} deuda(s) mensual(es) para el período ${data.periodo}.`;
+    exitoEl.classList.remove('oculto');
+    await cargarResumenCobros();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function cargarResumenCobros() {
+  const tbody = document.getElementById('tablaResumenCobros');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/resumen`);
+    cobrosResumenCache = data.resumen;
+    if (!data.resumen.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no hay clubes inscriptos en este torneo.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.resumen.map((r) => `
+      <tr>
+        <td>${escapeHtml(r.club_nombre)}</td>
+        <td>${formatearMonto(r.total_adeudado)}</td>
+        <td>${formatearMonto(r.total_pagado)}</td>
+        <td style="font-weight:700; color:${Number(r.saldo_pendiente) > 0 ? 'var(--rojo)' : 'var(--verde)'};">${formatearMonto(r.saldo_pendiente)}</td>
+        <td><button type="button" class="btn btn-secundario btn-pequeno" onclick="verDeudasClub('${r.club_id}', '${escapeHtml(r.club_nombre).replace(/'/g, "\\'")}')">Ver detalle</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function verDeudasClub(clubId, clubNombre) {
+  cobrosClubDeudasActualId = clubId;
+  cobrosClubDeudasActualNombre = clubNombre;
+  document.getElementById('panelDeudasClub').classList.remove('oculto');
+  document.getElementById('tituloDeudasClub').textContent = `Deudas de "${clubNombre}"`;
+  document.getElementById('formPagoCobro').classList.add('oculto');
+  await cargarDeudasClub();
+}
+
+async function cargarDeudasClub() {
+  const tbody = document.getElementById('tablaDeudasClub');
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/clubes/${cobrosClubDeudasActualId}/deudas`);
+    if (!data.deudas.length) {
+      tbody.innerHTML = '<tr><td colspan="7">Este club no tiene deudas cargadas.</td></tr>';
+      return;
+    }
+    const estadoTexto = { pendiente: 'Pendiente', parcial: 'Pago parcial', pagada: 'Pagada' };
+    tbody.innerHTML = data.deudas.map((d) => {
+      let descripcion = d.descripcion || '';
+      if (d.tipo === 'por_partido' && d.partido_club_local) {
+        descripcion = `${escapeHtml(d.partido_club_local)} vs ${escapeHtml(d.partido_club_visitante)}${d.partido_jornada ? ` (Jornada ${d.partido_jornada})` : ''}`;
+      }
+      return `
+        <tr>
+          <td>${NOMBRE_CONCEPTO_COBRO[d.tipo] || d.tipo}</td>
+          <td>${escapeHtml(descripcion)}</td>
+          <td>${formatearMonto(d.monto)}</td>
+          <td>${formatearMonto(d.total_pagado)}</td>
+          <td>${formatearMonto(d.saldo)}</td>
+          <td>${estadoTexto[d.estado] || d.estado}</td>
+          <td>${d.estado !== 'pagada' ? `<button type="button" class="btn btn-secundario btn-pequeno" onclick="mostrarFormPagoCobro('${d.id}', ${d.saldo})">Registrar pago</button>` : ''}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function mostrarFormPagoCobro(deudaId, saldo) {
+  document.getElementById('pagoDeudaId').value = deudaId;
+  document.getElementById('pagoMonto').value = saldo;
+  document.getElementById('pagoMonto').max = saldo;
+  document.getElementById('pagoFecha').value = '';
+  document.getElementById('pagoComentario').value = '';
+  document.getElementById('pagoFormError').classList.add('oculto');
+  document.getElementById('formPagoCobro').classList.remove('oculto');
+}
+
+async function guardarPagoCobro(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('pagoFormError');
+  errorEl.classList.add('oculto');
+  const cuerpo = {
+    deuda_id: document.getElementById('pagoDeudaId').value,
+    monto: Number(document.getElementById('pagoMonto').value),
+    fecha: document.getElementById('pagoFecha').value || null,
+    comentario: document.getElementById('pagoComentario').value.trim() || null
+  };
+  try {
+    await apiFetch(`/liga/cobros/${cobrosTorneoId}/pagos`, { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formPagoCobro').classList.add('oculto');
+    await Promise.all([cargarDeudasClub(), cargarResumenCobros(), cargarPagosCobros()]);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function cargarPagosCobros() {
+  const tbody = document.getElementById('tablaPagosCobros');
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/pagos`);
+    if (!data.pagos.length) {
+      tbody.innerHTML = '<tr><td colspan="6">Todavía no hay pagos registrados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.pagos.map((p) => `
+      <tr>
+        <td>${formatearFecha(p.fecha)}</td>
+        <td>${escapeHtml(p.club_nombre)}</td>
+        <td>${NOMBRE_CONCEPTO_COBRO[p.tipo] || p.tipo}</td>
+        <td>${formatearMonto(p.monto)}</td>
+        <td>${escapeHtml(p.comentario || '')}</td>
+        <td><button type="button" class="btn btn-secundario btn-pequeno" onclick="eliminarPagoCobro('${p.id}')">Anular</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function eliminarPagoCobro(pagoId) {
+  if (!confirm('¿Anular este pago?')) return;
+  try {
+    await apiFetch(`/liga/cobros/${cobrosTorneoId}/pagos/${pagoId}`, { method: 'DELETE' });
+    await Promise.all([cargarResumenCobros(), cargarPagosCobros()]);
+    if (cobrosClubDeudasActualId && !document.getElementById('panelDeudasClub').classList.contains('oculto')) {
+      await cargarDeudasClub();
+    }
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

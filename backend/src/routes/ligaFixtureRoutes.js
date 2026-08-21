@@ -4,6 +4,7 @@ const router = express.Router();
 const { query } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
+const { generarDeudaInscripcion, generarDeudasPorPartido } = require('../utils/cobros');
 
 // Chequea que la división pertenezca a un torneo de MI liga. Devuelve
 // {torneo, categoria} o null.
@@ -110,6 +111,13 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
        RETURNING *`,
       [req.params.torneoId, req.params.categoriaId, club_id, subcategoriaIdFinal, grupo || null]
     );
+
+    // Si el torneo tiene activado el cobro de "inscripción", esta alta
+    // genera automáticamente la deuda correspondiente para el club (si ya
+    // la tuviera generada por otra categoría del mismo torneo, no se
+    // duplica: la deuda es por club+torneo, no por categoría).
+    await generarDeudaInscripcion(req.params.torneoId, club_id);
+
     res.status(201).json({ ok: true, equipo: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
@@ -355,7 +363,7 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     // tener categoría, si la división no las usa) — un equipo de "2018"
     // no puede jugar contra uno de "2019".
     const equiposCheck = await query(
-      'SELECT id, subcategoria_id FROM equipos_torneo WHERE id = ANY($1::uuid[]) AND torneo_id = $2 AND categoria_id = $3',
+      'SELECT id, subcategoria_id, club_id FROM equipos_torneo WHERE id = ANY($1::uuid[]) AND torneo_id = $2 AND categoria_id = $3',
       [[equipo_local_id, equipo_visitante_id], req.params.torneoId, req.params.categoriaId]
     );
     if (equiposCheck.rows.length !== 2) {
@@ -397,6 +405,15 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
       [req.params.torneoId, req.params.categoriaId, equipo_local_id, equipo_visitante_id,
        fecha || null, hora || null, sede || null, jornada || null]
     );
+
+    // Si el torneo tiene activado el cobro "por partido", este alta genera
+    // automáticamente la deuda para los dos clubes que juegan.
+    const clubLocalId = equiposCheck.rows.find((e) => e.id === equipo_local_id)?.club_id;
+    const clubVisitanteId = equiposCheck.rows.find((e) => e.id === equipo_visitante_id)?.club_id;
+    if (clubLocalId && clubVisitanteId) {
+      await generarDeudasPorPartido(req.params.torneoId, rows[0].id, clubLocalId, clubVisitanteId);
+    }
+
     res.status(201).json({ ok: true, partido: rows[0] });
   } catch (err) {
     console.error('Error en POST partidos:', err);
@@ -433,13 +450,14 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
     }
 
     const equiposResult = await query(
-      'SELECT id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     const equipoIds = equiposResult.rows.map((e) => e.id);
     if (equipoIds.length < 2) {
       return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 equipos inscriptos para generar un fixture' });
     }
+    const clubIdPorEquipo = new Map(equiposResult.rows.map((e) => [e.id, e.club_id]));
 
     // "Apertura y Clausura" SIEMPRE genera las dos ruedas (apertura + clausura
     // invirtiendo localía), etiquetando cada partido con su ronda para poder
@@ -454,11 +472,13 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
       const jornada = i + 1;
       const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
       for (const [localId, visitanteId] of rondas[i]) {
-        await query(
+        const { rows: partidoRows } = await query(
           `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
           [req.params.torneoId, req.params.categoriaId, localId, visitanteId, jornada, ronda]
         );
+        await generarDeudasPorPartido(req.params.torneoId, partidoRows[0].id, clubIdPorEquipo.get(localId), clubIdPorEquipo.get(visitanteId));
         cantidadCreados += 1;
       }
     }
@@ -593,11 +613,13 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
         const jornada = i + 1;
         const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
         for (const [clubLocalId, clubVisitanteId] of rondas[i]) {
-          await query(
+          const { rows: partidoRows } = await query(
             `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id`,
             [req.params.torneoId, unidad.categoria_id, equipoIdPorClub.get(clubLocalId), equipoIdPorClub.get(clubVisitanteId), jornada, ronda]
           );
+          await generarDeudasPorPartido(req.params.torneoId, partidoRows[0].id, clubLocalId, clubVisitanteId);
           cantidadCreados += 1;
         }
       }

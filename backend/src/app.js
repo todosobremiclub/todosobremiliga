@@ -61,6 +61,9 @@ app.use('/liga/postulaciones', requireAuth, requireRole('super_admin', 'liga_adm
 // Configuración de la Liga: categorías de torneo (modalidades) con precio,
 // y las listas de tipos de gasto / tipos de ingreso / cuentas.
 app.use('/liga/configuracion', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaConfiguracionRoutes'));
+// Cobros: conceptos de pago por torneo (inscripción/mensual/por partido),
+// deudas de los clubes y registro de pagos (soporta pagos parciales).
+app.use('/liga/cobros', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaCobrosRoutes'));
 
 // ===== MÓDULO WEB (público, sin login) =====
 // Lo que consume el sitio web público de cada Liga: info de la liga,
