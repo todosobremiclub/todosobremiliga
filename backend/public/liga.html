@@ -7,6 +7,27 @@
 <link rel="stylesheet" href="/css/style.css">
 <style>
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .agenda-calendario-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .agenda-calendario-header h3 { margin: 0; font-size: 15px; color: var(--gris-700); }
+  .agenda-calendario-semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: stretch; }
+  .agenda-dia-columna { border: 1px solid var(--gris-200); border-radius: var(--radio); min-height: 160px; background: var(--gris-50, #f8f9fb); display: flex; flex-direction: column; }
+  .agenda-dia-columna.agenda-dia-hoy { border-color: var(--azul); box-shadow: 0 0 0 1px var(--azul) inset; }
+  .agenda-dia-encabezado { padding: 8px 10px; border-bottom: 1px solid var(--gris-200); text-align: center; }
+  .agenda-dia-nombre { font-size: 11px; font-weight: 700; color: var(--gris-600); text-transform: uppercase; letter-spacing: .03em; }
+  .agenda-dia-numero { font-size: 15px; font-weight: 800; color: var(--gris-900); }
+  .agenda-dia-hoy .agenda-dia-numero { color: var(--azul); }
+  .agenda-dia-eventos { padding: 6px; display: flex; flex-direction: column; gap: 6px; flex: 1; cursor: pointer; }
+  .agenda-evento-item { position: relative; background: var(--blanco); border: 1px solid var(--gris-300); border-left: 3px solid var(--azul); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+  .agenda-evento-item .agenda-evento-hora { font-weight: 700; color: var(--gris-700); }
+  .agenda-evento-item .agenda-evento-titulo { color: var(--gris-900); }
+  .agenda-evento-item .agenda-evento-lugar { color: var(--gris-600); font-size: 11px; }
+  .agenda-evento-item .agenda-evento-borrar { position: absolute; top: 3px; right: 5px; border: none; background: none; color: var(--gris-500, #999); cursor: pointer; font-size: 13px; line-height: 1; padding: 2px; }
+  .agenda-evento-item .agenda-evento-borrar:hover { color: var(--rojo, #d33); }
+  .agenda-evento-item.tipo-partido { border-left-color: #16a34a; }
+  .agenda-evento-item.tipo-reunion { border-left-color: #ca8a04; }
+  .agenda-evento-item.tipo-capacitacion { border-left-color: #7c3aed; }
+  .agenda-evento-item.tipo-otro { border-left-color: var(--gris-500, #999); }
+  .agenda-dia-sin-eventos { font-size: 11px; color: var(--gris-500, #999); text-align: center; margin-top: 10px; }
   .barra-filtros { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
   .barra-filtros input[type="text"], .barra-filtros select {
     padding: 8px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 13px;
@@ -1243,10 +1264,15 @@
           <button type="button" class="btn btn-secundario" id="btnCancelarFormEvento">Cancelar</button>
           <p class="mensaje-error oculto" id="eventoFormError"></p>
         </form>
-        <table>
-          <thead><tr><th>Fecha</th><th>Título</th><th>Tipo</th><th>Lugar</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaAgenda"><tr><td colspan="5">Cargando...</td></tr></tbody>
-        </table>
+        <div class="agenda-calendario-header">
+          <button type="button" class="btn btn-secundario btn-pequeno" id="btnSemanaAnterior">← Semana anterior</button>
+          <h3 id="agendaRangoSemana">Cargando...</h3>
+          <button type="button" class="btn btn-secundario btn-pequeno" id="btnSemanaHoy">Hoy</button>
+          <button type="button" class="btn btn-secundario btn-pequeno" id="btnSemanaSiguiente">Semana siguiente →</button>
+        </div>
+        <div class="agenda-calendario-semana" id="agendaCalendarioSemana">
+          <p class="sitio-vacio">Cargando...</p>
+        </div>
       </div>
     </div>
 

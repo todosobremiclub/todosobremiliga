@@ -544,6 +544,9 @@ function conectarEventos() {
     document.getElementById('formEvento').classList.add('oculto');
   });
   document.getElementById('formEvento').addEventListener('submit', guardarEvento);
+  document.getElementById('btnSemanaAnterior').addEventListener('click', () => cambiarSemanaAgenda(-7));
+  document.getElementById('btnSemanaSiguiente').addEventListener('click', () => cambiarSemanaAgenda(7));
+  document.getElementById('btnSemanaHoy').addEventListener('click', () => irASemanaHoyAgenda());
 
   // ---- Configuración ----
   document.getElementById('tabBtnConfigModalidades').addEventListener('click', () => cambiarTabConfig('modalidades'));
@@ -4846,28 +4849,105 @@ async function borrarGasto(gastoId) {
 
 // ===================== AGENDA =====================
 
+// ---- Agenda: calendario semanal ----
+// agendaInicioSemana guarda el lunes (medianoche UTC) de la semana que se
+// está mostrando; se calcula una sola vez (semana actual) y después la
+// navegación (anterior/siguiente/hoy) lo va corriendo de a 7 días.
+let agendaEventosCache = [];
+let agendaInicioSemana = null;
+const NOMBRES_DIAS_AGENDA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+// String YYYY-MM-DD de una fecha (columna DATE de Postgres, o un Date JS
+// pasado con toISOString()), sin usar new Date(texto) para no sufrir
+// corrimientos de huso horario al parsear.
+function fechaISO(valor) {
+  if (!valor) return '';
+  return String(valor).slice(0, 10);
+}
+
+// Lunes (medianoche UTC) de la semana que contiene la fecha dada.
+function lunesDeSemanaUTC(fecha) {
+  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
+  const diaSemana = d.getUTCDay(); // 0 = domingo
+  const offset = diaSemana === 0 ? -6 : 1 - diaSemana;
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d;
+}
+
+function irASemanaHoyAgenda() {
+  agendaInicioSemana = lunesDeSemanaUTC(new Date());
+  renderCalendarioAgenda();
+}
+
+function cambiarSemanaAgenda(dias) {
+  agendaInicioSemana.setUTCDate(agendaInicioSemana.getUTCDate() + dias);
+  renderCalendarioAgenda();
+}
+
 async function cargarAgenda() {
-  const tbody = document.getElementById('tablaAgenda');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  const cont = document.getElementById('agendaCalendarioSemana');
+  cont.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
   try {
     const data = await apiFetch('/liga/agenda');
-    const eventos = data.eventos;
-    if (!eventos.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no cargaste ningún evento.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = eventos.map((ev) => `
-      <tr>
-        <td>${new Date(ev.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}${ev.hora ? ' ' + ev.hora.slice(0, 5) : ''}</td>
-        <td>${escapeHtml(ev.titulo)}</td>
-        <td>${escapeHtml(ev.tipo)}</td>
-        <td>${escapeHtml(ev.lugar || '-')}</td>
-        <td><button class="btn btn-peligro btn-pequeno" onclick="borrarEvento('${ev.id}')">Borrar</button></td>
-      </tr>
-    `).join('');
+    agendaEventosCache = data.eventos;
+    if (!agendaInicioSemana) agendaInicioSemana = lunesDeSemanaUTC(new Date());
+    renderCalendarioAgenda();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    cont.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+function renderCalendarioAgenda() {
+  const cont = document.getElementById('agendaCalendarioSemana');
+  const inicio = agendaInicioSemana;
+  const fin = new Date(inicio);
+  fin.setUTCDate(fin.getUTCDate() + 6);
+  document.getElementById('agendaRangoSemana').textContent =
+    `${inicio.toLocaleDateString('es-AR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' })} al ` +
+    `${fin.toLocaleDateString('es-AR', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+
+  const hoyIso = fechaISO(new Date().toISOString());
+
+  const columnas = [];
+  for (let i = 0; i < 7; i++) {
+    const dia = new Date(inicio);
+    dia.setUTCDate(dia.getUTCDate() + i);
+    const diaIso = fechaISO(dia.toISOString());
+    const eventosDelDia = agendaEventosCache
+      .filter((ev) => fechaISO(ev.fecha) === diaIso)
+      .sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
+
+    const htmlEventos = eventosDelDia.length
+      ? eventosDelDia.map((ev) => `
+          <div class="agenda-evento-item tipo-${escapeHtml(ev.tipo || 'evento')}" onclick="event.stopPropagation();" title="${escapeHtml(ev.descripcion || '')}">
+            <button type="button" class="agenda-evento-borrar" onclick="event.stopPropagation(); borrarEvento('${ev.id}')" title="Borrar">×</button>
+            ${ev.hora ? `<div class="agenda-evento-hora">${escapeHtml(ev.hora.slice(0, 5))}</div>` : ''}
+            <div class="agenda-evento-titulo">${escapeHtml(ev.titulo)}</div>
+            ${ev.lugar ? `<div class="agenda-evento-lugar">${escapeHtml(ev.lugar)}</div>` : ''}
+          </div>
+        `).join('')
+      : '<p class="agenda-dia-sin-eventos">Sin eventos</p>';
+
+    columnas.push(`
+      <div class="agenda-dia-columna ${diaIso === hoyIso ? 'agenda-dia-hoy' : ''}">
+        <div class="agenda-dia-encabezado">
+          <div class="agenda-dia-nombre">${NOMBRES_DIAS_AGENDA[i]}</div>
+          <div class="agenda-dia-numero">${dia.getUTCDate()}</div>
+        </div>
+        <div class="agenda-dia-eventos" onclick="abrirFormEventoConFecha('${diaIso}')">${htmlEventos}</div>
+      </div>
+    `);
+  }
+  cont.innerHTML = columnas.join('');
+}
+
+// Al hacer click en un día de la semana (fuera de un evento puntual) abre el
+// formulario de "Nuevo Evento" con esa fecha ya completada.
+function abrirFormEventoConFecha(fechaIso) {
+  document.getElementById('formEvento').reset();
+  document.getElementById('eventoFormError').classList.add('oculto');
+  document.getElementById('formEvento').classList.remove('oculto');
+  document.getElementById('eventoFecha').value = fechaIso;
 }
 
 async function guardarEvento(e) {
@@ -4887,6 +4967,10 @@ async function guardarEvento(e) {
   try {
     await apiFetch('/liga/agenda', { method: 'POST', body: JSON.stringify(cuerpo) });
     document.getElementById('formEvento').classList.add('oculto');
+    // Salta a la semana del evento recién creado para que se vea en el
+    // calendario sin tener que navegar manualmente.
+    const [anio, mes, diaNum] = cuerpo.fecha.split('-').map(Number);
+    agendaInicioSemana = lunesDeSemanaUTC(new Date(Date.UTC(anio, mes - 1, diaNum)));
     cargarAgenda();
   } catch (err) {
     errorEl.textContent = err.message;
