@@ -480,6 +480,9 @@ function conectarEventos() {
     document.getElementById('noticiaImagenUrl').value = '';
     document.getElementById('noticiaImagenPreview').classList.add('oculto');
     document.getElementById('noticiaFormError').classList.add('oculto');
+    poblarSelectClubesNoticia();
+    poblarSegmentacionNoticia();
+    mostrarGrupoSegmentoNoticia('todos');
     document.getElementById('formNoticia').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormNoticia').addEventListener('click', () => {
@@ -487,6 +490,8 @@ function conectarEventos() {
   });
   document.getElementById('noticiaImagenArchivo').addEventListener('change', onElegirImagenNoticia);
   document.getElementById('formNoticia').addEventListener('submit', guardarNoticia);
+  document.getElementById('noticiaSegmento').addEventListener('change', (e) => mostrarGrupoSegmentoNoticia(e.target.value));
+  document.getElementById('noticiaTorneo').addEventListener('change', poblarCategoriasSegmentoNoticia);
 
   // ---- Notificaciones ----
   document.getElementById('btnMostrarFormNotificacion').addEventListener('click', () => {
@@ -4341,14 +4346,25 @@ function posicionEntreParentesisHtml(equipoTorneoId) {
 
 // ===================== NOTICIAS =====================
 
+// Texto corto para la columna "Mostrar a" del listado de Noticias.
+function segmentoNoticiaTexto(n) {
+  if (n.segmento_tipo === 'club') return `Club: ${escapeHtml(n.segmento_club_nombre || '-')}`;
+  if (n.segmento_tipo === 'ciudad') return `Ciudad: ${escapeHtml((n.segmento_ciudades || []).join(', '))}`;
+  if (n.segmento_tipo === 'provincia') return `Provincia: ${escapeHtml((n.segmento_provincias || []).join(', '))}`;
+  if (n.segmento_tipo === 'torneo') {
+    return `Torneo: ${escapeHtml(n.segmento_torneo_nombre || '-')}${n.segmento_categoria_nombre ? ' / ' + escapeHtml(n.segmento_categoria_nombre) : ''}`;
+  }
+  return 'Todos';
+}
+
 async function cargarNoticias() {
   const tbody = document.getElementById('tablaNoticias');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/liga/noticias');
     const noticias = data.noticias;
     if (!noticias.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no publicaste ninguna noticia.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">Todavía no publicaste ninguna noticia.</td></tr>';
       return;
     }
     const badgesEstado = { publicada: 'badge-activo', borrador: 'badge-pendiente', archivada: 'badge-inactivo' };
@@ -4357,6 +4373,7 @@ async function cargarNoticias() {
         <td>${escapeHtml(n.titulo)}</td>
         <td><span class="badge ${badgesEstado[n.estado] || ''}">${escapeHtml(n.estado)}</span></td>
         <td>${n.destacada ? 'Sí' : '-'}</td>
+        <td>${segmentoNoticiaTexto(n)}</td>
         <td>${new Date(n.publicado_at).toLocaleDateString('es-AR')}</td>
         <td>
           ${n.estado !== 'publicada' ? `<button class="btn btn-secundario btn-pequeno" onclick="cambiarEstadoNoticia('${n.id}', 'publicada')">Publicar</button>` : ''}
@@ -4365,7 +4382,61 @@ async function cargarNoticias() {
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function poblarSelectClubesNoticia() {
+  const select = document.getElementById('noticiaClub');
+  const opciones = clubesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  select.innerHTML = '<option value="">Elegí un club</option>' + opciones;
+}
+
+// Muestra sólo el/los control(es) que corresponden al modo de segmentación
+// elegido ("Mostrar a"), y oculta el resto (mismo patrón que Notificaciones).
+function mostrarGrupoSegmentoNoticia(segmento) {
+  document.getElementById('grupoNoticiaClub').classList.toggle('oculto', segmento !== 'club');
+  document.getElementById('grupoNoticiaCiudad').classList.toggle('oculto', segmento !== 'ciudad');
+  document.getElementById('grupoNoticiaProvincia').classList.toggle('oculto', segmento !== 'provincia');
+  document.getElementById('grupoNoticiaTorneo').classList.toggle('oculto', segmento !== 'torneo');
+  document.getElementById('grupoNoticiaCategoria').classList.toggle('oculto', segmento !== 'torneo');
+}
+
+async function poblarSegmentacionNoticia() {
+  const selectTorneo = document.getElementById('noticiaTorneo');
+  document.getElementById('noticiaCategoria').innerHTML = '<option value="">Todas las categorías del torneo</option>';
+  try {
+    const torneos = torneosCache.length ? torneosCache : (await apiFetch('/liga/torneos')).torneos;
+    selectTorneo.innerHTML = '<option value="">Elegí un torneo</option>' +
+      torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  } catch (err) {
+    selectTorneo.innerHTML = '<option value="">Elegí un torneo</option>';
+  }
+
+  try {
+    const data = await apiFetch('/liga/clubes/filtros-disponibles');
+    document.getElementById('noticiaCiudad').innerHTML =
+      (data.ciudades || []).map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    document.getElementById('noticiaProvincia').innerHTML =
+      (data.provincias || []).map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  } catch (err) {
+    // si falla, los selects quedan vacíos; no bloquea el resto del formulario
+  }
+}
+
+async function poblarCategoriasSegmentoNoticia() {
+  const torneoId = document.getElementById('noticiaTorneo').value;
+  const selectCategoria = document.getElementById('noticiaCategoria');
+  if (!torneoId) {
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>' +
+      data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  } catch (err) {
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
   }
 }
 
@@ -4374,14 +4445,36 @@ async function guardarNoticia(e) {
   const errorEl = document.getElementById('noticiaFormError');
   errorEl.classList.add('oculto');
 
+  const segmento = document.getElementById('noticiaSegmento').value;
   const cuerpo = {
     titulo: document.getElementById('noticiaTitulo').value.trim(),
     contenido: document.getElementById('noticiaContenido').value.trim(),
     imagen_url: document.getElementById('noticiaImagenUrl').value.trim() || undefined,
-    destacada: document.getElementById('noticiaDestacada').checked
+    destacada: document.getElementById('noticiaDestacada').checked,
+    segmento_tipo: segmento
   };
 
   try {
+    if (segmento === 'club') {
+      const clubId = document.getElementById('noticiaClub').value;
+      if (!clubId) throw new Error('Elegí un club');
+      cuerpo.segmento_club_id = clubId;
+    } else if (segmento === 'ciudad') {
+      const ciudades = Array.from(document.getElementById('noticiaCiudad').selectedOptions).map((o) => o.value);
+      if (!ciudades.length) throw new Error('Elegí al menos una ciudad');
+      cuerpo.segmento_ciudades = ciudades;
+    } else if (segmento === 'provincia') {
+      const provincias = Array.from(document.getElementById('noticiaProvincia').selectedOptions).map((o) => o.value);
+      if (!provincias.length) throw new Error('Elegí al menos una provincia');
+      cuerpo.segmento_provincias = provincias;
+    } else if (segmento === 'torneo') {
+      const torneoId = document.getElementById('noticiaTorneo').value;
+      if (!torneoId) throw new Error('Elegí un torneo');
+      cuerpo.segmento_torneo_id = torneoId;
+      const categoriaId = document.getElementById('noticiaCategoria').value;
+      if (categoriaId) cuerpo.segmento_categoria_id = categoriaId;
+    }
+
     await apiFetch('/liga/noticias', { method: 'POST', body: JSON.stringify(cuerpo) });
     document.getElementById('formNoticia').classList.add('oculto');
     cargarNoticias();

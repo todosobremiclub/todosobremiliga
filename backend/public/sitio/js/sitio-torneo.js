@@ -49,6 +49,29 @@ async function init() {
   document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTab('tarjetas'));
 
   await cargarCategorias();
+  cargarNoticiasTorneo();
+}
+
+// Noticias que la Liga segmentó específicamente para este torneo (todas las
+// categorías, salvo que la Liga haya elegido una categoría puntual).
+async function cargarNoticiasTorneo() {
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/noticias`);
+    const data = await res.json();
+    if (!data.ok || !data.noticias.length) return;
+
+    document.getElementById('bloqueNoticiasTorneo').classList.remove('oculto');
+    document.getElementById('listaNoticiasTorneo').innerHTML = data.noticias.map((n) => `
+      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
+        <h3>${escapeHtml(n.titulo)}</h3>
+        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
+        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
+        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
+      </div>
+    `).join('');
+  } catch (err) {
+    // si falla, no se muestra el bloque de noticias; no bloquea el resto de la página
+  }
 }
 
 // Una unidad (categoría sin subcategorías, o cada subcategoría) suma a la

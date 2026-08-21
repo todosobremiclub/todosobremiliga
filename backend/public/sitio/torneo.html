@@ -17,6 +17,12 @@
   .tabs-categorias, .tabs-subcategorias { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
   .tabs-subcategorias { margin-bottom: 20px; }
   .club-escudo-mini { width: 20px; height: 20px; }
+  .noticia-card { background: var(--blanco); border-radius: var(--radio); padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .noticia-card.destacada { border-left: 4px solid var(--azul); }
+  .noticia-card h3 { margin: 0 0 4px; font-size: 15px; }
+  .noticia-card .noticia-fecha { font-size: 12px; color: var(--gris-600); margin-bottom: 8px; }
+  .noticia-card img { max-width: 100%; border-radius: 8px; margin-bottom: 8px; }
+  .noticia-card .noticia-contenido { margin: 0; font-size: 13px; color: var(--gris-700); }
 </style>
 </head>
 <body>
@@ -30,6 +36,11 @@
   </div>
 
   <div class="sitio-contenido">
+    <div id="bloqueNoticiasTorneo" class="oculto">
+      <h2 style="margin-top:0;">Noticias del Torneo</h2>
+      <div id="listaNoticiasTorneo"></div>
+    </div>
+
     <!-- Categorías del torneo, como botones arriba de todo. Si el torneo
          suma varias categorías/subcategorías a una tabla general, el último
          botón de esta fila es "Tabla general". -->

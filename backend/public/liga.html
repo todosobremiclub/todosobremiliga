@@ -1012,6 +1012,36 @@
             <div>
               <label><input type="checkbox" id="noticiaDestacada" style="width:auto; margin-right:6px;">Destacada</label>
             </div>
+            <div>
+              <label for="noticiaSegmento">Mostrar a</label>
+              <select id="noticiaSegmento">
+                <option value="todos">Todos (home pública de la Liga)</option>
+                <option value="club">Un club puntual (en su página pública)</option>
+                <option value="ciudad">Por ciudad (en la página de cada club)</option>
+                <option value="provincia">Por provincia (en la página de cada club)</option>
+                <option value="torneo">Por torneo / categoría (en la página del torneo)</option>
+              </select>
+            </div>
+            <div class="oculto" id="grupoNoticiaClub">
+              <label for="noticiaClub">Club</label>
+              <select id="noticiaClub"></select>
+            </div>
+            <div class="oculto" id="grupoNoticiaCiudad">
+              <label for="noticiaCiudad">Ciudad(es) — Ctrl/Cmd para elegir varias</label>
+              <select id="noticiaCiudad" multiple size="4"></select>
+            </div>
+            <div class="oculto" id="grupoNoticiaProvincia">
+              <label for="noticiaProvincia">Provincia(s) — Ctrl/Cmd para elegir varias</label>
+              <select id="noticiaProvincia" multiple size="4"></select>
+            </div>
+            <div class="oculto" id="grupoNoticiaTorneo">
+              <label for="noticiaTorneo">Torneo</label>
+              <select id="noticiaTorneo"><option value="">Elegí un torneo</option></select>
+            </div>
+            <div class="oculto" id="grupoNoticiaCategoria">
+              <label for="noticiaCategoria">Categoría (opcional)</label>
+              <select id="noticiaCategoria"><option value="">Todas las categorías del torneo</option></select>
+            </div>
           </div>
           <button type="submit" class="btn">Publicar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormNoticia">Cancelar</button>
@@ -1020,9 +1050,9 @@
 
         <table>
           <thead>
-            <tr><th>Título</th><th>Estado</th><th>Destacada</th><th>Fecha</th><th>Acciones</th></tr>
+            <tr><th>Título</th><th>Estado</th><th>Destacada</th><th>Mostrar a</th><th>Fecha</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaNoticias"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          <tbody id="tablaNoticias"><tr><td colspan="6">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

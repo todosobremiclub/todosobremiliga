@@ -514,6 +514,9 @@ router.post('/ligas/:slug/postulaciones', async (req, res) => {
 });
 
 // GET /web/ligas/:slug/noticias — noticias públicas (publicadas) de una Liga
+// que son para "todos": las segmentadas (por club/ciudad/provincia/torneo)
+// no se muestran en la home general, sólo en la página pública de ese club
+// o torneo en particular.
 router.get('/ligas/:slug/noticias', async (req, res) => {
   try {
     const { rows } = await query(
@@ -521,12 +524,68 @@ router.get('/ligas/:slug/noticias', async (req, res) => {
        FROM noticias n
        JOIN ligas l ON l.id = n.liga_id
        WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'
+         AND n.segmento_tipo = 'todos'
        ORDER BY n.destacada DESC, n.publicado_at DESC`,
       [req.params.slug]
     );
     res.json({ ok: true, noticias: rows });
   } catch (err) {
     console.error('Error en GET noticias publicas:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/ligas/:slug/clubes/:clubId/noticias — noticias segmentadas que le
+// corresponden a un Club puntual: las que la Liga apuntó directamente a ese
+// club, a su ciudad, a su provincia, o a un torneo/categoría en el que el
+// club participa. Las noticias "todos" ya se ven en la home de la Liga, así
+// que acá no se repiten.
+router.get('/ligas/:slug/clubes/:clubId/noticias', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+       FROM noticias n
+       JOIN ligas l ON l.id = n.liga_id
+       LEFT JOIN clubes c ON c.id = $2
+       WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'
+         AND (
+           (n.segmento_tipo = 'club' AND n.segmento_club_id = $2)
+           OR (n.segmento_tipo = 'ciudad' AND c.ciudad IS NOT NULL AND c.ciudad = ANY(n.segmento_ciudades))
+           OR (n.segmento_tipo = 'provincia' AND c.provincia IS NOT NULL AND c.provincia = ANY(n.segmento_provincias))
+           OR (n.segmento_tipo = 'torneo' AND EXISTS (
+                 SELECT 1 FROM equipos_torneo et
+                 WHERE et.club_id = $2 AND et.torneo_id = n.segmento_torneo_id
+                   AND (n.segmento_categoria_id IS NULL OR et.categoria_id = n.segmento_categoria_id)
+               ))
+         )
+       ORDER BY n.destacada DESC, n.publicado_at DESC`,
+      [req.params.slug, req.params.clubId]
+    );
+    res.json({ ok: true, noticias: rows });
+  } catch (err) {
+    console.error('Error en GET noticias publicas de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/torneos/:torneoId/noticias — noticias segmentadas por ese torneo
+// (opcionalmente acotadas a una categoría puntual vía ?categoria_id=).
+router.get('/torneos/:torneoId/noticias', async (req, res) => {
+  try {
+    const categoriaId = req.query.categoria_id || null;
+    const { rows } = await query(
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+       FROM noticias n
+       JOIN ligas l ON l.id = n.liga_id
+       WHERE l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'
+         AND n.segmento_tipo = 'torneo' AND n.segmento_torneo_id = $1
+         AND (n.segmento_categoria_id IS NULL OR $2::uuid IS NULL OR n.segmento_categoria_id = $2)
+       ORDER BY n.destacada DESC, n.publicado_at DESC`,
+      [req.params.torneoId, categoriaId]
+    );
+    res.json({ ok: true, noticias: rows });
+  } catch (err) {
+    console.error('Error en GET noticias publicas de torneo:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
