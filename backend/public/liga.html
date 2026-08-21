@@ -55,10 +55,12 @@
   .tab-btn-general { border-style: dashed; }
   .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; }
   .link-club-fichajes:hover { color: var(--azul); text-decoration: underline; }
-  .bloque-torneo-fichajes-club { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--gris-200); }
-  .bloque-torneo-fichajes-club:last-child { border-bottom: none; }
+  .bloque-torneo-fichajes-club { margin-bottom: 18px; padding: 12px 14px; border-radius: 10px; background: var(--gris-100); }
+  .bloque-torneo-fichajes-club:last-child { margin-bottom: 0; }
   .bloque-categoria-fichajes-club { margin-top: 10px; margin-left: 12px; }
-  .chip-torneo-registrado { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--gris-300); border-radius: 999px; font-size: 12px; margin: 0 6px 6px 0; }
+  .fila-grupo-club-clickable { margin: 0; font-size: 14px; }
+  .flecha-grupo-club { display: inline-block; width: 16px; color: var(--azul); }
+  .chip-torneo-registrado { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--azul-100, #dbeafe); background: var(--azul-50, #eff6ff); border-radius: 999px; font-size: 12px; margin: 0 6px 6px 0; }
   .campo-color { display: flex; align-items: center; gap: 8px; }
   .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
   .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
@@ -520,7 +522,10 @@
     <div class="oculto panel popup-modal popup-modal-ancho" id="modalFichajesClub">
       <div class="panel-header">
         <h2 id="tituloFichajesClub">Fichajes del Club</h2>
-        <button class="btn btn-secundario" id="btnCerrarFichajesClub">Cerrar</button>
+        <div>
+          <button class="btn" id="btnVerCobrosClubDesdeFichajes">💰 Deuda y pagos</button>
+          <button class="btn btn-secundario" id="btnCerrarFichajesClub">Cerrar</button>
+        </div>
       </div>
       <div id="resumenTorneosRegistradosClub" style="margin-bottom:16px;"></div>
       <div id="listaFichajesPorTorneoClub"><p class="texto-ayuda">Cargando...</p></div>
@@ -1256,30 +1261,8 @@
             <select id="cobrosTorneoSelect" style="min-width:220px;"></select>
           </div>
         </div>
-        <p class="texto-ayuda">Configurá qué le cobra este torneo a cada club (inscripción, cuota mensual y/o cargo por partido). Al activar un concepto, se generan automáticamente las deudas pendientes de cada club inscripto.</p>
-        <div id="cobrosSinTorneo" class="oculto"><p class="sitio-vacio">Este torneo todavía no tiene clubes inscriptos ni configuración de cobros.</p></div>
-
-        <div id="cobrosConceptos" class="oculto">
-          <table>
-            <thead><tr><th>Concepto</th><th>Monto</th><th>Activo</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaConceptosCobro"><tr><td colspan="4">Cargando...</td></tr></tbody>
-          </table>
-
-          <div class="panel-header" style="margin-top:20px;">
-            <h3 style="margin:0;">Cuota mensual</h3>
-          </div>
-          <div class="form-grid">
-            <div>
-              <label for="cobrosPeriodoMensual">Período a generar</label>
-              <input type="month" id="cobrosPeriodoMensual">
-            </div>
-            <div style="display:flex; align-items:flex-end;">
-              <button type="button" class="btn" id="btnGenerarCargoMensual">Generar cargo del período</button>
-            </div>
-          </div>
-          <p class="mensaje-error oculto" id="cobrosMensualError"></p>
-          <p class="texto-ayuda oculto" id="cobrosMensualExito"></p>
-        </div>
+        <p class="texto-ayuda">Qué pagó y qué adeuda cada club de este torneo. Los conceptos de cobro (inscripción, cuota mensual, cargo por partido) se configuran en Configuración → Cobros.</p>
+        <div id="cobrosSinTorneo" class="oculto"><p class="sitio-vacio">Este torneo todavía no tiene clubes inscriptos.</p></div>
       </div>
 
       <div class="panel oculto" id="panelResumenCobros">
@@ -1292,39 +1275,48 @@
         </table>
       </div>
 
-      <!-- Detalle de deudas de un club + registrar pago -->
-      <div class="panel oculto" id="panelDeudasClub">
-        <div class="panel-header">
-          <h2 id="tituloDeudasClub">Deudas del club</h2>
-          <button type="button" class="btn btn-secundario" id="btnCerrarDeudasClub">Cerrar</button>
-        </div>
-        <table>
-          <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaDeudasClub"><tr><td colspan="7">Cargando...</td></tr></tbody>
-        </table>
-
-        <form id="formPagoCobro" class="oculto">
-          <input type="hidden" id="pagoDeudaId">
-          <div class="form-grid">
-            <div><label for="pagoMonto">Monto a pagar *</label><input type="number" id="pagoMonto" step="0.01" min="0.01" required></div>
-            <div><label for="pagoFecha">Fecha</label><input type="date" id="pagoFecha"></div>
-            <div><label for="pagoComentario">Comentario</label><input type="text" id="pagoComentario"></div>
-          </div>
-          <button type="submit" class="btn">Registrar pago</button>
-          <button type="button" class="btn btn-secundario" id="btnCancelarFormPagoCobro">Cancelar</button>
-          <p class="mensaje-error oculto" id="pagoFormError"></p>
-        </form>
-      </div>
-
       <div class="panel">
         <div class="panel-header">
           <h2>Pagos registrados</h2>
         </div>
-        <table>
-          <thead><tr><th>Fecha</th><th>Club</th><th>Concepto</th><th>Monto</th><th>Comentario</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaPagosCobros"><tr><td colspan="6">Cargando...</td></tr></tbody>
-        </table>
+        <div id="listaPagosCobrosPorClub"><p class="texto-ayuda">Cargando...</p></div>
       </div>
+    </div>
+
+    <!-- Detalle de deudas de un club + registrar pago: se abre como popup -->
+    <div class="oculto panel popup-modal popup-modal-ancho" id="panelDeudasClub">
+      <div class="panel-header">
+        <h2 id="tituloDeudasClub">Deudas del club</h2>
+        <button type="button" class="btn btn-secundario" id="btnCerrarDeudasClub">Cerrar</button>
+      </div>
+      <table>
+        <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tablaDeudasClub"><tr><td colspan="7">Cargando...</td></tr></tbody>
+      </table>
+
+      <form id="formPagoCobro" class="oculto">
+        <input type="hidden" id="pagoDeudaId">
+        <div class="form-grid">
+          <div><label for="pagoMonto">Monto a pagar *</label><input type="number" id="pagoMonto" step="0.01" min="0.01" required></div>
+          <div><label for="pagoFecha">Fecha</label><input type="date" id="pagoFecha"></div>
+          <div><label for="pagoComentario">Comentario</label><input type="text" id="pagoComentario"></div>
+        </div>
+        <button type="submit" class="btn">Registrar pago</button>
+        <button type="button" class="btn btn-secundario" id="btnCancelarFormPagoCobro">Cancelar</button>
+        <p class="mensaje-error oculto" id="pagoFormError"></p>
+      </form>
+    </div>
+
+    <!-- Deuda y pagos de un club, a través de TODOS sus torneos: se abre
+         desde el popup de Fichajes del club (botón "Deuda y pagos"). -->
+    <div class="oculto panel popup-modal popup-modal-ancho" id="modalCobrosClub">
+      <div class="panel-header">
+        <h2 id="tituloCobrosClub">Deuda y pagos del club</h2>
+        <button type="button" class="btn btn-secundario" id="btnCerrarCobrosClub">Cerrar</button>
+      </div>
+      <div id="resumenCobrosClubPorTorneo"><p class="texto-ayuda">Cargando...</p></div>
+      <h3 style="margin-top:24px;">Pagos realizados</h3>
+      <div id="listaPagosCobrosClub"><p class="texto-ayuda">Cargando...</p></div>
     </div>
 
     <!-- ===== SECCIÓN AGENDA ===== -->
@@ -1372,42 +1364,17 @@
     <!-- ===== SECCIÓN CONFIGURACIÓN ===== -->
     <div id="seccionConfiguracion" class="oculto">
       <div class="tabs">
-        <button class="tab-btn activo" id="tabBtnConfigModalidades">Categorías de torneo</button>
-        <button class="tab-btn" id="tabBtnConfigTiposGasto">Tipos de gasto</button>
+        <button class="tab-btn activo" id="tabBtnConfigTiposGasto">Tipos de gasto</button>
         <button class="tab-btn" id="tabBtnConfigTiposIngreso">Tipos de ingreso</button>
         <button class="tab-btn" id="tabBtnConfigCuentas">Cuentas</button>
         <button class="tab-btn" id="tabBtnConfigTiposCancha">Tipos de cancha</button>
         <button class="tab-btn" id="tabBtnConfigPredios">Predios y canchas propias</button>
         <button class="tab-btn" id="tabBtnConfigArbitros">Árbitros</button>
-      </div>
-
-      <!-- Categorías de torneo (modalidades): Futsal, Senior, Leyendas, etc. -->
-      <div id="subConfigModalidades">
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Categorías de torneo</h2>
-            <button class="btn" id="btnMostrarFormModalidad">+ Nueva categoría</button>
-          </div>
-          <p class="texto-ayuda">Son categorías propias de tu Liga (ej: Futsal, Senior, Leyendas) — no confundir con las categorías de cada torneo. Cada club puede anotarse en varias, y podés cobrarle un precio fijo a cada categoría. Después vas a poder filtrar los Clubes por estas categorías.</p>
-          <form id="formModalidad" class="oculto">
-            <input type="hidden" id="modalidadIdEdicion">
-            <div class="form-grid">
-              <div><label for="modalidadNombre">Nombre *</label><input type="text" id="modalidadNombre" required placeholder="ej: Senior"></div>
-              <div><label for="modalidadPrecio">Precio por partido</label><input type="number" id="modalidadPrecio" step="0.01" min="0"></div>
-            </div>
-            <button type="submit" class="btn">Guardar</button>
-            <button type="button" class="btn btn-secundario" id="btnCancelarFormModalidad">Cancelar</button>
-            <p class="mensaje-error oculto" id="modalidadFormError"></p>
-          </form>
-          <table>
-            <thead><tr><th>Nombre</th><th>Precio por partido</th><th>Clubes anotados</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaModalidades"><tr><td colspan="4">Cargando...</td></tr></tbody>
-          </table>
-        </div>
+        <button class="tab-btn" id="tabBtnConfigCobros">Cobros</button>
       </div>
 
       <!-- Tipos de gasto -->
-      <div id="subConfigTiposGasto" class="oculto">
+      <div id="subConfigTiposGasto">
         <div class="panel">
           <div class="panel-header">
             <h2>Tipos de gasto</h2>
@@ -1588,6 +1555,45 @@
             <thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th>Acciones</th></tr></thead>
             <tbody id="tablaArbitros"><tr><td colspan="4">Cargando...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Cobros: conceptos de pago (inscripción/mensual/por partido) que
+           configura cada torneo, y la generación manual del cargo mensual. -->
+      <div id="subConfigCobros" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Cobros</h2>
+            <div>
+              <label for="configCobrosTorneoSelect" style="margin-right:8px;">Torneo:</label>
+              <select id="configCobrosTorneoSelect" style="min-width:220px;"></select>
+            </div>
+          </div>
+          <p class="texto-ayuda">Configurá qué le cobra este torneo a cada club (inscripción, cuota mensual y/o cargo por partido). Al activar un concepto, se generan automáticamente las deudas pendientes de cada club ya inscripto.</p>
+          <div id="configCobrosSinTorneo" class="oculto"><p class="sitio-vacio">Todavía no hay torneos cargados.</p></div>
+
+          <div id="configCobrosConceptos" class="oculto">
+            <table>
+              <thead><tr><th>Concepto</th><th>Monto</th><th>Activo</th><th>Acciones</th></tr></thead>
+              <tbody id="tablaConceptosCobro"><tr><td colspan="4">Cargando...</td></tr></tbody>
+            </table>
+
+            <div class="panel-header" style="margin-top:20px;">
+              <h3 style="margin:0;">Cuota mensual</h3>
+            </div>
+            <p class="texto-ayuda">El primer día de cada mes se genera automáticamente la cuota del período que arranca, para todos los torneos que tengan este concepto activo. Usá este botón solo si necesitás generarla a mano (ej: para un período pasado, o para forzarla antes de que corra el proceso automático).</p>
+            <div class="form-grid">
+              <div>
+                <label for="cobrosPeriodoMensual">Período a generar</label>
+                <input type="month" id="cobrosPeriodoMensual">
+              </div>
+              <div style="display:flex; align-items:flex-end;">
+                <button type="button" class="btn" id="btnGenerarCargoMensual">Generar cargo del período</button>
+              </div>
+            </div>
+            <p class="mensaje-error oculto" id="cobrosMensualError"></p>
+            <p class="texto-ayuda oculto" id="cobrosMensualExito"></p>
+          </div>
         </div>
       </div>
     </div>

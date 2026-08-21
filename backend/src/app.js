@@ -100,5 +100,10 @@ app.use('/liga/gastos', requireAuth, requireRole('super_admin', 'liga_admin'), r
 app.use('/liga/ingresos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaIngresosRoutes'));
 app.use('/liga/agenda', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaAgendaRoutes'));
 
+// Job programado: genera automáticamente la cuota mensual de Cobros el
+// primer día de cada mes (ver src/jobs/cobrosMensual.js).
+const { programarGeneracionMensualAutomatica } = require('./jobs/cobrosMensual');
+programarGeneracionMensualAutomatica();
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API escuchando en ${PORT}`));

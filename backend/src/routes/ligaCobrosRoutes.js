@@ -12,6 +12,72 @@ async function buscarTorneoDeMiLiga(torneoId, ligaId) {
   return rows[0] || null;
 }
 
+// ===== DEUDA Y PAGOS DE UN CLUB, A TRAVÉS DE TODOS SUS TORNEOS =====
+// A diferencia del resto de las rutas de este archivo (que miran un torneo
+// para todos los clubes), estas dos miran un club para todos los torneos de
+// tu Liga — pensadas para el popup "Deuda y pagos" que se abre desde la
+// pantalla de Fichajes del club.
+
+// GET /liga/cobros/clubes/:clubId/deudas
+router.get('/clubes/:clubId/deudas', async (req, res) => {
+  try {
+    const clubOk = await query('SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2', [req.params.clubId, req.ligaId]);
+    if (!clubOk.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+
+    const { rows } = await query(
+      `SELECT d.*, t.nombre AS torneo_nombre,
+              p.jornada AS partido_jornada,
+              cl.nombre AS partido_club_local, cv.nombre AS partido_club_visitante,
+              COALESCE(pg.total_pagado, 0) AS total_pagado,
+              d.monto - COALESCE(pg.total_pagado, 0) AS saldo,
+              CASE
+                WHEN COALESCE(pg.total_pagado, 0) <= 0 THEN 'pendiente'
+                WHEN COALESCE(pg.total_pagado, 0) >= d.monto THEN 'pagada'
+                ELSE 'parcial'
+              END AS estado
+       FROM club_deudas d
+       JOIN torneos t ON t.id = d.torneo_id
+       LEFT JOIN partidos p ON p.id = d.partido_id
+       LEFT JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       LEFT JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       LEFT JOIN clubes cl ON cl.id = el.club_id
+       LEFT JOIN clubes cv ON cv.id = ev.club_id
+       LEFT JOIN LATERAL (
+         SELECT SUM(monto) AS total_pagado FROM club_pagos WHERE deuda_id = d.id
+       ) pg ON true
+       WHERE d.club_id = $1 AND t.liga_id = $2
+       ORDER BY t.nombre ASC, d.creado_at DESC`,
+      [req.params.clubId, req.ligaId]
+    );
+    res.json({ ok: true, deudas: rows });
+  } catch (err) {
+    console.error('Error en GET deudas de club (todos los torneos):', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /liga/cobros/clubes/:clubId/pagos
+router.get('/clubes/:clubId/pagos', async (req, res) => {
+  try {
+    const clubOk = await query('SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2', [req.params.clubId, req.ligaId]);
+    if (!clubOk.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
+
+    const { rows } = await query(
+      `SELECT pg.*, d.tipo, d.descripcion AS deuda_descripcion, d.monto AS deuda_monto, t.nombre AS torneo_nombre
+       FROM club_pagos pg
+       JOIN club_deudas d ON d.id = pg.deuda_id
+       JOIN torneos t ON t.id = d.torneo_id
+       WHERE d.club_id = $1 AND t.liga_id = $2
+       ORDER BY pg.fecha DESC, pg.creado_at DESC`,
+      [req.params.clubId, req.ligaId]
+    );
+    res.json({ ok: true, pagos: rows });
+  } catch (err) {
+    console.error('Error en GET pagos de club (todos los torneos):', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // ===== CONCEPTOS DE COBRO DEL TORNEO =====
 
 // GET /liga/cobros/:torneoId/conceptos
