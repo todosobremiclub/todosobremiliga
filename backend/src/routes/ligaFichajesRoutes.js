@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
@@ -110,6 +110,92 @@ router.patch('/:fichajeId/rechazar', async (req, res) => {
   } catch (err) {
     console.error('Error en PATCH rechazar fichaje:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PUT /liga/fichajes/:fichajeId — la Liga corrige a qué torneo/categoría
+// quedó fichado un jugador (por ejemplo, si el club se equivocó al pedirlo).
+router.put('/:fichajeId', async (req, res) => {
+  const { torneo_id, categoria_id } = req.body;
+  if (!torneo_id || !categoria_id) {
+    return res.status(400).json({ ok: false, error: 'Faltan torneo_id y/o categoria_id' });
+  }
+  try {
+    const fichaje = await query('SELECT * FROM fichajes WHERE id = $1 AND liga_id = $2', [req.params.fichajeId, req.ligaId]);
+    if (!fichaje.rows[0]) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+
+    const contexto = await query(
+      `SELECT 1 FROM categorias c JOIN torneos t ON t.id = c.torneo_id
+       WHERE c.id = $1 AND c.torneo_id = $2 AND t.liga_id = $3`,
+      [categoria_id, torneo_id, req.ligaId]
+    );
+    if (!contexto.rows[0]) {
+      return res.status(400).json({ ok: false, error: 'Esa categoría no pertenece a ese torneo de tu Liga' });
+    }
+
+    const { rows } = await query(
+      `UPDATE fichajes SET torneo_id = $1, categoria_id = $2 WHERE id = $3 AND liga_id = $4 RETURNING *`,
+      [torneo_id, categoria_id, req.params.fichajeId, req.ligaId]
+    );
+    res.json({ ok: true, fichaje: rows[0] });
+  } catch (err) {
+    console.error('Error en PUT /liga/fichajes/:fichajeId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/fichajes/:fichajeId — borra un fichaje puntual (y el carnet
+// asociado, si ya se había generado al aprobarlo).
+router.delete('/:fichajeId', async (req, res) => {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const fichaje = await client.query('SELECT id FROM fichajes WHERE id = $1 AND liga_id = $2', [req.params.fichajeId, req.ligaId]);
+    if (!fichaje.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    }
+    await client.query('DELETE FROM carnets WHERE fichaje_id = $1', [req.params.fichajeId]);
+    await client.query('DELETE FROM fichajes WHERE id = $1', [req.params.fichajeId]);
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /liga/fichajes/:fichajeId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /liga/fichajes/eliminar-multiple — borrado masivo de fichajes (y sus
+// carnets asociados), pensado para el checkbox de selección múltiple en el
+// listado de fichajes del panel de Liga.
+router.post('/eliminar-multiple', async (req, res) => {
+  const { fichaje_ids } = req.body;
+  if (!Array.isArray(fichaje_ids) || !fichaje_ids.length) {
+    return res.status(400).json({ ok: false, error: 'Falta fichaje_ids (array)' });
+  }
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const propios = await client.query(
+      'SELECT id FROM fichajes WHERE id = ANY($1::uuid[]) AND liga_id = $2',
+      [fichaje_ids, req.ligaId]
+    );
+    const idsPropios = propios.rows.map((r) => r.id);
+    if (idsPropios.length) {
+      await client.query('DELETE FROM carnets WHERE fichaje_id = ANY($1::uuid[])', [idsPropios]);
+      await client.query('DELETE FROM fichajes WHERE id = ANY($1::uuid[])', [idsPropios]);
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, eliminados: idsPropios.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en POST /liga/fichajes/eliminar-multiple:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
   }
 });
 

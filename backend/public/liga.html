@@ -21,6 +21,13 @@
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
   .tabs-categorias-liga { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
   .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
+  /* Los botones de editar/eliminar de cada categoría/subcategoría quedan
+     invisibles hasta que se pasa el mouse (o se hace foco, para que sigan
+     siendo accesibles por teclado) sobre ese chip puntual — así el nombre de
+     la categoría queda como protagonista y no hay dos botones extra
+     compitiendo visualmente al lado de cada una. */
+  .tab-btn-categoria-grupo .btn-icono { opacity: 0; transition: opacity 0.15s ease; }
+  .tab-btn-categoria-grupo:hover .btn-icono, .tab-btn-categoria-grupo:focus-within .btn-icono { opacity: 1; }
   .tab-btn-categoria { padding: 10px 16px; }
   .foto-mini-tab-categoria { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
   .logo-mini-torneo { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
@@ -785,9 +792,9 @@
           <!-- Tabla de posiciones -->
           <div id="subSeccionTabla" class="oculto">
             <div class="tabs oculto" id="tabsRondaTabla">
-              <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
               <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
               <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
+              <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
             </div>
             <table>
               <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
@@ -923,13 +930,43 @@
             <option value="">Todas las categorías</option>
           </select>
         </div>
+        <div class="barra-acciones-masivas" id="barraAccionesMasivasFichajes">
+          <span id="cantidadFichajesSeleccionados">0 seleccionados</span>
+          <button class="btn btn-peligro btn-pequeno" id="btnEliminarFichajesSeleccionados">Eliminar seleccionados</button>
+          <button class="btn btn-secundario btn-pequeno" id="btnLimpiarSeleccionFichajes">Limpiar selección</button>
+        </div>
         <table>
           <thead>
-            <tr><th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th><th>Acciones</th></tr>
+            <tr>
+              <th><input type="checkbox" id="chkSeleccionarTodosFichajes"></th>
+              <th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th><th>Acciones</th>
+            </tr>
           </thead>
-          <tbody id="tablaFichajesLiga"><tr><td colspan="8">Cargando...</td></tr></tbody>
+          <tbody id="tablaFichajesLiga"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Popup: editar torneo/categoría de un fichaje -->
+    <div class="popup-modal oculto" id="modalEditarFichaje">
+      <div class="panel-header">
+        <h2>Editar fichaje</h2>
+        <button class="btn btn-secundario btn-pequeno" id="btnCerrarEditarFichaje">Cerrar</button>
+      </div>
+      <p id="jugadorEditarFichajeNombre" style="font-weight:600; margin-bottom:12px;"></p>
+      <input type="hidden" id="fichajeIdEdicion">
+      <div class="form-grid">
+        <div>
+          <label for="editarFichajeTorneo">Torneo</label>
+          <select id="editarFichajeTorneo"></select>
+        </div>
+        <div>
+          <label for="editarFichajeCategoria">Categoría</label>
+          <select id="editarFichajeCategoria"></select>
+        </div>
+      </div>
+      <p class="mensaje-error oculto" id="editarFichajeError"></p>
+      <button class="btn" id="btnGuardarEdicionFichaje" style="margin-top:12px;">Guardar</button>
     </div>
 
     <!-- Carnet: tarjeta con todos los datos del socio (vista Liga). -->
