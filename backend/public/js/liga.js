@@ -2660,9 +2660,7 @@ async function verFichajesClub(clubId, nombreClub) {
   document.getElementById('modalFichajesClub').classList.remove('oculto');
   mostrarFondoModal();
   document.getElementById('tituloFichajesClub').textContent = `Torneos y fichajes de "${nombreClub}"`;
-  const contResumen = document.getElementById('resumenTorneosRegistradosClub');
   const contLista = document.getElementById('listaFichajesPorTorneoClub');
-  contResumen.innerHTML = '';
   contLista.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   // Arranca todo retraído cada vez que se abre el popup: clubes con muchos
   // socios en varias divisiones no deben mostrar de entrada una lista larga.
@@ -2673,27 +2671,10 @@ async function verFichajesClub(clubId, nombreClub) {
       apiFetch(`/liga/clubes/${clubId}/participaciones`),
       apiFetch(`/liga/fichajes?club_id=${clubId}`)
     ]);
-    renderResumenTorneosRegistradosClub(dataParticipaciones.participaciones || []);
-    renderFichajesPorTorneoClub(dataFichajes.fichajes || []);
+    renderFichajesPorTorneoClub(dataParticipaciones.participaciones || [], dataFichajes.fichajes || []);
   } catch (err) {
-    contResumen.innerHTML = '';
     contLista.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
   }
-}
-
-function renderResumenTorneosRegistradosClub(participaciones) {
-  const cont = document.getElementById('resumenTorneosRegistradosClub');
-  if (!participaciones.length) {
-    cont.innerHTML = '<p class="texto-ayuda">Este club todavía no está registrado en ningún torneo.</p>';
-    return;
-  }
-  cont.innerHTML = '<p class="texto-ayuda" style="margin-bottom:6px;">🏆 Registrado en:</p>' +
-    participaciones.map((p) => `
-      <span class="chip-torneo-registrado">
-        <strong>${escapeHtml(p.torneo_nombre || '-')}</strong>
-        · ${escapeHtml(p.categoria_nombre || '-')}${p.subcategoria_nombre ? ` (${escapeHtml(p.subcategoria_nombre)})` : ''}
-      </span>
-    `).join('');
 }
 
 // Torneos y divisiones retraídos/expandidos dentro del popup de fichajes de
@@ -2705,63 +2686,111 @@ const categoriasFichajesClubExpandidas = new Set();
 function toggleTorneoFichajesClub(torneoKey) {
   if (torneosFichajesClubExpandidos.has(torneoKey)) torneosFichajesClubExpandidos.delete(torneoKey);
   else torneosFichajesClubExpandidos.add(torneoKey);
-  renderFichajesPorTorneoClub(fichajesPorTorneoClubCache);
+  renderFichajesPorTorneoClub(participacionesPorTorneoClubCache, fichajesPorTorneoClubCache);
 }
 
 function toggleCategoriaFichajesClub(categoriaKey) {
   if (categoriasFichajesClubExpandidas.has(categoriaKey)) categoriasFichajesClubExpandidas.delete(categoriaKey);
   else categoriasFichajesClubExpandidas.add(categoriaKey);
-  renderFichajesPorTorneoClub(fichajesPorTorneoClubCache);
+  renderFichajesPorTorneoClub(participacionesPorTorneoClubCache, fichajesPorTorneoClubCache);
 }
 
+let participacionesPorTorneoClubCache = [];
 let fichajesPorTorneoClubCache = [];
 
-function renderFichajesPorTorneoClub(fichajes) {
+// Combina en un solo árbol Torneo → División → Fichajes:
+// - Las PARTICIPACIONES (equipos_torneo) definen qué torneos y divisiones
+//   tiene el club, aunque todavía no tenga ningún jugador fichado ahí.
+// - Los FICHAJES aportan los jugadores dentro de cada división, y también
+//   pueden traer torneos/divisiones si por algún motivo ya no hay una
+//   participación activa (ej: se dio de baja el equipo pero el fichaje quedó).
+function armarArbolTorneosFichajesClub(participaciones, fichajes) {
+  const torneos = new Map(); // key: torneoId || 'sin-torneo'
+
+  function getTorneo(torneoId, torneoNombre) {
+    const key = torneoId || 'sin-torneo';
+    if (!torneos.has(key)) {
+      torneos.set(key, { torneoId, torneoNombre: torneoNombre || 'Sin torneo', categorias: new Map() });
+    }
+    const t = torneos.get(key);
+    if (torneoNombre && t.torneoNombre === 'Sin torneo') t.torneoNombre = torneoNombre;
+    return t;
+  }
+
+  function getCategoria(torneoEntry, categoriaId, categoriaNombre) {
+    const key = categoriaId || 'sin-division';
+    if (!torneoEntry.categorias.has(key)) {
+      torneoEntry.categorias.set(key, { categoriaId, categoriaNombre: categoriaNombre || 'Sin división', subcategorias: new Set(), fichajes: [] });
+    }
+    const c = torneoEntry.categorias.get(key);
+    if (categoriaNombre && c.categoriaNombre === 'Sin división') c.categoriaNombre = categoriaNombre;
+    return c;
+  }
+
+  participaciones.forEach((p) => {
+    const t = getTorneo(p.torneo_id, p.torneo_nombre);
+    const c = getCategoria(t, p.categoria_id, p.categoria_nombre);
+    if (p.subcategoria_nombre) c.subcategorias.add(p.subcategoria_nombre);
+  });
+
+  fichajes.forEach((f) => {
+    const t = getTorneo(f.torneo_id, f.torneo_nombre);
+    const c = getCategoria(t, f.categoria_id, f.categoria_nombre);
+    c.fichajes.push(f);
+  });
+
+  return torneos;
+}
+
+function renderFichajesPorTorneoClub(participaciones, fichajes) {
+  participacionesPorTorneoClubCache = participaciones;
   fichajesPorTorneoClubCache = fichajes;
   const cont = document.getElementById('listaFichajesPorTorneoClub');
-  if (!fichajes.length) {
-    cont.innerHTML = '<p class="texto-ayuda">Este club todavía no tiene jugadores fichados.</p>';
+
+  if (!participaciones.length && !fichajes.length) {
+    cont.innerHTML = '<p class="texto-ayuda">Este club todavía no está registrado en ningún torneo ni tiene jugadores fichados.</p>';
     return;
   }
 
-  const torneosOrdenados = Array.from(new Set(fichajes.map((f) => f.torneo_id)))
-    .map((torneoId) => fichajes.find((f) => f.torneo_id === torneoId))
-    .sort((a, b) => (a.torneo_nombre || '').localeCompare(b.torneo_nombre || ''));
+  const torneos = armarArbolTorneosFichajesClub(participaciones, fichajes);
+  const torneosOrdenados = Array.from(torneos.entries())
+    .sort(([, a], [, b]) => (a.torneoNombre || '').localeCompare(b.torneoNombre || ''));
 
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
 
-  cont.innerHTML = torneosOrdenados.map((torneoRef) => {
-    const torneoKey = torneoRef.torneo_id || 'sin-torneo';
-    const fichajesTorneo = fichajes.filter((f) => f.torneo_id === torneoRef.torneo_id);
+  cont.innerHTML = torneosOrdenados.map(([torneoKey, torneoEntry]) => {
     const torneoExpandido = torneosFichajesClubExpandidos.has(torneoKey);
+    const totalFichajesTorneo = Array.from(torneoEntry.categorias.values()).reduce((acc, c) => acc + c.fichajes.length, 0);
+    const categoriasOrdenadas = Array.from(torneoEntry.categorias.entries())
+      .sort(([, a], [, b]) => (a.categoriaNombre || '').localeCompare(b.categoriaNombre || ''));
 
-    const categoriasOrdenadas = Array.from(new Set(fichajesTorneo.map((f) => f.categoria_id || '')))
-      .map((categoriaId) => fichajesTorneo.find((f) => (f.categoria_id || '') === categoriaId))
-      .sort((a, b) => (a.categoria_nombre || '').localeCompare(b.categoria_nombre || ''));
-
-    const bloquesCategorias = !torneoExpandido ? '' : categoriasOrdenadas.map((catRef) => {
-      const categoriaKey = `${torneoKey}::${catRef.categoria_id || 'sin-categoria'}`;
+    const bloquesCategorias = !torneoExpandido ? '' : categoriasOrdenadas.map(([categoriaKeyPart, catEntry]) => {
+      const categoriaKey = `${torneoKey}::${categoriaKeyPart}`;
       const categoriaExpandida = categoriasFichajesClubExpandidas.has(categoriaKey);
-      const fichajesCategoria = fichajesTorneo
-        .filter((f) => (f.categoria_id || '') === (catRef.categoria_id || ''))
+      const fichajesCategoria = catEntry.fichajes.slice()
         .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
-      const filas = !categoriaExpandida ? '' : fichajesCategoria.map((f) => `
-        <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
-          ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
-          <span style="flex:1;">
-            ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
-            ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
-          </span>
-          <span class="texto-ayuda" style="min-width:90px;">DNI ${escapeHtml(f.jugador_dni || '-')}</span>
-          <span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span>
-          ${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : ''}
-        </div>
-      `).join('');
+      const chipsSubcategorias = catEntry.subcategorias.size
+        ? `<span class="texto-ayuda"> — ${Array.from(catEntry.subcategorias).map(escapeHtml).join(', ')}</span>`
+        : '';
+      const filas = !categoriaExpandida ? '' : (fichajesCategoria.length
+        ? fichajesCategoria.map((f) => `
+            <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
+              ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
+              <span style="flex:1;">
+                ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
+                ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
+              </span>
+              <span class="texto-ayuda" style="min-width:90px;">DNI ${escapeHtml(f.jugador_dni || '-')}</span>
+              <span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span>
+              ${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : ''}
+            </div>
+          `).join('')
+        : '<p class="texto-ayuda" style="margin:4px 0 0;">Todavía no hay fichajes cargados en esta división.</p>');
       return `
         <div class="bloque-categoria-fichajes-club">
           <h4 class="fila-grupo-club-clickable" style="margin-bottom:4px; cursor:pointer;" onclick="toggleCategoriaFichajesClub('${categoriaKey}')">
             <span class="flecha-grupo-club">${categoriaExpandida ? '▾' : '▸'}</span>
-            ${escapeHtml(catRef.categoria_nombre || 'Sin división')} <span class="texto-ayuda">(${fichajesCategoria.length})</span>
+            ${escapeHtml(catEntry.categoriaNombre)}${chipsSubcategorias} <span class="texto-ayuda">(${catEntry.fichajes.length} fichado(s))</span>
           </h4>
           ${filas}
         </div>
@@ -2772,7 +2801,7 @@ function renderFichajesPorTorneoClub(fichajes) {
       <div class="bloque-torneo-fichajes-club">
         <h3 class="fila-grupo-club-clickable" style="cursor:pointer;" onclick="toggleTorneoFichajesClub('${torneoKey}')">
           <span class="flecha-grupo-club">${torneoExpandido ? '▾' : '▸'}</span>
-          👤 ${escapeHtml(torneoRef.torneo_nombre || 'Sin torneo')} <span class="texto-ayuda">(${fichajesTorneo.length} fichado(s))</span>
+          🏆 ${escapeHtml(torneoEntry.torneoNombre)} <span class="texto-ayuda">(${torneoEntry.categorias.size} división(es) · ${totalFichajesTorneo} fichado(s))</span>
         </h3>
         ${bloquesCategorias}
       </div>
