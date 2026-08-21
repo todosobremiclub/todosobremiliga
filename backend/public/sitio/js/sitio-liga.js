@@ -15,6 +15,8 @@ async function init() {
     return;
   }
 
+  configurarBuscadorClubes(slug);
+
   try {
     const resLiga = await fetch(`/web/ligas/${encodeURIComponent(slug)}`);
     const dataLiga = await resLiga.json();
@@ -68,6 +70,54 @@ async function init() {
     `).join('');
   } catch (err) {
     contenedorNoticias.innerHTML = `<p class="sitio-vacio">Error cargando noticias: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+// Buscador de clubes: al tipear (con un pequeño debounce) consulta el
+// buscador público de la Liga y muestra los resultados en un desplegable
+// debajo del input; al elegir uno, navega al perfil público de ese club.
+function configurarBuscadorClubes(slug) {
+  const input = document.getElementById('buscadorClubesLiga');
+  const resultados = document.getElementById('resultadosBuscadorClubes');
+  let temporizador = null;
+
+  input.addEventListener('input', () => {
+    clearTimeout(temporizador);
+    const texto = input.value.trim();
+    if (!texto) {
+      resultados.classList.add('oculto');
+      resultados.innerHTML = '';
+      return;
+    }
+    temporizador = setTimeout(() => buscarClubes(slug, texto, resultados), 250);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!resultados.contains(e.target) && e.target !== input) {
+      resultados.classList.add('oculto');
+    }
+  });
+}
+
+async function buscarClubes(slug, texto, resultados) {
+  try {
+    const res = await fetch(`/web/ligas/${encodeURIComponent(slug)}/clubes/buscar?q=${encodeURIComponent(texto)}`);
+    const data = await res.json();
+    if (!data.ok || !data.clubes.length) {
+      resultados.innerHTML = '<p class="sitio-vacio" style="padding:10px 14px; margin:0;">No se encontraron clubes.</p>';
+      resultados.classList.remove('oculto');
+      return;
+    }
+    resultados.innerHTML = data.clubes.map((c) => `
+      <a class="buscador-clubes-resultado" href="/sitio/club.html?ligaSlug=${encodeURIComponent(slug)}&clubId=${c.id}">
+        ${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="">` : `<span class="club-swatch" style="background:${c.color_primario || '#ccc'};"></span>`}
+        ${escapeHtml(c.nombre)}
+      </a>
+    `).join('');
+    resultados.classList.remove('oculto');
+  } catch (err) {
+    resultados.innerHTML = `<p class="sitio-vacio" style="padding:10px 14px; margin:0;">Error: ${escapeHtml(err.message)}</p>`;
+    resultados.classList.remove('oculto');
   }
 }
 

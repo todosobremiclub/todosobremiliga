@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .club-header-logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
+  .tarjeta-participacion-club {
+    background: var(--blanco); border-radius: var(--radio); padding: 18px; margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .tarjeta-participacion-club h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .tarjeta-participacion-club .logo-mini-torneo-club { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+  .tarjeta-participacion-club .categoria-nombre { margin: 0 0 12px; font-size: 13px; color: var(--gris-600); }
+  .participacion-resumen { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  .puesto-tabla { font-size: 28px; font-weight: 800; color: var(--azul-oscuro); line-height: 1; }
+  .puesto-tabla span { font-size: 13px; font-weight: 400; color: var(--gris-600); }
+  .stats-mini { display: flex; gap: 12px; font-size: 12px; color: var(--gris-600); }
+  .stats-mini strong { display: block; font-size: 15px; color: var(--gris-900); }
+  .proximo-partido-club { font-size: 13px; color: var(--gris-700); display: flex; align-items: center; gap: 8px; }
+  .proximo-partido-club img, .proximo-partido-club .club-swatch { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+  .link-ver-torneo { font-size: 13px; margin-top: 10px; display: inline-block; }
+</style>
+</head>
+<body>
+  <div class="sitio-header">
+    <div class="sitio-header-inner">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <img id="clubLogo" class="club-header-logo oculto" alt="">
+        <div>
+          <h1 id="nombreClub">Cargando...</h1>
+          <div class="sitio-breadcrumb"><a href="#" id="linkVolverLiga">← Volver a la Liga</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sitio-contenido">
+    <p id="direccionClub" class="sitio-vacio oculto"></p>
+
+    <h2 style="margin-top:0;">Torneos y categorías</h2>
+    <div id="listaParticipacionesClub">
+      <p class="sitio-vacio">Cargando...</p>
+    </div>
+  </div>
+
+  <script src="/sitio/js/sitio-club.js"></script>
+</body>
+</html>

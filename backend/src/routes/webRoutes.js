@@ -356,6 +356,107 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/tarjetas', async (req, re
   }
 });
 
+// GET /web/ligas/:slug/clubes/buscar?q=... — buscador público de clubes
+// dentro de una Liga (solo clubes con al menos un equipo inscripto en algún
+// torneo de esa Liga), para el buscador de la página pública de la Liga.
+router.get('/ligas/:slug/clubes/buscar', async (req, res) => {
+  const texto = (req.query.q || '').trim();
+  try {
+    const { rows } = await query(
+      `SELECT DISTINCT c.id, c.nombre, c.logo_url, c.color_primario
+       FROM clubes c
+       JOIN equipos_torneo et ON et.club_id = c.id
+       JOIN torneos t ON t.id = et.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva'
+         AND ($2 = '' OR c.nombre ILIKE '%' || $2 || '%')
+       ORDER BY c.nombre ASC
+       LIMIT 20`,
+      [req.params.slug, texto]
+    );
+    res.json({ ok: true, clubes: rows });
+  } catch (err) {
+    console.error('Error en GET buscador de clubes:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/ligas/:slug/clubes/:clubId — perfil público de un Club dentro de
+// una Liga: datos básicos, todas sus participaciones (torneo/categoría o
+// subcategoría) con su posición actual en la tabla, y el próximo partido de
+// cada una. Pensado para la página pública de perfil de club.
+router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
+  try {
+    const clubResult = await query(
+      `SELECT c.id, c.nombre, c.logo_url, c.color_primario, c.direccion, c.ciudad, c.provincia
+       FROM clubes c
+       JOIN club_liga cl ON cl.club_id = c.id
+       JOIN ligas l ON l.id = cl.liga_id
+       WHERE c.id = $1 AND l.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.clubId, req.params.slug]
+    );
+    if (!clubResult.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en esta Liga' });
+
+    const { rows: participaciones } = await query(
+      `WITH participaciones AS (
+         SELECT et.id AS equipo_torneo_id, et.torneo_id, et.categoria_id, et.subcategoria_id
+         FROM equipos_torneo et
+         JOIN torneos t ON t.id = et.torneo_id
+         JOIN ligas l ON l.id = t.liga_id
+         WHERE et.club_id = $1 AND l.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
+       ),
+       ranking AS (
+         SELECT et.id AS equipo_torneo_id,
+                RANK() OVER (
+                  PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id
+                  ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC
+                ) AS puesto,
+                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id) AS total_equipos,
+                COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
+                COALESCE(tp.ganados, 0) AS ganados, COALESCE(tp.empatados, 0) AS empatados,
+                COALESCE(tp.perdidos, 0) AS perdidos, COALESCE(tp.diferencia, 0) AS diferencia
+         FROM equipos_torneo et
+         JOIN participaciones p2
+           ON p2.torneo_id = et.torneo_id AND p2.categoria_id = et.categoria_id
+           AND p2.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+         LEFT JOIN tabla_posiciones tp
+           ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = 'general'
+       )
+       SELECT p.equipo_torneo_id, p.torneo_id, t.nombre AS torneo_nombre, t.logo_url AS torneo_logo_url, t.estado AS torneo_estado,
+              p.categoria_id, c.nombre AS categoria_nombre, p.subcategoria_id, cs.nombre AS subcategoria_nombre,
+              r.puesto, r.total_equipos, r.puntos, r.partidos_jugados, r.ganados, r.empatados, r.perdidos, r.diferencia,
+              prox.fecha AS proximo_fecha, prox.hora AS proximo_hora, prox.rival_nombre, prox.rival_logo_url, prox.lv AS proximo_lv
+       FROM participaciones p
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN categorias c ON c.id = p.categoria_id
+       LEFT JOIN categoria_subcategorias cs ON cs.id = p.subcategoria_id
+       JOIN ranking r ON r.equipo_torneo_id = p.equipo_torneo_id
+       LEFT JOIN LATERAL (
+         SELECT pa.fecha, pa.hora,
+                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN 'V' ELSE 'L' END AS lv,
+                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN cv.nombre ELSE cl.nombre END AS rival_nombre,
+                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN cv.logo_url ELSE cl.logo_url END AS rival_logo_url
+         FROM partidos pa
+         JOIN equipos_torneo el ON el.id = pa.equipo_local_id
+         JOIN equipos_torneo ev ON ev.id = pa.equipo_visitante_id
+         JOIN clubes cl ON cl.id = el.club_id
+         JOIN clubes cv ON cv.id = ev.club_id
+         WHERE (pa.equipo_local_id = p.equipo_torneo_id OR pa.equipo_visitante_id = p.equipo_torneo_id)
+           AND (pa.resultado_local IS NULL OR pa.resultado_visitante IS NULL)
+         ORDER BY pa.fecha ASC NULLS LAST, pa.jornada ASC NULLS LAST
+         LIMIT 1
+       ) prox ON true
+       ORDER BY t.nombre ASC, c.nombre ASC, cs.nombre ASC`,
+      [req.params.clubId, req.params.slug]
+    );
+
+    res.json({ ok: true, club: clubResult.rows[0], participaciones });
+  } catch (err) {
+    console.error('Error en GET perfil publico de club:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/postulacion — datos básicos de la Liga para pintar el
 // formulario público de "postulate como Club" (QR o link).
 router.get('/ligas/:slug/postulacion', async (req, res) => {

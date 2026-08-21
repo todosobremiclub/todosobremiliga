@@ -640,6 +640,29 @@ button.btn-peligro:hover { background: #fee2e2; }
   padding: 20px 0;
 }
 
+/* Buscador de clubes de la página pública de una Liga: input + lista de
+   resultados desplegable debajo, que se cierra sola al elegir un club o
+   hacer click afuera. */
+.buscador-clubes { position: relative; max-width: 420px; margin-bottom: 20px; }
+.buscador-clubes input {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--gris-300); border-radius: var(--radio);
+  font-size: 14px; box-sizing: border-box;
+}
+.buscador-clubes-resultados {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin-top: 4px;
+  background: var(--blanco); border-radius: var(--radio); box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  max-height: 320px; overflow-y: auto;
+}
+.buscador-clubes-resultado {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; text-decoration: none;
+  color: var(--gris-900); font-size: 14px; border-bottom: 1px solid var(--gris-100);
+}
+.buscador-clubes-resultado:last-child { border-bottom: none; }
+.buscador-clubes-resultado:hover { background: var(--gris-100); }
+.buscador-clubes-resultado img, .buscador-clubes-resultado .club-swatch {
+  width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+}
+
 .noticia-card {
   background: var(--blanco);
   border-radius: var(--radio);
