@@ -477,12 +477,15 @@ function conectarEventos() {
   // ---- Noticias ----
   document.getElementById('btnMostrarFormNoticia').addEventListener('click', () => {
     document.getElementById('formNoticia').reset();
+    document.getElementById('noticiaImagenUrl').value = '';
+    document.getElementById('noticiaImagenPreview').classList.add('oculto');
     document.getElementById('noticiaFormError').classList.add('oculto');
     document.getElementById('formNoticia').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormNoticia').addEventListener('click', () => {
     document.getElementById('formNoticia').classList.add('oculto');
   });
+  document.getElementById('noticiaImagenArchivo').addEventListener('change', onElegirImagenNoticia);
   document.getElementById('formNoticia').addEventListener('submit', guardarNoticia);
 
   // ---- Notificaciones ----
@@ -491,11 +494,15 @@ function conectarEventos() {
     document.getElementById('notificacionFormError').classList.add('oculto');
     document.getElementById('notificacionFormOk').classList.add('oculto');
     poblarSelectClubesNotificacion();
+    poblarSegmentacionNotificacion();
+    mostrarGrupoSegmentoNotificacion('todos');
     document.getElementById('formNotificacion').classList.remove('oculto');
   });
   document.getElementById('btnCancelarFormNotificacion').addEventListener('click', () => {
     document.getElementById('formNotificacion').classList.add('oculto');
   });
+  document.getElementById('notificacionSegmento').addEventListener('change', (e) => mostrarGrupoSegmentoNotificacion(e.target.value));
+  document.getElementById('notificacionTorneo').addEventListener('change', () => poblarCategoriasSegmentoNotificacion());
   document.getElementById('formNotificacion').addEventListener('submit', enviarNotificacion);
 
   // ---- Finanzas ----
@@ -3302,6 +3309,19 @@ function onElegirLogoTorneo(e) {
   lector.readAsDataURL(archivo);
 }
 
+function onElegirImagenNoticia(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    const preview = document.getElementById('noticiaImagenPreview');
+    preview.src = lector.result;
+    preview.classList.remove('oculto');
+    document.getElementById('noticiaImagenUrl').value = lector.result;
+  };
+  lector.readAsDataURL(archivo);
+}
+
 function onElegirFotoCategoria(e) {
   const archivo = e.target.files[0];
   if (!archivo) return;
@@ -3536,6 +3556,14 @@ function cambiarTabDetalle(nombre) {
   // El selector de ronda es compartido por las cuatro pestañas: se muestra
   // en todas ellas (no sólo en Tabla) cuando el torneo es Apertura/Clausura.
   document.getElementById('tabsRondaTabla').classList.toggle('oculto', !torneoActualEsAperturaClausura());
+  // En Fixture no tiene sentido "General" (el fixture es siempre de una
+  // ronda puntual): se oculta esa opción y, si estaba elegida, se pasa a
+  // Apertura por defecto.
+  document.getElementById('tabBtnRondaGeneral').classList.toggle('oculto', nombre === 'fixture');
+  if (nombre === 'fixture' && rondaTablaActual === 'general') {
+    cambiarRondaTabla('apertura');
+    return;
+  }
   if (nombre === 'fixture') cargarPartidos();
   if (nombre === 'tabla') cargarTabla();
   if (nombre === 'goleadores') cargarGoleadores();
@@ -4380,7 +4408,93 @@ async function cambiarEstadoNoticia(noticiaId, nuevoEstado) {
 function poblarSelectClubesNotificacion() {
   const select = document.getElementById('notificacionClub');
   const opciones = clubesCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-  select.innerHTML = '<option value="">Todos los clubes de la Liga</option>' + opciones;
+  select.innerHTML = '<option value="">Elegí un club</option>' + opciones;
+}
+
+// Muestra sólo el/los control(es) que corresponden al modo de segmentación
+// elegido ("Enviar a"), y oculta el resto.
+function mostrarGrupoSegmentoNotificacion(segmento) {
+  document.getElementById('grupoNotifClub').classList.toggle('oculto', segmento !== 'club');
+  document.getElementById('grupoNotifCiudad').classList.toggle('oculto', segmento !== 'ciudad');
+  document.getElementById('grupoNotifProvincia').classList.toggle('oculto', segmento !== 'provincia');
+  document.getElementById('grupoNotifTorneo').classList.toggle('oculto', segmento !== 'torneo');
+  document.getElementById('grupoNotifCategoria').classList.toggle('oculto', segmento !== 'torneo');
+}
+
+// Carga las ciudades/provincias ya cargadas en clubes de la Liga (mismo
+// endpoint que usa el filtro de la sección Clubes) y los torneos, para los
+// desplegables de segmentación de la notificación.
+async function poblarSegmentacionNotificacion() {
+  const selectTorneo = document.getElementById('notificacionTorneo');
+  document.getElementById('notificacionCategoria').innerHTML = '<option value="">Todas las categorías del torneo</option>';
+  try {
+    // Si todavía no se visitó la pestaña Torneos esta sesión, torneosCache
+    // puede estar vacío: se trae directo en ese caso.
+    const torneos = torneosCache.length ? torneosCache : (await apiFetch('/liga/torneos')).torneos;
+    selectTorneo.innerHTML = '<option value="">Elegí un torneo</option>' +
+      torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+  } catch (err) {
+    selectTorneo.innerHTML = '<option value="">Elegí un torneo</option>';
+  }
+
+  try {
+    const data = await apiFetch('/liga/clubes/filtros-disponibles');
+    document.getElementById('notificacionCiudad').innerHTML =
+      (data.ciudades || []).map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    document.getElementById('notificacionProvincia').innerHTML =
+      (data.provincias || []).map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  } catch (err) {
+    // si falla, los selects quedan vacíos; no bloquea el resto del formulario
+  }
+}
+
+async function poblarCategoriasSegmentoNotificacion() {
+  const torneoId = document.getElementById('notificacionTorneo').value;
+  const selectCategoria = document.getElementById('notificacionCategoria');
+  if (!torneoId) {
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>' +
+      data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  } catch (err) {
+    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+  }
+}
+
+// Resuelve el modo de segmentación elegido a una lista de club_id concretos
+// (o null = todos los clubes de la Liga, sin filtrar). Reutiliza GET
+// /liga/clubes con el flag todos=true para traer TODOS los que matchean,
+// no sólo una página.
+async function resolverClubIdsSegmentoNotificacion() {
+  const segmento = document.getElementById('notificacionSegmento').value;
+  if (segmento === 'todos') return null;
+  if (segmento === 'club') {
+    const clubId = document.getElementById('notificacionClub').value;
+    return clubId ? [clubId] : null;
+  }
+
+  const params = new URLSearchParams({ todos: 'true' });
+  if (segmento === 'ciudad') {
+    const ciudades = Array.from(document.getElementById('notificacionCiudad').selectedOptions).map((o) => o.value);
+    if (!ciudades.length) throw new Error('Elegí al menos una ciudad');
+    ciudades.forEach((c) => params.append('ciudad', c));
+  } else if (segmento === 'provincia') {
+    const provincias = Array.from(document.getElementById('notificacionProvincia').selectedOptions).map((o) => o.value);
+    if (!provincias.length) throw new Error('Elegí al menos una provincia');
+    provincias.forEach((p) => params.append('provincia', p));
+  } else if (segmento === 'torneo') {
+    const torneoId = document.getElementById('notificacionTorneo').value;
+    if (!torneoId) throw new Error('Elegí un torneo');
+    params.set('torneo_id', torneoId);
+    const categoriaId = document.getElementById('notificacionCategoria').value;
+    if (categoriaId) params.set('categoria_id', categoriaId);
+  }
+
+  const data = await apiFetch(`/liga/clubes?${params.toString()}`);
+  return data.clubes.map((c) => c.id);
 }
 
 async function cargarNotificaciones() {
@@ -4413,18 +4527,39 @@ async function enviarNotificacion(e) {
   errorEl.classList.add('oculto');
   okEl.classList.add('oculto');
 
-  const cuerpo = {
-    titulo: document.getElementById('notificacionTitulo').value.trim(),
-    mensaje: document.getElementById('notificacionMensaje').value.trim(),
-    tipo: document.getElementById('notificacionTipo').value,
-    club_id: document.getElementById('notificacionClub').value || undefined
-  };
+  const titulo = document.getElementById('notificacionTitulo').value.trim();
+  const mensaje = document.getElementById('notificacionMensaje').value.trim();
+  const tipo = document.getElementById('notificacionTipo').value;
 
   try {
-    await apiFetch('/liga/notificaciones', { method: 'POST', body: JSON.stringify(cuerpo) });
+    // null = todos los clubes de la Liga (un solo envío, club_id vacío); un
+    // array = un envío por cada club_id resuelto por el filtro elegido.
+    const clubIds = await resolverClubIdsSegmentoNotificacion();
+
+    if (clubIds === null) {
+      await apiFetch('/liga/notificaciones', { method: 'POST', body: JSON.stringify({ titulo, mensaje, tipo }) });
+    } else {
+      if (!clubIds.length) {
+        errorEl.textContent = 'Ningún club coincide con ese filtro.';
+        errorEl.classList.remove('oculto');
+        return;
+      }
+      let enviados = 0;
+      for (const clubId of clubIds) {
+        try {
+          await apiFetch('/liga/notificaciones', { method: 'POST', body: JSON.stringify({ titulo, mensaje, tipo, club_id: clubId }) });
+          enviados++;
+        } catch (err) {
+          // sigue con el resto de los clubes aunque uno falle puntualmente
+        }
+      }
+      if (!enviados) throw new Error('No se pudo enviar la notificación a ningún club.');
+    }
+
     okEl.textContent = 'Notificación enviada correctamente.';
     okEl.classList.remove('oculto');
     document.getElementById('formNotificacion').reset();
+    mostrarGrupoSegmentoNotificacion('todos');
     cargarNotificaciones();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -4490,7 +4625,7 @@ async function cargarFinanzas() {
 
 async function cargarIngresos() {
   const tbody = document.getElementById('tablaIngresos');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/liga/ingresos');
     const ingresos = data.ingresos;
@@ -4498,7 +4633,7 @@ async function cargarIngresos() {
     document.getElementById('totalIngresos').textContent = formatearMonto(total);
 
     if (!ingresos.length) {
-      tbody.innerHTML = '<tr><td colspan="7">Todavía no cargaste ningún ingreso.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8">Todavía no cargaste ningún ingreso.</td></tr>';
       return;
     }
     tbody.innerHTML = ingresos.map((i) => `
@@ -4509,11 +4644,12 @@ async function cargarIngresos() {
         <td>${escapeHtml(i.cuenta_nombre || '-')}</td>
         <td>${formatearMonto(i.monto)}</td>
         <td>${new Date(i.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
+        <td>${escapeHtml(i.comentario || '-')}</td>
         <td><button class="btn btn-peligro btn-pequeno" onclick="borrarIngreso('${i.id}')">Borrar</button></td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -4528,7 +4664,8 @@ async function guardarIngreso(e) {
     fecha: document.getElementById('ingresoFecha').value || undefined,
     club_id: document.getElementById('ingresoClub').value || undefined,
     tipo_ingreso_id: document.getElementById('ingresoTipo').value || undefined,
-    cuenta_id: document.getElementById('ingresoCuenta').value || undefined
+    cuenta_id: document.getElementById('ingresoCuenta').value || undefined,
+    comentario: document.getElementById('ingresoComentario').value.trim() || undefined
   };
 
   try {
@@ -4553,7 +4690,7 @@ async function borrarIngreso(ingresoId) {
 
 async function cargarGastos() {
   const tbody = document.getElementById('tablaGastos');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
   try {
     const data = await apiFetch('/liga/gastos');
     const gastos = data.gastos;
@@ -4561,7 +4698,7 @@ async function cargarGastos() {
     document.getElementById('totalGastos').textContent = formatearMonto(total);
 
     if (!gastos.length) {
-      tbody.innerHTML = '<tr><td colspan="6">Todavía no cargaste ningún gasto.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">Todavía no cargaste ningún gasto.</td></tr>';
       return;
     }
     tbody.innerHTML = gastos.map((g) => `
@@ -4571,11 +4708,12 @@ async function cargarGastos() {
         <td>${escapeHtml(g.cuenta_nombre || '-')}</td>
         <td>${formatearMonto(g.monto)}</td>
         <td>${new Date(g.fecha).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</td>
+        <td>${escapeHtml(g.comentario || '-')}</td>
         <td><button class="btn btn-peligro btn-pequeno" onclick="borrarGasto('${g.id}')">Borrar</button></td>
       </tr>
     `).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -4589,7 +4727,8 @@ async function guardarGasto(e) {
     monto: document.getElementById('gastoMonto').value,
     fecha: document.getElementById('gastoFecha').value || undefined,
     tipo_gasto_id: document.getElementById('gastoTipo').value || undefined,
-    cuenta_id: document.getElementById('gastoCuenta').value || undefined
+    cuenta_id: document.getElementById('gastoCuenta').value || undefined,
+    comentario: document.getElementById('gastoComentario').value.trim() || undefined
   };
 
   try {

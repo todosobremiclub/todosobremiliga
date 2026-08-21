@@ -1002,8 +1002,12 @@
               <textarea id="noticiaContenido" required rows="5" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit;"></textarea>
             </div>
             <div>
-              <label for="noticiaImagenUrl">URL de imagen</label>
-              <input type="text" id="noticiaImagenUrl">
+              <label for="noticiaImagenArchivo">Imagen</label>
+              <div class="logo-preview-wrap">
+                <img id="noticiaImagenPreview" class="oculto" alt="">
+                <input type="file" id="noticiaImagenArchivo" accept="image/*">
+              </div>
+              <input type="hidden" id="noticiaImagenUrl">
             </div>
             <div>
               <label><input type="checkbox" id="noticiaDestacada" style="width:auto; margin-right:6px;">Destacada</label>
@@ -1038,9 +1042,13 @@
               <input type="text" id="notificacionTitulo" required>
             </div>
             <div>
-              <label for="notificacionClub">Destinatario</label>
-              <select id="notificacionClub">
-                <option value="">Todos los clubes de la Liga</option>
+              <label for="notificacionSegmento">Enviar a</label>
+              <select id="notificacionSegmento">
+                <option value="todos">Todos los clubes de la Liga</option>
+                <option value="club">Un club puntual</option>
+                <option value="ciudad">Por ciudad</option>
+                <option value="provincia">Por provincia</option>
+                <option value="torneo">Por torneo / categoría</option>
               </select>
             </div>
             <div>
@@ -1051,6 +1059,26 @@
                 <option value="fixture">Fixture</option>
                 <option value="administrativo">Administrativo</option>
               </select>
+            </div>
+            <div class="oculto" id="grupoNotifClub">
+              <label for="notificacionClub">Club</label>
+              <select id="notificacionClub"></select>
+            </div>
+            <div class="oculto" id="grupoNotifCiudad">
+              <label for="notificacionCiudad">Ciudad(es) — Ctrl/Cmd para elegir varias</label>
+              <select id="notificacionCiudad" multiple size="4"></select>
+            </div>
+            <div class="oculto" id="grupoNotifProvincia">
+              <label for="notificacionProvincia">Provincia(s) — Ctrl/Cmd para elegir varias</label>
+              <select id="notificacionProvincia" multiple size="4"></select>
+            </div>
+            <div class="oculto" id="grupoNotifTorneo">
+              <label for="notificacionTorneo">Torneo</label>
+              <select id="notificacionTorneo"><option value="">Elegí un torneo</option></select>
+            </div>
+            <div class="oculto" id="grupoNotifCategoria">
+              <label for="notificacionCategoria">Categoría (opcional)</label>
+              <select id="notificacionCategoria"><option value="">Todas las categorías del torneo</option></select>
             </div>
           </div>
           <label for="notificacionMensaje">Mensaje *</label>
@@ -1111,13 +1139,15 @@
               <select id="ingresoCuenta"><option value="">Sin especificar</option></select>
             </div>
           </div>
+          <label for="ingresoComentario">Comentario (opcional)</label>
+          <textarea id="ingresoComentario" rows="2" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit; margin-bottom:16px;"></textarea>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormIngreso">Cancelar</button>
           <p class="mensaje-error oculto" id="ingresoFormError"></p>
         </form>
         <table>
-          <thead><tr><th>Concepto</th><th>Club</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaIngresos"><tr><td colspan="7">Cargando...</td></tr></tbody>
+          <thead><tr><th>Concepto</th><th>Club</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Comentario</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaIngresos"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -1140,13 +1170,15 @@
               <select id="gastoCuenta"><option value="">Sin especificar</option></select>
             </div>
           </div>
+          <label for="gastoComentario">Comentario (opcional)</label>
+          <textarea id="gastoComentario" rows="2" style="width:100%; padding:8px 10px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px; font-family:inherit; margin-bottom:16px;"></textarea>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormGasto">Cancelar</button>
           <p class="mensaje-error oculto" id="gastoFormError"></p>
         </form>
         <table>
-          <thead><tr><th>Concepto</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Acciones</th></tr></thead>
-          <tbody id="tablaGastos"><tr><td colspan="6">Cargando...</td></tr></tbody>
+          <thead><tr><th>Concepto</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Comentario</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaGastos"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

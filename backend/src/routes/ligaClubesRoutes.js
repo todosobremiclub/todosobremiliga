@@ -53,6 +53,13 @@ router.get('/', async (req, res) => {
     const canchaTecho = (req.query.cancha_techo || '').trim();
     const soloReglamentaria = req.query.cancha_reglamentaria === 'true';
     const incluirInactivos = req.query.incluir_inactivos === 'true';
+    const torneoId = (req.query.torneo_id || '').trim();
+    const categoriaId = (req.query.categoria_id || '').trim();
+    const subcategoriaId = (req.query.subcategoria_id || '').trim();
+    // todos=true: para casos como "elegir destinatarios de una notificación",
+    // donde hace falta la lista COMPLETA de clubes que matchean el filtro,
+    // no una página de a la vez.
+    const todos = req.query.todos === 'true';
 
     const columnaOrden = COLUMNAS_ORDEN_CLUBES[req.query.orden_campo] || 'c.nombre';
     const direccionOrden = (req.query.orden_direccion || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
@@ -85,6 +92,33 @@ router.get('/', async (req, res) => {
     }
     if (soloReglamentaria) {
       filtroCancha += ` AND cc.cancha_reglamentaria = TRUE`;
+    }
+    if (torneoId) {
+      params.push(torneoId);
+      let subFiltro = `et.torneo_id = $${params.length}`;
+      if (categoriaId) {
+        params.push(categoriaId);
+        subFiltro += ` AND et.categoria_id = $${params.length}`;
+      }
+      if (subcategoriaId) {
+        params.push(subcategoriaId);
+        subFiltro += ` AND et.subcategoria_id = $${params.length}`;
+      }
+      filtros += ` AND EXISTS (SELECT 1 FROM equipos_torneo et WHERE et.club_id = c.id AND ${subFiltro})`;
+    }
+
+    if (todos) {
+      const { rows } = await query(
+        `SELECT c.id, c.nombre, c.ciudad, c.provincia, c.logo_url, c.color_primario
+         FROM club_liga cl
+         JOIN clubes c ON c.id = cl.club_id
+         LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
+         WHERE cl.liga_id = $1${filtros}${filtroCancha}
+         ORDER BY c.nombre ASC
+         LIMIT 1000`,
+        params
+      );
+      return res.json({ ok: true, clubes: rows, total: rows.length, todos: true });
     }
 
     const totalResult = await query(

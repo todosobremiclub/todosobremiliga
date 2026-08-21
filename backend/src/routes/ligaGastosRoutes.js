@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
 // POST /liga/gastos — registrar un gasto
 router.post('/', async (req, res) => {
-  const { concepto, categoria, monto, fecha, comprobante_url, tipo_gasto_id, cuenta_id } = req.body;
+  const { concepto, categoria, monto, fecha, comprobante_url, tipo_gasto_id, cuenta_id, comentario } = req.body;
 
   if (!concepto || !concepto.trim() || monto == null) {
     return res.status(400).json({ ok: false, error: 'Faltan concepto y/o monto' });
@@ -49,11 +49,11 @@ router.post('/', async (req, res) => {
       if (!ok.rows[0]) return res.status(400).json({ ok: false, error: 'Esa cuenta no pertenece a tu Liga' });
     }
     const { rows } = await query(
-      `INSERT INTO gastos (liga_id, concepto, categoria, monto, fecha, comprobante_url, creado_por, tipo_gasto_id, cuenta_id)
-       VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_DATE), $6, $7, $8, $9)
+      `INSERT INTO gastos (liga_id, concepto, categoria, monto, fecha, comprobante_url, creado_por, tipo_gasto_id, cuenta_id, comentario)
+       VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_DATE), $6, $7, $8, $9, $10)
        RETURNING *`,
       [req.ligaId, concepto.trim(), categoria || null, monto, fecha || null,
-       comprobante_url || null, req.usuario.id, tipo_gasto_id || null, cuenta_id || null]
+       comprobante_url || null, req.usuario.id, tipo_gasto_id || null, cuenta_id || null, comentario || null]
     );
     res.status(201).json({ ok: true, gasto: rows[0] });
   } catch (err) {

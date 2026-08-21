@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
 // POST /liga/ingresos — registrar un ingreso (ej. cuota de afiliación de un club)
 router.post('/', async (req, res) => {
-  const { concepto, categoria, monto, fecha, comprobante_url, club_id, tipo_ingreso_id, cuenta_id } = req.body;
+  const { concepto, categoria, monto, fecha, comprobante_url, club_id, tipo_ingreso_id, cuenta_id, comentario } = req.body;
 
   if (!concepto || !concepto.trim() || monto == null) {
     return res.status(400).json({ ok: false, error: 'Faltan concepto y/o monto' });
@@ -59,11 +59,11 @@ router.post('/', async (req, res) => {
     }
 
     const { rows } = await query(
-      `INSERT INTO ingresos (liga_id, club_id, concepto, categoria, monto, fecha, comprobante_url, creado_por, tipo_ingreso_id, cuenta_id)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, CURRENT_DATE), $7, $8, $9, $10)
+      `INSERT INTO ingresos (liga_id, club_id, concepto, categoria, monto, fecha, comprobante_url, creado_por, tipo_ingreso_id, cuenta_id, comentario)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, CURRENT_DATE), $7, $8, $9, $10, $11)
        RETURNING *`,
       [req.ligaId, club_id || null, concepto.trim(), categoria || null, monto,
-       fecha || null, comprobante_url || null, req.usuario.id, tipo_ingreso_id || null, cuenta_id || null]
+       fecha || null, comprobante_url || null, req.usuario.id, tipo_ingreso_id || null, cuenta_id || null, comentario || null]
     );
     res.status(201).json({ ok: true, ingreso: rows[0] });
   } catch (err) {
