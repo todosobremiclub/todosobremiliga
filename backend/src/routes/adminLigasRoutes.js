@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
       [tipo || null, q || null]
     );
     const { rows } = await query(
-      `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.telefono, l.email_contacto,
+      `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.ciudad, l.provincia, l.telefono, l.email_contacto,
               l.color_primario, l.color_secundario, l.color_acento, l.activo, l.tipo, l.estado_demo,
               l.creado_at,
               COUNT(cl.club_id) AS cantidad_clubes
@@ -75,7 +75,7 @@ router.get('/:id', async (req, res) => {
 // pide al Super Admin que lo piense).
 router.post('/', async (req, res) => {
   const {
-    nombre, logo_url, direccion, telefono, email_contacto,
+    nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
     color_primario, color_secundario, color_acento, tipo, estado_demo
   } = req.body;
 
@@ -103,12 +103,12 @@ router.post('/', async (req, res) => {
     }
 
     const { rows } = await query(
-      `INSERT INTO ligas (nombre, slug, logo_url, direccion, telefono, email_contacto,
+      `INSERT INTO ligas (nombre, slug, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
                            color_primario, color_secundario, color_acento, tipo, estado_demo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, 'productiva'), $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'productiva'), $13)
        RETURNING *`,
-      [nombre.trim(), slugFinal, logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null,
+      [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
+       telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
        color_acento || null, tipo || null, estado_demo || null]
     );
     res.status(201).json({ ok: true, liga: rows[0] });
@@ -122,7 +122,7 @@ router.post('/', async (req, res) => {
 // El slug se recalcula solo si cambió el nombre.
 router.put('/:id', async (req, res) => {
   const {
-    nombre, logo_url, direccion, telefono, email_contacto,
+    nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
     color_primario, color_secundario, color_acento, tipo, estado_demo
   } = req.body;
 
@@ -155,15 +155,15 @@ router.put('/:id', async (req, res) => {
 
     const { rows } = await query(
       `UPDATE ligas SET
-         nombre = $1, slug = $2, logo_url = $3, direccion = $4, telefono = $5,
-         email_contacto = $6, color_primario = $7, color_secundario = $8, color_acento = $9,
-         tipo = COALESCE($10, tipo), estado_demo = $11,
+         nombre = $1, slug = $2, logo_url = $3, direccion = $4, ciudad = $5, provincia = $6, telefono = $7,
+         email_contacto = $8, color_primario = $9, color_secundario = $10, color_acento = $11,
+         tipo = COALESCE($12, tipo), estado_demo = $13,
          actualizado_at = NOW()
-       WHERE id = $12
+       WHERE id = $14
        RETURNING *`,
-      [nombre.trim(), slugFinal, logo_url || null, direccion || null, telefono || null,
-       email_contacto || null, color_primario || null, color_secundario || null, color_acento || null,
-       tipo || null, estado_demo || null, req.params.id]
+      [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
+       telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
+       color_acento || null, tipo || null, estado_demo || null, req.params.id]
     );
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {

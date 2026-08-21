@@ -45,6 +45,18 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
   border: 1px solid rgba(0,0,0,0.15);
 }
 
+/* Escudo/logo del club en la tabla de posiciones — se usa en vez del
+   puntito de color (.club-swatch) siempre que el club tenga logo cargado. */
+.escudo-mini-tabla {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 /* "Últimas 5" — V/E/P de los últimos partidos jugados por un equipo, el más
    reciente a la izquierda. Se usa en la tabla de posiciones (Panel de Liga y
    sitio público). */

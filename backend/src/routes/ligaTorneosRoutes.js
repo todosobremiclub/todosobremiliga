@@ -62,7 +62,8 @@ router.get('/:torneoId', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, deporte, temporada, formato_juego,
-    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego
+    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego,
+    goles_walkover_ganador, goles_walkover_perdedor, logo_url
   } = req.body;
 
   const deportesValidos = ['futbol', 'voley', 'handball', 'basquet', 'futsal', 'otro'];
@@ -87,13 +88,16 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
     }
     const { rows } = await query(
-      `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9, COALESCE($10, 'clubes'))
+      `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego, goles_walkover_ganador, goles_walkover_perdedor, logo_url)
+       VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9, COALESCE($10, 'clubes'), COALESCE($11, 3), COALESCE($12, 0), $13)
        RETURNING *`,
       [req.ligaId, nombre.trim(), deporte, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
-       fecha_inicio || null, fecha_fin || null, cancha_juego || null]
+       fecha_inicio || null, fecha_fin || null, cancha_juego || null,
+       goles_walkover_ganador != null && goles_walkover_ganador !== '' ? goles_walkover_ganador : null,
+       goles_walkover_perdedor != null && goles_walkover_perdedor !== '' ? goles_walkover_perdedor : null,
+       logo_url || null]
     );
     res.status(201).json({ ok: true, torneo: rows[0] });
   } catch (err) {
@@ -106,7 +110,8 @@ router.post('/', async (req, res) => {
 router.put('/:torneoId', async (req, res) => {
   const {
     nombre, deporte, temporada, formato_juego,
-    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego
+    sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego,
+    goles_walkover_ganador, goles_walkover_perdedor, logo_url
   } = req.body;
 
   try {
@@ -127,13 +132,19 @@ router.put('/:torneoId', async (req, res) => {
          config_extra = COALESCE($6, config_extra),
          fecha_inicio = COALESCE($7, fecha_inicio),
          fecha_fin = COALESCE($8, fecha_fin),
-         cancha_juego = COALESCE($9, cancha_juego)
-       WHERE id = $10
+         cancha_juego = COALESCE($9, cancha_juego),
+         goles_walkover_ganador = COALESCE($10, goles_walkover_ganador),
+         goles_walkover_perdedor = COALESCE($11, goles_walkover_perdedor),
+         logo_url = $12
+       WHERE id = $13
        RETURNING *`,
       [nombre || null, deporte || null, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
        fecha_inicio || null, fecha_fin || null, cancha_juego || null,
+       goles_walkover_ganador != null && goles_walkover_ganador !== '' ? goles_walkover_ganador : null,
+       goles_walkover_perdedor != null && goles_walkover_perdedor !== '' ? goles_walkover_perdedor : null,
+       logo_url || null,
        req.params.torneoId]
     );
     res.json({ ok: true, torneo: rows[0] });
@@ -262,7 +273,7 @@ router.get('/:torneoId/tabla-general', async (req, res) => {
 
 // POST /liga/torneos/:torneoId/categorias — alta de una categoría
 router.post('/:torneoId/categorias', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general, foto_url } = req.body;
   const generosValidos = ['masculino', 'femenino', 'mixto'];
 
   if (!nombre || !nombre.trim()) {
@@ -277,12 +288,12 @@ router.post('/:torneoId/categorias', async (req, res) => {
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
 
     const { rows } = await query(
-      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7, COALESCE($8, TRUE))
+      `INSERT INTO categorias (torneo_id, nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general, foto_url)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 0), $7, COALESCE($8, TRUE), $9)
        RETURNING *`,
       [req.params.torneoId, nombre.trim(), genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
        precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
-       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null]
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null, foto_url || null]
     );
     res.status(201).json({ ok: true, categoria: { ...rows[0], subcategorias: [] } });
   } catch (err) {
@@ -293,7 +304,7 @@ router.post('/:torneoId/categorias', async (req, res) => {
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId — edición
 router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
-  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general } = req.body;
+  const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general, foto_url } = req.body;
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
     if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
@@ -306,12 +317,13 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
          edad_maxima = COALESCE($4, edad_maxima),
          orden = COALESCE($5, orden),
          precio_inscripcion = $6,
-         suma_tabla_general = COALESCE($7, suma_tabla_general)
-       WHERE id = $8 AND torneo_id = $9
+         suma_tabla_general = COALESCE($7, suma_tabla_general),
+         foto_url = $8
+       WHERE id = $9 AND torneo_id = $10
        RETURNING *`,
       [nombre || null, genero || null, edad_minima || null, edad_maxima || null, orden ?? null,
        precio_inscripcion != null && precio_inscripcion !== '' ? precio_inscripcion : null,
-       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null,
+       typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null, foto_url || null,
        req.params.categoriaId, req.params.torneoId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });

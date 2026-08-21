@@ -43,12 +43,23 @@ function calcularStats(equipoIds, partidos, sistemaPuntaje) {
     const visitante = stats[p.equipo_visitante_id];
     if (!local || !visitante) continue; // equipo dado de baja, se ignora
 
+    local.partidos_jugados += 1;
+    visitante.partidos_jugados += 1;
+
+    // Doble incomparecencia: ningún equipo se presentó, así que pierden los
+    // dos (0 puntos cada uno) sin comparar ningún marcador — de lo
+    // contrario el 0 a 0 que se guarda para tener algo que mostrar se
+    // contaría, incorrectamente, como un empate para ambos.
+    if (p.no_presento_local && p.no_presento_visitante) {
+      local.perdidos += 1;
+      visitante.perdidos += 1;
+      continue;
+    }
+
     const { local: ptsLocal, visitante: ptsVisitante } = calcularPuntosPartido(
       p.resultado_local, p.resultado_visitante, sistemaPuntaje
     );
 
-    local.partidos_jugados += 1;
-    visitante.partidos_jugados += 1;
     local.a_favor += p.resultado_local;
     local.en_contra += p.resultado_visitante;
     visitante.a_favor += p.resultado_visitante;
@@ -113,7 +124,8 @@ async function recalcularTablaPosiciones(torneoId, categoriaId) {
   const equipoIds = equiposResult.rows.map((e) => e.id);
 
   const partidosResult = await query(
-    `SELECT equipo_local_id, equipo_visitante_id, resultado_local, resultado_visitante, ronda
+    `SELECT equipo_local_id, equipo_visitante_id, resultado_local, resultado_visitante, ronda,
+            no_presento_local, no_presento_visitante
      FROM partidos
      WHERE torneo_id = $1 AND categoria_id = $2 AND estado = 'jugado'
        AND resultado_local IS NOT NULL AND resultado_visitante IS NOT NULL`,

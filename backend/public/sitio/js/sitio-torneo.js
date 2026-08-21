@@ -100,7 +100,7 @@ async function cargarCategorias() {
 function renderTabsCategorias() {
   const cont = document.getElementById('tabsCategorias');
   const botonesCategorias = categoriasCache.map((c) => `
-    <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneral && categoriaSeleccionadaId === c.id ? 'activo' : ''}" onclick="seleccionarCategoria('${c.id}')">${escapeHtml(c.nombre)}</button>
+    <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneral && categoriaSeleccionadaId === c.id ? 'activo' : ''}" onclick="seleccionarCategoria('${c.id}')">${c.foto_url ? `<img src="${c.foto_url}" alt="" class="foto-mini-tab-categoria">` : ''}${escapeHtml(c.nombre)}</button>
   `).join('');
   const botonGeneral = hayTablaGeneral
     ? `<button class="tab-btn tab-btn-categoria tab-btn-general ${mostrandoTablaGeneral ? 'activo' : ''}" onclick="seleccionarTablaGeneral()">Tabla general</button>`
@@ -308,7 +308,7 @@ async function cargarFixture() {
       <tr>
         <td>${p.jornada != null ? p.jornada : '-'}</td>
         <td>${escudoClub(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</td>
-        <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</td>
+        <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}${(p.no_presento_local || p.no_presento_visitante) ? ' <span class="badge badge-pendiente" title="Resultado por incomparecencia">W.O.</span>' : ''}</td>
         <td>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</td>
         <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
       </tr>

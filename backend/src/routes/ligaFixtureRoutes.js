@@ -168,6 +168,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
               COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
               COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
               COALESCE(ccSel.tamanio, ccl.tamanio) AS club_local_cancha_tamanio,
+              COALESCE(ccSel.piso, ccl.piso) AS club_local_cancha_piso,
               COALESCE(tcSel.nombre, tcl.nombre) AS club_local_cancha_tipo_nombre,
               COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
               pr.nombre AS predio_nombre, cp.nombre AS cancha_predio_nombre,
@@ -549,9 +550,15 @@ router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/jugadores', a
 // tarjetas_amarillas, tarjetas_rojas}] — reemplaza por completo las
 // estadísticas cargadas para este partido (permite corregir la carga).
 router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', async (req, res) => {
-  const { resultado_local, resultado_visitante, detalle_resultado, observaciones, estadisticas_jugadores } = req.body;
+  let { resultado_local, resultado_visitante } = req.body;
+  const { detalle_resultado, observaciones, estadisticas_jugadores, no_presento_local, no_presento_visitante } = req.body;
+  const ausenteLocal = !!no_presento_local;
+  const ausenteVisitante = !!no_presento_visitante;
 
-  if (resultado_local == null || resultado_visitante == null) {
+  // El resultado manual solo es obligatorio cuando el partido se jugó
+  // normalmente. Si se tildó que alguno (o los dos) no se presentó, el
+  // marcador se completa solo más abajo.
+  if (!ausenteLocal && !ausenteVisitante && (resultado_local == null || resultado_visitante == null)) {
     return res.status(400).json({ ok: false, error: 'Faltan resultado_local y/o resultado_visitante' });
   }
 
@@ -559,18 +566,32 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
+    if (ausenteLocal && ausenteVisitante) {
+      // Ningún equipo se presentó: los dos pierden el partido, sin usar
+      // ningún marcador (el 0 a 0 es solo para tener algo que mostrar).
+      resultado_local = 0;
+      resultado_visitante = 0;
+    } else if (ausenteLocal) {
+      resultado_local = contexto.goles_walkover_perdedor;
+      resultado_visitante = contexto.goles_walkover_ganador;
+    } else if (ausenteVisitante) {
+      resultado_local = contexto.goles_walkover_ganador;
+      resultado_visitante = contexto.goles_walkover_perdedor;
+    }
+
     const { rows } = await query(
       `UPDATE partidos SET
          resultado_local = $1, resultado_visitante = $2,
          detalle_resultado = COALESCE($3, detalle_resultado),
          observaciones = COALESCE($4, observaciones),
+         no_presento_local = $5, no_presento_visitante = $6,
          estado = 'jugado',
          actualizado_at = NOW()
-       WHERE id = $5 AND torneo_id = $6 AND categoria_id = $7
+       WHERE id = $7 AND torneo_id = $8 AND categoria_id = $9
        RETURNING *`,
       [resultado_local, resultado_visitante,
        detalle_resultado ? JSON.stringify(detalle_resultado) : null,
-       observaciones || null,
+       observaciones || null, ausenteLocal, ausenteVisitante,
        req.params.partidoId, req.params.torneoId, req.params.categoriaId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });

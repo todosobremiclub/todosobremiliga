@@ -332,10 +332,14 @@ function conectarEventos() {
     document.getElementById('torneoIdEdicion').value = '';
     document.getElementById('torneoPtsVictoria').value = 3;
     document.getElementById('torneoPtsEmpate').value = 1;
+    document.getElementById('torneoLogoUrl').value = '';
+    document.getElementById('torneoLogoArchivo').value = '';
+    document.getElementById('torneoLogoPreview').classList.add('oculto');
     document.getElementById('torneoFormError').classList.add('oculto');
     document.getElementById('formTorneo').classList.remove('oculto');
     mostrarFondoModal();
   });
+  document.getElementById('torneoLogoArchivo').addEventListener('change', onElegirLogoTorneo);
   document.getElementById('btnCancelarFormTorneo').addEventListener('click', () => {
     document.getElementById('formTorneo').classList.add('oculto');
     ocultarFondoModal();
@@ -412,6 +416,9 @@ function conectarEventos() {
 
   document.getElementById('btnGenerarFixture').addEventListener('click', () => {
     document.getElementById('fixtureAccionError').classList.add('oculto');
+    const esAperturaClausura = torneoActualEsAperturaClausura();
+    document.getElementById('grupoFixtureIdaVuelta').classList.toggle('oculto', esAperturaClausura);
+    document.getElementById('ayudaFixtureAperturaClausura').classList.toggle('oculto', !esAperturaClausura);
     document.getElementById('formGenerarFixture').classList.remove('oculto');
   });
   document.getElementById('btnCancelarGenerarFixture').addEventListener('click', () => {
@@ -1697,6 +1704,21 @@ function actualizarBarraAccionesMasivas() {
 
 let torneosAsignarMasivoCache = [];
 
+// Selección tildada en el popup, guardada aparte del DOM: como los grupos de
+// torneo/categoría se pueden retraer/expandir (lo que vuelve a dibujar todo
+// el HTML), si el tilde dependiera solo del DOM se perdería cada vez que se
+// abre o cierra una flechita. Clave: `${categoriaId}::${subcategoriaId||''}`.
+const seleccionAsignarMasivoKeys = new Set();
+
+function claveSeleccionAsignarMasivo(categoriaId, subcategoriaId) {
+  return `${categoriaId}::${subcategoriaId || ''}`;
+}
+
+function toggleSeleccionAsignarMasivo(categoriaId, subcategoriaId, marcado) {
+  const clave = claveSeleccionAsignarMasivo(categoriaId, subcategoriaId);
+  if (marcado) seleccionAsignarMasivoKeys.add(clave); else seleccionAsignarMasivoKeys.delete(clave);
+}
+
 async function abrirAsignarCategoriaMasivo() {
   if (!clubesSeleccionadosIds.size) return;
   document.getElementById('modalAsignarCategoriaMasivo').classList.remove('oculto');
@@ -1705,6 +1727,7 @@ async function abrirAsignarCategoriaMasivo() {
     `Vas a inscribir ${clubesSeleccionadosIds.size} club(es) seleccionado(s) en las categorías/subcategorías que tildes.`;
   document.getElementById('asignarMasivoError').classList.add('oculto');
   document.getElementById('asignarMasivoOk').classList.add('oculto');
+  seleccionAsignarMasivoKeys.clear();
   const cont = document.getElementById('listaAsignarMasivoTorneos');
   cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   try {
@@ -1724,26 +1747,66 @@ async function abrirAsignarCategoriaMasivo() {
   }
 }
 
+// Torneos y categorías (con subcategorías) que están expandidos en el popup
+// de asignación masiva — arranca vacío = todo retraído, así la lista larga
+// de categorías no abruma de entrada; se expande tocando la flechita.
+const torneosAsignarMasivoExpandidos = new Set();
+const categoriasAsignarMasivoExpandidas = new Set();
+
+function toggleTorneoAsignarMasivo(torneoId) {
+  if (torneosAsignarMasivoExpandidos.has(torneoId)) torneosAsignarMasivoExpandidos.delete(torneoId);
+  else torneosAsignarMasivoExpandidos.add(torneoId);
+  renderAsignarMasivoTorneos();
+}
+
+function toggleCategoriaAsignarMasivo(categoriaId) {
+  if (categoriasAsignarMasivoExpandidas.has(categoriaId)) categoriasAsignarMasivoExpandidas.delete(categoriaId);
+  else categoriasAsignarMasivoExpandidas.add(categoriaId);
+  renderAsignarMasivoTorneos();
+}
+
+// Tildar el checkbox "Todas" de una categoría marca (o desmarca) de una
+// todas sus subcategorías — para no tener que tildarlas una por una cuando
+// se quiere anotar a los clubes en todas.
+function toggleTodasSubcategoriasAsignarMasivo(categoriaId, marcado) {
+  document.querySelectorAll(`.chk-categoria-asignar-masivo[data-categoria-id="${categoriaId}"][data-subcategoria-id]`)
+    .forEach((chk) => {
+      chk.checked = marcado;
+      toggleSeleccionAsignarMasivo(categoriaId, chk.dataset.subcategoriaId, marcado);
+    });
+}
+
 function renderAsignarMasivoTorneos() {
   const cont = document.getElementById('listaAsignarMasivoTorneos');
   // Igual que en "Participaciones del club": si la categoría tiene
   // subcategorías cargadas, se tilda a nivel subcategoría (no tiene sentido
   // dejar al club en la categoría "pelada"); si no tiene, se tilda la
-  // categoría directamente.
-  cont.innerHTML = torneosAsignarMasivoCache.map((t) => `
-    <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
-      <strong>${escapeHtml(t.nombre)}</strong> <span class="texto-ayuda" style="margin:0;">(${escapeHtml(t.deporte)})</span>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px; margin-left:12px;">
-        ${t.categorias.length ? t.categorias.map((c) => {
+  // categoría directamente. Torneos y categorías-con-subcategorías arrancan
+  // retraídos (solo el nombre + flecha) para no abrumar con una lista larga.
+  cont.innerHTML = torneosAsignarMasivoCache.map((t) => {
+    const expandidoTorneo = torneosAsignarMasivoExpandidos.has(t.id);
+    const cuerpoTorneo = !t.categorias.length
+      ? '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'
+      : t.categorias.map((c) => {
           if (c.subcategorias.length) {
+            const expandidaCategoria = categoriasAsignarMasivoExpandidas.has(c.id);
+            const todasTildadas = c.subcategorias.every((s) => seleccionAsignarMasivoKeys.has(claveSeleccionAsignarMasivo(c.id, s.id)));
             return `
               <div>
-                <span style="font-size:13px; font-weight:600;">${escapeHtml(c.nombre)}</span>
-                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; margin-left:14px;">
+                <span class="fila-grupo-club-clickable" style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="toggleCategoriaAsignarMasivo('${c.id}')">
+                  <span class="flecha-grupo-club">${expandidaCategoria ? '▾' : '▸'}</span>
+                  <span style="font-size:13px; font-weight:600;">${escapeHtml(c.nombre)}</span>
+                  <label style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:400; margin-left:8px;" onclick="event.stopPropagation();">
+                    <input type="checkbox" ${todasTildadas ? 'checked' : ''} onchange="toggleTodasSubcategoriasAsignarMasivo('${c.id}', this.checked)"> Todas
+                  </label>
+                </span>
+                <div class="${expandidaCategoria ? '' : 'oculto'}" style="display:${expandidaCategoria ? 'flex' : 'none'}; flex-wrap:wrap; gap:10px; margin-top:4px; margin-left:20px;">
                   ${c.subcategorias.map((s) => `
                     <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
                       <input type="checkbox" class="chk-categoria-asignar-masivo" data-torneo-id="${t.id}"
-                        data-categoria-id="${c.id}" data-subcategoria-id="${s.id}">
+                        data-categoria-id="${c.id}" data-subcategoria-id="${s.id}"
+                        ${seleccionAsignarMasivoKeys.has(claveSeleccionAsignarMasivo(c.id, s.id)) ? 'checked' : ''}
+                        onchange="toggleSeleccionAsignarMasivo('${c.id}', '${s.id}', this.checked)">
                       ${escapeHtml(s.nombre)}
                     </label>
                   `).join('')}
@@ -1753,14 +1816,26 @@ function renderAsignarMasivoTorneos() {
           }
           return `
             <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400;">
-              <input type="checkbox" class="chk-categoria-asignar-masivo" data-torneo-id="${t.id}" data-categoria-id="${c.id}">
+              <input type="checkbox" class="chk-categoria-asignar-masivo" data-torneo-id="${t.id}" data-categoria-id="${c.id}"
+                ${seleccionAsignarMasivoKeys.has(claveSeleccionAsignarMasivo(c.id, '')) ? 'checked' : ''}
+                onchange="toggleSeleccionAsignarMasivo('${c.id}', '', this.checked)">
               ${escapeHtml(c.nombre)}
             </label>
           `;
-        }).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
+        }).join('');
+
+    return `
+      <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
+        <div class="fila-grupo-club-clickable" style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="toggleTorneoAsignarMasivo('${t.id}')">
+          <span class="flecha-grupo-club">${expandidoTorneo ? '▾' : '▸'}</span>
+          <strong>${escapeHtml(t.nombre)}</strong> <span class="texto-ayuda" style="margin:0;">(${escapeHtml(t.deporte)})</span>
+        </div>
+        <div class="${expandidoTorneo ? '' : 'oculto'}" style="display:flex; flex-direction:column; gap:8px; margin-top:8px; margin-left:20px;">
+          ${cuerpoTorneo}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 async function confirmarAsignarCategoriaMasivo() {
@@ -2807,7 +2882,7 @@ function renderTorneos() {
         <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarTorneo('${t.id}')">${ICONO_LAPIZ}</button>
         <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarTorneo('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
       </div>
-      <h3>${escapeHtml(t.nombre)}</h3>
+      <h3>${t.logo_url ? `<img src="${t.logo_url}" alt="" class="logo-mini-torneo">` : ''}${escapeHtml(t.nombre)}</h3>
       <p>${escapeHtml(t.deporte)} · ${escapeHtml(NOMBRES_FORMATO_TORNEO[t.formato_juego] || t.formato_juego || '-')}</p>
       <p><span class="badge ${t.estado === 'historico' ? 'badge-inactivo' : 'badge-activo'}">${escapeHtml(t.estado || 'planificado')}</span></p>
     </div>
@@ -2842,6 +2917,15 @@ function editarTorneo(torneoId) {
   document.getElementById('torneoCanchaJuego').value = torneo.cancha_juego || 'clubes';
   document.getElementById('torneoGolesWalkoverGanador').value = torneo.goles_walkover_ganador != null ? torneo.goles_walkover_ganador : 3;
   document.getElementById('torneoGolesWalkoverPerdedor').value = torneo.goles_walkover_perdedor != null ? torneo.goles_walkover_perdedor : 0;
+  document.getElementById('torneoLogoUrl').value = torneo.logo_url || '';
+  document.getElementById('torneoLogoArchivo').value = '';
+  const previewLogoTorneo = document.getElementById('torneoLogoPreview');
+  if (torneo.logo_url) {
+    previewLogoTorneo.src = torneo.logo_url;
+    previewLogoTorneo.classList.remove('oculto');
+  } else {
+    previewLogoTorneo.classList.add('oculto');
+  }
   document.getElementById('torneoFormError').classList.add('oculto');
   document.getElementById('formTorneo').classList.remove('oculto');
   mostrarFondoModal();
@@ -2870,7 +2954,8 @@ async function guardarTorneo(e) {
     fecha_inicio: document.getElementById('torneoFechaInicio').value || undefined,
     cancha_juego: document.getElementById('torneoCanchaJuego').value || undefined,
     goles_walkover_ganador: document.getElementById('torneoGolesWalkoverGanador').value || undefined,
-    goles_walkover_perdedor: document.getElementById('torneoGolesWalkoverPerdedor').value || undefined
+    goles_walkover_perdedor: document.getElementById('torneoGolesWalkoverPerdedor').value || undefined,
+    logo_url: document.getElementById('torneoLogoUrl').value || undefined
   };
 
   try {
@@ -3022,6 +3107,19 @@ function editarCategoria(categoriaId) {
   }
   document.getElementById('categoriaFormError').classList.add('oculto');
   document.getElementById('formCategoria').classList.remove('oculto');
+}
+
+function onElegirLogoTorneo(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    const preview = document.getElementById('torneoLogoPreview');
+    preview.src = lector.result;
+    preview.classList.remove('oculto');
+    document.getElementById('torneoLogoUrl').value = lector.result;
+  };
+  lector.readAsDataURL(archivo);
 }
 
 function onElegirFotoCategoria(e) {
@@ -3232,11 +3330,7 @@ function mostrarBloqueDetalleCategoriaLiga() {
   jornadaFixtureActual = 1;
   rondaTablaActual = 'general';
   tablaActualCache = [];
-  // Se pide la tabla ya mismo (aunque el sub-tab que se abre por defecto sea
-  // "fixture") para tener la posición actual de cada equipo lista y poder
-  // mostrarla entre paréntesis junto a cada partido.
-  cargarTabla();
-  cambiarTabDetalle('fixture');
+  cambiarTabDetalle('tabla');
 }
 
 function cambiarTabDetalle(nombre) {
@@ -3292,7 +3386,7 @@ async function cargarTablaGeneral(torneoId) {
     }
     tbody.innerHTML = filas.map((f) => `
       <tr>
-        <td>${swatch(f.club_color_primario)}${escapeHtml(f.club_nombre)}</td>
+        <td>${escudoOSwatch(f.club_logo_url, f.club_color_primario)}${escapeHtml(f.club_nombre)}</td>
         <td>${f.partidos_jugados}</td>
         <td>${f.ganados}</td>
         <td>${f.empatados}</td>
@@ -3536,12 +3630,17 @@ function renderJornadaFixture(jornadasDisponibles) {
 
     let bloqueCancha;
     if (fixtureCanchaJuegoActual === 'propias_liga') {
+      const detallesPredio = [];
+      if (p.cancha_predio_tipo_nombre) detallesPredio.push(escapeHtml(p.cancha_predio_tipo_nombre));
+      if (p.cancha_predio_techo) detallesPredio.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
+      if (p.cancha_predio_tamanio) detallesPredio.push(escapeHtml(p.cancha_predio_tamanio));
       bloqueCancha = `
         <div>
           <label style="font-size:12px;">Predio y cancha</label>
           <select data-partido-id="${p.id}" class="select-cancha-predio-partido" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
             ${opcionesCanchasPredio(p.cancha_predio_id)}
           </select>
+          ${p.cancha_predio_id && detallesPredio.length ? `<p class="texto-ayuda" style="margin:4px 0 0;">${detallesPredio.join(' · ')}</p>` : ''}
         </div>`;
     } else {
       const canchasClub = canchasClubFixtureCache[p.club_local_id] || [];
@@ -3553,19 +3652,29 @@ function renderJornadaFixture(jornadasDisponibles) {
           const etiqueta = `${escapeHtml(c.nombre || 'Cancha')}${c.es_principal ? ' (Principal)' : ''}`;
           return `<option value="${c.id}" ${c.id === seleccionada ? 'selected' : ''}>${etiqueta}</option>`;
         }).join('');
+        const canchaSeleccionada = canchasClub.find((c) => c.id === seleccionada);
+        const detallesClub = [];
+        if (canchaSeleccionada) {
+          if (canchaSeleccionada.tipo_cancha_nombre) detallesClub.push(escapeHtml(canchaSeleccionada.tipo_cancha_nombre));
+          if (canchaSeleccionada.tipo_techo) detallesClub.push(canchaSeleccionada.tipo_techo === 'techada' ? 'Techada' : 'Aire libre');
+          if (canchaSeleccionada.piso) detallesClub.push(escapeHtml(canchaSeleccionada.piso));
+          if (canchaSeleccionada.tamanio) detallesClub.push(escapeHtml(canchaSeleccionada.tamanio));
+        }
         bloqueCancha = `
           <div>
             <label style="font-size:12px;">Cancha del local</label>
             <select data-partido-id="${p.id}" class="select-cancha-club-partido" style="width:100%; padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;">
               ${opciones}
             </select>
+            ${detallesClub.length ? `<p class="texto-ayuda" style="margin:4px 0 0;">${detallesClub.join(' · ')}</p>` : ''}
           </div>`;
       } else {
         const detalles = [];
         if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
-        if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
-        if (p.club_local_cancha_tamanio) detalles.push(escapeHtml(p.club_local_cancha_tamanio));
         if (p.club_local_cancha_tipo_nombre) detalles.push(escapeHtml(p.club_local_cancha_tipo_nombre));
+        if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
+        if (p.club_local_cancha_piso) detalles.push(escapeHtml(p.club_local_cancha_piso));
+        if (p.club_local_cancha_tamanio) detalles.push(escapeHtml(p.club_local_cancha_tamanio));
         bloqueCancha = `<div><label style="font-size:12px;">Cancha (del local)</label><p class="texto-ayuda" style="margin:2px 0;">${detalles.length ? detalles.join(' · ') : 'Sin datos de cancha cargados'}</p></div>`;
       }
     }
@@ -3940,7 +4049,7 @@ async function cargarTabla() {
     }
     tbody.innerHTML = tabla.map((fila) => `
       <tr>
-        <td>${swatch(fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
+        <td>${escudoOSwatch(fila.club_logo_url, fila.club_color_primario)}${escapeHtml(fila.club_nombre)}</td>
         <td>${fila.partidos_jugados}</td>
         <td>${fila.ganados}</td>
         <td>${fila.empatados}</td>
@@ -4348,6 +4457,16 @@ function escapeHtml(texto) {
 function swatch(color) {
   if (!color) return '';
   return `<span class="club-swatch" style="background:${color};"></span>`;
+}
+
+// Igual que swatch(), pero para las tablas de posiciones: si el club tiene
+// escudo/logo cargado se muestra siempre esa imagen en vez del puntito de
+// color (que queda solo como respaldo cuando no hay logo).
+function escudoOSwatch(logoUrl, color) {
+  if (logoUrl) {
+    return `<img src="${escapeHtml(logoUrl)}" alt="" class="escudo-mini-tabla">`;
+  }
+  return swatch(color);
 }
 
 document.addEventListener('DOMContentLoaded', init);

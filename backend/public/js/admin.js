@@ -115,6 +115,8 @@ function limpiarFormLiga() {
   document.getElementById('grupoEstadoDemo').classList.toggle('oculto', tabActual !== 'demo');
   document.getElementById('ligaEstadoDemo').value = 'pendiente';
   document.getElementById('ligaDireccion').value = '';
+  document.getElementById('ligaCiudad').value = '';
+  document.getElementById('ligaProvincia').value = '';
   document.getElementById('ligaTelefono').value = '';
   document.getElementById('ligaEmail').value = '';
   document.getElementById('ligaLogoUrl').value = '';
@@ -209,6 +211,8 @@ function editarLiga(ligaId) {
   document.getElementById('grupoEstadoDemo').classList.toggle('oculto', liga.tipo !== 'demo');
   document.getElementById('ligaEstadoDemo').value = liga.estado_demo || 'pendiente';
   document.getElementById('ligaDireccion').value = liga.direccion || '';
+  document.getElementById('ligaCiudad').value = liga.ciudad || '';
+  document.getElementById('ligaProvincia').value = liga.provincia || '';
   document.getElementById('ligaTelefono').value = liga.telefono || '';
   document.getElementById('ligaEmail').value = liga.email_contacto || '';
   document.getElementById('ligaLogoUrl').value = liga.logo_url || '';
@@ -244,6 +248,8 @@ async function guardarLiga(e) {
     tipo,
     estado_demo: tipo === 'demo' ? document.getElementById('ligaEstadoDemo').value : undefined,
     direccion: document.getElementById('ligaDireccion').value.trim() || undefined,
+    ciudad: document.getElementById('ligaCiudad').value.trim() || undefined,
+    provincia: document.getElementById('ligaProvincia').value.trim() || undefined,
     telefono: document.getElementById('ligaTelefono').value.trim() || undefined,
     email_contacto: document.getElementById('ligaEmail').value.trim() || undefined,
     logo_url: document.getElementById('ligaLogoUrl').value || undefined,
@@ -312,6 +318,8 @@ async function verLiga(ligaId) {
         <div><strong>Estado:</strong> ${liga.tipo === 'demo' ? (ESTADOS_DEMO_LABELS[liga.estado_demo] || 'Pendiente') : (liga.activo ? 'Activa' : 'Inactiva')}</div>
         <div><strong>Clubes cargados:</strong> ${liga.cantidad_clubes}</div>
         <div><strong>Dirección:</strong> ${escapeHtml(liga.direccion || '-')}</div>
+        <div><strong>Ciudad:</strong> ${escapeHtml(liga.ciudad || '-')}</div>
+        <div><strong>Provincia:</strong> ${escapeHtml(liga.provincia || '-')}</div>
         <div><strong>Teléfono:</strong> ${escapeHtml(liga.telefono || '-')}</div>
         <div><strong>Email:</strong> ${escapeHtml(liga.email_contacto || '-')}</div>
       </div>

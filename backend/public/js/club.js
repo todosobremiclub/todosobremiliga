@@ -1,5 +1,16 @@
 // Lógica del Panel de Club: Jugadores + Fichajes/Carnets.
 
+const ICONO_PERSONA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+
+// Foto de un jugador/socio en listados y en el carnet digital: si no tiene
+// foto cargada, en vez de dejar el círculo vacío se simula una foto de
+// carnet (silueta genérica de persona) para que se vea como un carnet real
+// al que todavía no se le subió la fotito.
+function fotoJugadorHtml(fotoUrl, clase) {
+  if (fotoUrl) return `<img src="${fotoUrl}" alt="" class="${clase}">`;
+  return `<span class="${clase} sin-foto">${ICONO_PERSONA}</span>`;
+}
+
 let jugadoresCache = [];
 let ligasClubCache = [];
 let fichajesCache = [];
@@ -204,7 +215,7 @@ function renderJugadores() {
   tbody.innerHTML = lista.map((j) => `
     <tr>
       <td><input type="checkbox" class="check-jugador" data-jugador-id="${j.id}" onchange="toggleSeleccionJugador('${j.id}', this.checked)" ${jugadoresSeleccionados.has(j.id) ? 'checked' : ''}></td>
-      <td>${j.foto_url ? `<img src="${j.foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+      <td>${fotoJugadorHtml(j.foto_url, 'foto-jugador-mini')}</td>
       <td>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</td>
       <td>${escapeHtml(j.dni)}</td>
       <td>${formatearFecha(j.fecha_nacimiento)}</td>
@@ -522,7 +533,7 @@ function renderFichajes() {
     }
     return `
       <tr>
-        <td>${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="foto-jugador-mini">` : ''}</td>
+        <td>${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}</td>
         <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</td>
         <td>${escapeHtml(f.liga_nombre)}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
@@ -557,7 +568,7 @@ function abrirCarnet(fichajeId) {
         <strong>${escapeHtml(f.club_nombre || '-')}</strong>
       </div>
       <div class="carnet-cuerpo">
-        ${f.jugador_foto_url ? `<img src="${f.jugador_foto_url}" alt="" class="carnet-foto">` : ''}
+        ${fotoJugadorHtml(f.jugador_foto_url, 'carnet-foto')}
         <p class="carnet-nombre">${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}</p>
         <div class="carnet-datos">
           <div><span>DNI</span><span>${escapeHtml(f.jugador_dni || '-')}</span></div>

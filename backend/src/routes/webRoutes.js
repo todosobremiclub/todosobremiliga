@@ -198,6 +198,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
     const { rows } = await query(
       `SELECT p.id, p.fecha, p.hora, p.sede, p.jornada, p.estado,
               p.resultado_local, p.resultado_visitante, p.detalle_resultado,
+              p.no_presento_local, p.no_presento_visitante,
               el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
               cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
               cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color
@@ -256,6 +257,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId/f
     const { rows } = await query(
       `SELECT p.id, p.fecha, p.hora, p.sede, p.jornada, p.estado,
               p.resultado_local, p.resultado_visitante, p.detalle_resultado,
+              p.no_presento_local, p.no_presento_visitante,
               p.equipo_local_id, p.equipo_visitante_id,
               cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
               cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color
