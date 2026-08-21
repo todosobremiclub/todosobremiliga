@@ -1,4 +1,4 @@
-// Página pública de un Equipo (perfil de club dentro de un torneo/categoría):
+// Página pública de un Equipo (perfil de club dentro de un torneo/división):
 // últimos resultados, próximos partidos, resultados, plantel del club y
 // goleadores/tarjetas de todo el torneo.
 

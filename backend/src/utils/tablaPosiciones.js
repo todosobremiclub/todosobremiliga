@@ -103,10 +103,10 @@ async function guardarTabla(torneoId, categoriaId, ronda, stats) {
   }
 }
 
-// Recalcula TODA la tabla de posiciones de una categoría, a partir de los
+// Recalcula TODA la tabla de posiciones de una división, a partir de los
 // partidos jugados. Se recalcula desde cero cada vez (simple y sin riesgo de
 // arrastrar errores de un cálculo incremental) — el volumen de partidos por
-// categoría es chico, así que no hay problema de performance.
+// división es chico, así que no hay problema de performance.
 //
 // Si el torneo tiene formato "apertura_clausura", se guardan TRES tablas
 // separadas (ronda='apertura', ronda='clausura' y ronda='general' con el

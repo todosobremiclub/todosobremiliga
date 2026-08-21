@@ -1,10 +1,10 @@
-// Página pública de un Torneo: categorías arriba como botones y, debajo, la
-// tabla de posiciones / fixture / goleadores / tarjetas de la categoría (o
-// subcategoría) elegida. Si una categoría tiene subcategorías, hay que
+// Página pública de un Torneo: divisiones arriba como botones y, debajo, la
+// tabla de posiciones / fixture / goleadores / tarjetas de la división (o
+// categoría) elegida. Si una división tiene categorías, hay que
 // elegir una para ver su información (no se auto-selecciona ninguna). Si el
-// torneo tiene más de una unidad (categoría sin subcategorías, o
-// subcategoría) marcada con "suma a tabla general", se agrega al final de
-// los botones de categoría un botón extra "Tabla general".
+// torneo tiene más de una unidad (división sin categorías, o
+// categoría) marcada con "suma a tabla general", se agrega al final de
+// los botones de división un botón extra "Tabla general".
 
 function getParamsDeUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -23,8 +23,8 @@ let subcategoriaSeleccionadaId = null;
 let mostrandoTablaGeneral = false;
 let hayTablaGeneral = false;
 let tablaCache = [];
-// Categoría/subcategoría pedidas por URL (ej. al volver desde la página de
-// un Equipo) — si vienen, se seleccionan en vez de la primera categoría por
+// División/categoría pedidas por URL (ej. al volver desde la página de
+// un Equipo) — si vienen, se seleccionan en vez de la primera división por
 // defecto.
 let categoriaIdDesdeUrl = null;
 let subcategoriaIdDesdeUrl = null;
@@ -53,7 +53,7 @@ async function init() {
 }
 
 // Noticias que la Liga segmentó específicamente para este torneo (todas las
-// categorías, salvo que la Liga haya elegido una categoría puntual).
+// divisiones, salvo que la Liga haya elegido una división puntual).
 async function cargarNoticiasTorneo() {
   try {
     const res = await fetch(`/web/torneos/${torneoIdActual}/noticias`);
@@ -74,7 +74,7 @@ async function cargarNoticiasTorneo() {
   }
 }
 
-// Una unidad (categoría sin subcategorías, o cada subcategoría) suma a la
+// Una unidad (división sin categorías, o cada categoría) suma a la
 // tabla general salvo que se haya destildado explícitamente esa opción.
 function sumaTablaGeneral(unidad) {
   return unidad.suma_tabla_general !== false;
@@ -87,7 +87,7 @@ async function cargarCategorias() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias`);
     const data = await res.json();
     if (!data.ok || !data.categorias.length) {
-      cont.innerHTML = '<p class="sitio-vacio">Este Torneo todavía no tiene categorías publicadas.</p>';
+      cont.innerHTML = '<p class="sitio-vacio">Este Torneo todavía no tiene divisiones publicadas.</p>';
       return;
     }
     categoriasCache = data.categorias;
@@ -101,10 +101,10 @@ async function cargarCategorias() {
     hayTablaGeneral = unidadesSumables >= 2;
 
     renderTabsCategorias();
-    // Arranca mostrando la categoría pedida por URL (ej. al volver desde la
-    // página de un Equipo) o, si no vino ninguna, la primera categoría del
-    // torneo. Si esa categoría tiene subcategorías hay que elegir una — salvo
-    // que también haya venido una subcategoría puntual por URL.
+    // Arranca mostrando la división pedida por URL (ej. al volver desde la
+    // página de un Equipo) o, si no vino ninguna, la primera división del
+    // torneo. Si esa división tiene categorías hay que elegir una — salvo
+    // que también haya venido una categoría puntual por URL.
     const categoriaInicialId = (categoriaIdDesdeUrl && categoriasCache.some((c) => c.id === categoriaIdDesdeUrl))
       ? categoriaIdDesdeUrl
       : categoriasCache[0].id;
@@ -116,7 +116,7 @@ async function cargarCategorias() {
       }
     }
   } catch (err) {
-    cont.innerHTML = `<p class="sitio-vacio">Error cargando categorías: ${escapeHtml(err.message)}</p>`;
+    cont.innerHTML = `<p class="sitio-vacio">Error cargando divisiones: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -155,7 +155,7 @@ function seleccionarCategoria(categoriaId) {
 
   const categoria = categoriasCache.find((c) => c.id === categoriaId);
   if (categoria && categoria.subcategorias && categoria.subcategorias.length) {
-    mostrarMensajeSinSeleccion('Elegí una subcategoría para ver su información.');
+    mostrarMensajeSinSeleccion('Elegí una categoría para ver su información.');
   } else {
     mostrarBloqueContenidoCategoria();
   }
@@ -206,7 +206,7 @@ function cambiarTab(nombre) {
   if (nombre === 'tarjetas') cargarTarjetasPublico();
 }
 
-// Query string con la subcategoría elegida (si corresponde), para pasarle a
+// Query string con la categoría elegida (si corresponde), para pasarle a
 // los endpoints públicos de tabla/fixture/goleadores/tarjetas.
 function qsSubcategoria() {
   return subcategoriaSeleccionadaId ? `?subcategoria_id=${subcategoriaSeleccionadaId}` : '';
@@ -219,7 +219,7 @@ async function cargarGoleadoresPublico() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/goleadores${qsSubcategoria()}`);
     const data = await res.json();
     if (!data.ok || !data.goleadores.length) {
-      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = data.goleadores.map((g) => `
@@ -241,7 +241,7 @@ async function cargarTarjetasPublico() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/tarjetas${qsSubcategoria()}`);
     const data = await res.json();
     if (!data.ok || !data.tarjetas.length) {
-      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = data.tarjetas.map((t) => `
@@ -293,7 +293,7 @@ async function cargarTabla() {
     const data = await res.json();
     if (!data.ok || !data.tabla.length) {
       tablaCache = [];
-      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta división.</td></tr>';
       return;
     }
     tablaCache = data.tabla;

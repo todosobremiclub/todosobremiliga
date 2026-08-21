@@ -55,10 +55,10 @@ router.get('/ligas/:slug/torneos', async (req, res) => {
   }
 });
 
-// GET /web/torneos/:torneoId/categorias — categorías públicas de un torneo,
-// incluyendo sus subcategorías (si tiene): el sitio público usa esto para
-// saber si una categoría se ve "pelada" (tabla/fixture directo) o hay que
-// elegir antes una subcategoría (mismo criterio que el Panel de Liga).
+// GET /web/torneos/:torneoId/categorias — divisiones públicas de un torneo,
+// incluyendo sus categorías (si tiene): el sitio público usa esto para
+// saber si una división se ve "pelada" (tabla/fixture directo) o hay que
+// elegir antes una categoría (mismo criterio que el Panel de Liga).
 router.get('/torneos/:torneoId/categorias', async (req, res) => {
   try {
     const categoriasResult = await query(
@@ -90,9 +90,9 @@ router.get('/torneos/:torneoId/categorias', async (req, res) => {
 });
 
 // GET /web/torneos/:torneoId/tabla-general — tabla general pública para
-// torneos con varias categorías y/o subcategorías: suma en una sola tabla
-// por club los puntos de todas las unidades (categoría sin subcategorías, o
-// cada subcategoría) marcadas con "suma_tabla_general" (mismo criterio que
+// torneos con varias divisiones y/o categorías: suma en una sola tabla
+// por club los puntos de todas las unidades (división sin categorías, o
+// cada categoría) marcadas con "suma_tabla_general" (mismo criterio que
 // la tabla general del Panel de Liga).
 router.get('/torneos/:torneoId/tabla-general', async (req, res) => {
   try {
@@ -222,7 +222,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
 });
 
 // GET /web/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId — ficha
-// pública de un equipo (club + torneo + categoría + liga), para armar el
+// pública de un equipo (club + torneo + división + liga), para armar el
 // encabezado de la página pública del equipo.
 router.get('/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId', async (req, res) => {
   try {
@@ -382,8 +382,8 @@ router.get('/ligas/:slug/clubes/buscar', async (req, res) => {
 });
 
 // GET /web/ligas/:slug/clubes/:clubId — perfil público de un Club dentro de
-// una Liga: datos básicos, todas sus participaciones (torneo/categoría o
-// subcategoría) con su posición actual en la tabla, y el próximo partido de
+// una Liga: datos básicos, todas sus participaciones (torneo/división o
+// categoría) con su posición actual en la tabla, y el próximo partido de
 // cada una. Pensado para la página pública de perfil de club.
 router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
   try {
@@ -537,7 +537,7 @@ router.get('/ligas/:slug/noticias', async (req, res) => {
 
 // GET /web/ligas/:slug/clubes/:clubId/noticias — noticias segmentadas que le
 // corresponden a un Club puntual: las que la Liga apuntó directamente a ese
-// club, a su ciudad, a su provincia, o a un torneo/categoría en el que el
+// club, a su ciudad, a su provincia, o a un torneo/división en el que el
 // club participa. Las noticias "todos" ya se ven en la home de la Liga, así
 // que acá no se repiten.
 router.get('/ligas/:slug/clubes/:clubId/noticias', async (req, res) => {
@@ -569,7 +569,7 @@ router.get('/ligas/:slug/clubes/:clubId/noticias', async (req, res) => {
 });
 
 // GET /web/torneos/:torneoId/noticias — noticias segmentadas por ese torneo
-// (opcionalmente acotadas a una categoría puntual vía ?categoria_id=).
+// (opcionalmente acotadas a una división puntual vía ?categoria_id=).
 router.get('/torneos/:torneoId/noticias', async (req, res) => {
   try {
     const categoriaId = req.query.categoria_id || null;

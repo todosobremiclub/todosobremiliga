@@ -1,4 +1,4 @@
-// Lógica del Panel de Liga: Clubes + Torneos/Categorías/Equipos/Fixture/Tabla.
+// Lógica del Panel de Liga: Clubes + Torneos/Divisiones/Equipos/Fixture/Tabla.
 
 let clubesCache = [];
 let torneosCache = [];
@@ -45,9 +45,9 @@ let categoriaActualId = null;
 let categoriaActualNombre = '';
 let subcategoriaActualId = null;
 let subcategoriaActualNombre = '';
-// Estado de la vista "Categorías" del torneo (fusiona lo que antes eran 3
-// pop-ups: Categorías, Subcategorías y Detalle, en una sola pantalla con
-// categorías arriba como botones — ver verCategorias más abajo).
+// Estado de la vista "Divisiones" del torneo (fusiona lo que antes eran 3
+// pop-ups: Divisiones, Categorías y Detalle, en una sola pantalla con
+// divisiones arriba como botones — ver verCategorias más abajo).
 let mostrandoTablaGeneralLiga = false;
 let hayTablaGeneralLiga = false;
 let rondaTablaActual = 'general';
@@ -70,7 +70,7 @@ function torneoActualObj() {
 }
 
 // ----- Popups: todas las pantallas de edición/detalle (Club, Usuarios,
-// Canchas, Documentos, Notas, Torneo, Categorías, Detalle de categoría,
+// Canchas, Documentos, Notas, Torneo, Divisiones, Detalle de división,
 // Participaciones) se muestran como ventana modal centrada, compartiendo un
 // único fondo oscuro (#fondoModalGenerico). -----
 function mostrarFondoModal() {
@@ -349,7 +349,7 @@ function conectarEventos() {
   document.getElementById('buscadorTorneos').addEventListener('input', () => renderTorneos());
   document.getElementById('checkVerTorneosHistoricos').addEventListener('change', () => renderTorneos());
 
-  // ---- Categorías ----
+  // ---- Divisiones ----
   document.getElementById('checkTorneoHistorico').addEventListener('change', (e) => {
     toggleTorneoHistorico(e.target.checked);
   });
@@ -379,15 +379,15 @@ function conectarEventos() {
   });
   document.getElementById('formCategoria').addEventListener('submit', guardarCategoria);
 
-  // ---- Subcategorías de la categoría elegida (el botón "+ Subcategoría" se
+  // ---- Categorías de la división elegida (el botón "+ Categoría" se
   // agrega dinámicamente en renderTabsSubcategoriasLiga, junto a las
-  // subcategorías ya cargadas) ----
+  // categorías ya cargadas) ----
   document.getElementById('btnCancelarFormSubcategoria').addEventListener('click', () => {
     document.getElementById('formSubcategoria').classList.add('oculto');
   });
   document.getElementById('formSubcategoria').addEventListener('submit', guardarSubcategoria);
 
-  // ---- Detalle de categoría/subcategoría (fixture/tabla/goleadores/tarjetas) ----
+  // ---- Detalle de división/categoría (fixture/tabla/goleadores/tarjetas) ----
   document.getElementById('btnAbrirGestionarEquipos').addEventListener('click', abrirGestionarEquipos);
   document.getElementById('btnCerrarGestionarEquipos').addEventListener('click', cerrarGestionarEquipos);
   document.getElementById('tabBtnFixture').addEventListener('click', () => cambiarTabDetalle('fixture'));
@@ -422,11 +422,11 @@ function conectarEventos() {
     document.getElementById('ayudaFixtureAperturaClausura').classList.toggle('oculto', !esAperturaClausura);
 
     // Ofrece espejar el fixture (mismos rivales) contra otras
-    // categorías/subcategorías sólo cuando tiene sentido: si esta categoría
-    // tiene subcategorías, se espeja contra las OTRAS subcategorías de la
-    // MISMA categoría (ej: Zona A con 2018/2019); si no tiene subcategorías,
-    // se espeja contra las OTRAS categorías del torneo sin subcategorías
-    // (ej: Baby Fútbol con categorías 2018/2019/2020).
+    // divisiones/categorías sólo cuando tiene sentido: si esta división
+    // tiene categorías, se espeja contra las OTRAS categorías de la
+    // MISMA división (ej: Zona A con 2018/2019); si no tiene categorías,
+    // se espeja contra las OTRAS divisiones del torneo sin categorías
+    // (ej: Baby Fútbol con divisiones 2018/2019/2020).
     const categoria = categoriasCache.find((c) => c.id === categoriaActualId);
     const tieneSubcategorias = !!(categoria && categoria.subcategorias && categoria.subcategorias.length);
     const puedeEspejarSubcategorias = tieneSubcategorias && !!subcategoriaActualId && categoria.subcategorias.length > 1;
@@ -1370,7 +1370,7 @@ function poblarFiltroCategoriaFichajesLiga() {
     }
   });
   categorias.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
-  select.innerHTML = '<option value="">Todas las categorías</option>' +
+  select.innerHTML = '<option value="">Todas las divisiones</option>' +
     categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre || '-')}</option>`).join('');
   if (categorias.some((c) => c.id === actual)) select.value = actual;
 }
@@ -1500,7 +1500,7 @@ async function eliminarFichajesSeleccionadosLiga() {
   }
 }
 
-// ----- Editar torneo/categoría de un fichaje puntual -----
+// ----- Editar torneo/división de un fichaje puntual -----
 
 async function abrirEditarFichaje(fichajeId) {
   const f = fichajesLigaCache.find((x) => x.id === fichajeId);
@@ -1553,7 +1553,7 @@ async function guardarEdicionFichaje() {
   const torneo_id = document.getElementById('editarFichajeTorneo').value;
   const categoria_id = document.getElementById('editarFichajeCategoria').value;
   if (!torneo_id || !categoria_id) {
-    errorEl.textContent = 'Elegí torneo y categoría.';
+    errorEl.textContent = 'Elegí torneo y división.';
     errorEl.classList.remove('oculto');
     return;
   }
@@ -1608,7 +1608,7 @@ function abrirCarnetLiga(fichajeId) {
           <div><span>DNI</span><span>${escapeHtml(f.jugador_dni || '-')}</span></div>
           <div><span>Fecha de nacimiento</span><span>${formatearFecha(f.jugador_fecha_nacimiento)}</span></div>
           <div><span>Torneo</span><span>${escapeHtml(f.torneo_nombre || '-')}</span></div>
-          <div><span>Categoría</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
+          <div><span>División</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
         </div>
         <div class="carnet-qr" id="carnetLigaQrContainer"></div>
         <p class="carnet-codigo-texto">${escapeHtml(f.carnet_codigo_qr)}</p>
@@ -1878,12 +1878,12 @@ function actualizarBarraAccionesMasivas() {
     `${cantidad} club${cantidad === 1 ? '' : 'es'} seleccionado${cantidad === 1 ? '' : 's'}`;
 }
 
-// ----- Asignación masiva de clubes a una categoría/subcategoría -----
+// ----- Asignación masiva de clubes a una división/categoría -----
 
 let torneosAsignarMasivoCache = [];
 
 // Selección tildada en el popup, guardada aparte del DOM: como los grupos de
-// torneo/categoría se pueden retraer/expandir (lo que vuelve a dibujar todo
+// torneo/división se pueden retraer/expandir (lo que vuelve a dibujar todo
 // el HTML), si el tilde dependiera solo del DOM se perdería cada vez que se
 // abre o cierra una flechita. Clave: `${categoriaId}::${subcategoriaId||''}`.
 const seleccionAsignarMasivoKeys = new Set();
@@ -1902,7 +1902,7 @@ async function abrirAsignarCategoriaMasivo() {
   document.getElementById('modalAsignarCategoriaMasivo').classList.remove('oculto');
   mostrarFondoModal();
   document.getElementById('resumenClubesAsignarMasivo').textContent =
-    `Vas a inscribir ${clubesSeleccionadosIds.size} club(es) seleccionado(s) en las categorías/subcategorías que tildes.`;
+    `Vas a inscribir ${clubesSeleccionadosIds.size} club(es) seleccionado(s) en las divisiones/categorías que tildes.`;
   document.getElementById('asignarMasivoError').classList.add('oculto');
   document.getElementById('asignarMasivoOk').classList.add('oculto');
   seleccionAsignarMasivoKeys.clear();
@@ -1925,9 +1925,9 @@ async function abrirAsignarCategoriaMasivo() {
   }
 }
 
-// Torneos y categorías (con subcategorías) que están expandidos en el popup
+// Torneos y divisiones (con categorías) que están expandidos en el popup
 // de asignación masiva — arranca vacío = todo retraído, así la lista larga
-// de categorías no abruma de entrada; se expande tocando la flechita.
+// de divisiones no abruma de entrada; se expande tocando la flechita.
 const torneosAsignarMasivoExpandidos = new Set();
 const categoriasAsignarMasivoExpandidas = new Set();
 
@@ -1943,8 +1943,8 @@ function toggleCategoriaAsignarMasivo(categoriaId) {
   renderAsignarMasivoTorneos();
 }
 
-// Tildar el checkbox "Todas" de una categoría marca (o desmarca) de una
-// todas sus subcategorías — para no tener que tildarlas una por una cuando
+// Tildar el checkbox "Todas" de una división marca (o desmarca) de una
+// todas sus categorías — para no tener que tildarlas una por una cuando
 // se quiere anotar a los clubes en todas.
 function toggleTodasSubcategoriasAsignarMasivo(categoriaId, marcado) {
   document.querySelectorAll(`.chk-categoria-asignar-masivo[data-categoria-id="${categoriaId}"][data-subcategoria-id]`)
@@ -1956,15 +1956,15 @@ function toggleTodasSubcategoriasAsignarMasivo(categoriaId, marcado) {
 
 function renderAsignarMasivoTorneos() {
   const cont = document.getElementById('listaAsignarMasivoTorneos');
-  // Igual que en "Participaciones del club": si la categoría tiene
-  // subcategorías cargadas, se tilda a nivel subcategoría (no tiene sentido
-  // dejar al club en la categoría "pelada"); si no tiene, se tilda la
-  // categoría directamente. Torneos y categorías-con-subcategorías arrancan
+  // Igual que en "Participaciones del club": si la división tiene
+  // categorías cargadas, se tilda a nivel categoría (no tiene sentido
+  // dejar al club en la división "pelada"); si no tiene, se tilda la
+  // división directamente. Torneos y divisiones-con-categorías arrancan
   // retraídos (solo el nombre + flecha) para no abrumar con una lista larga.
   cont.innerHTML = torneosAsignarMasivoCache.map((t) => {
     const expandidoTorneo = torneosAsignarMasivoExpandidos.has(t.id);
     const cuerpoTorneo = !t.categorias.length
-      ? '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'
+      ? '<span class="texto-ayuda">Este torneo todavía no tiene divisiones.</span>'
       : t.categorias.map((c) => {
           if (c.subcategorias.length) {
             const expandidaCategoria = categoriasAsignarMasivoExpandidas.has(c.id);
@@ -2031,7 +2031,7 @@ async function confirmarAsignarCategoriaMasivo() {
   }));
 
   if (!seleccionadas.length) {
-    errorEl.textContent = 'Tildá al menos una categoría o subcategoría.';
+    errorEl.textContent = 'Tildá al menos una división o categoría.';
     errorEl.classList.remove('oculto');
     return;
   }
@@ -2042,9 +2042,9 @@ async function confirmarAsignarCategoriaMasivo() {
   const erroresPorSeleccion = [];
 
   try {
-    // Se inscribe una selección (torneo+categoría+subcategoría) por vez —
-    // el endpoint ya valida por su cuenta la regla de "una sola categoría
-    // por torneo", así que si se tildaron dos categorías distintas de un
+    // Se inscribe una selección (torneo+división+categoría) por vez —
+    // el endpoint ya valida por su cuenta la regla de "una sola división
+    // por torneo", así que si se tildaron dos divisiones distintas de un
     // mismo torneo, esa combinación puntual queda reportada como error por
     // club en vez de romper el resto de las inscripciones.
     for (const sel of seleccionadas) {
@@ -2063,8 +2063,8 @@ async function confirmarAsignarCategoriaMasivo() {
       if (fallidos.length) erroresPorSeleccion.push(fallidos.length);
     }
     const totalFallidos = erroresPorSeleccion.reduce((a, b) => a + b, 0);
-    okEl.textContent = `Se hicieron ${totalAgregados} de ${totalIntentos} inscripción(es) (${clubIds.length} club(es) × ${seleccionadas.length} categoría(s)/subcategoría(s)).` +
-      (totalFallidos ? ` ${totalFallidos} no se pudieron hacer (ya estaban inscriptos, no pertenecen a tu Liga, o ya tenían otra categoría en ese torneo).` : '');
+    okEl.textContent = `Se hicieron ${totalAgregados} de ${totalIntentos} inscripción(es) (${clubIds.length} club(es) × ${seleccionadas.length} división(s)/categoría(s)).` +
+      (totalFallidos ? ` ${totalFallidos} no se pudieron hacer (ya estaban inscriptos, no pertenecen a tu Liga, o ya tenían otra división en ese torneo).` : '');
     okEl.classList.remove('oculto');
     cargarClubes();
   } catch (err) {
@@ -2074,7 +2074,7 @@ async function confirmarAsignarCategoriaMasivo() {
 }
 
 async function eliminarClub(clubId, nombreClub) {
-  if (!confirm(`¿Eliminar a "${nombreClub}" de tu Liga? Se borran también sus inscripciones a categorías (equipos, partidos y tabla de esta Liga). El club NO se borra de otras Ligas en las que participe.`)) {
+  if (!confirm(`¿Eliminar a "${nombreClub}" de tu Liga? Se borran también sus inscripciones a divisiones (equipos, partidos y tabla de esta Liga). El club NO se borra de otras Ligas en las que participe.`)) {
     return;
   }
   try {
@@ -2607,9 +2607,9 @@ async function verParticipacionesClub(clubId, nombreClub) {
       cont.innerHTML = '<p class="texto-ayuda">Todavía no hay torneos creados en tu Liga.</p>';
       return;
     }
-    // Para categorías CON subcategorías, la inscripción es a nivel
-    // subcategoría (el club no puede quedar en la categoría "pelada"): se
-    // muestra un checkbox por subcategoría en vez de uno por categoría.
+    // Para divisiones CON categorías, la inscripción es a nivel
+    // categoría (el club no puede quedar en la división "pelada"): se
+    // muestra un checkbox por categoría en vez de uno por división.
     cont.innerHTML = torneos.map((t) => `
       <div class="panel" style="margin-bottom:10px; box-shadow:none; border:1px solid var(--gris-300);">
         <label style="display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer;">
@@ -2643,12 +2643,12 @@ async function verParticipacionesClub(clubId, nombreClub) {
                 ${escapeHtml(c.nombre)}
               </label>
             `;
-          }).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene categorías.</span>'}
+          }).join('') : '<span class="texto-ayuda">Este torneo todavía no tiene divisiones.</span>'}
         </div>
       </div>
     `).join('');
 
-    // Tildar/destildar el torneo marca (o desmarca) todas sus categorías por defecto.
+    // Tildar/destildar el torneo marca (o desmarca) todas sus divisiones por defecto.
     cont.querySelectorAll('.chk-torneo-participacion').forEach((chkTorneo) => {
       chkTorneo.addEventListener('change', () => {
         const torneoId = chkTorneo.dataset.torneoId;
@@ -2691,7 +2691,7 @@ async function guardarParticipaciones() {
 
 // ----- Fichajes del club: popup de solo lectura que se abre al tocar el
 // nombre del club en el listado de Clubes. Muestra en qué torneos está
-// registrado (equipos_torneo) y, agrupados por torneo y categoría, los
+// registrado (equipos_torneo) y, agrupados por torneo y división, los
 // jugadores que tiene fichados en cada uno (fichajes). -----
 
 async function verFichajesClub(clubId, nombreClub) {
@@ -2703,7 +2703,7 @@ async function verFichajesClub(clubId, nombreClub) {
   contResumen.innerHTML = '';
   contLista.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
   // Arranca todo retraído cada vez que se abre el popup: clubes con muchos
-  // socios en varias categorías no deben mostrar de entrada una lista larga.
+  // socios en varias divisiones no deben mostrar de entrada una lista larga.
   torneosFichajesClubExpandidos.clear();
   categoriasFichajesClubExpandidas.clear();
   try {
@@ -2734,7 +2734,7 @@ function renderResumenTorneosRegistradosClub(participaciones) {
     `).join('');
 }
 
-// Torneos y categorías retraídos/expandidos dentro del popup de fichajes de
+// Torneos y divisiones retraídos/expandidos dentro del popup de fichajes de
 // un club — se reinician (todo retraído) cada vez que se abre el popup, ver
 // verFichajesClub().
 const torneosFichajesClubExpandidos = new Set();
@@ -2799,7 +2799,7 @@ function renderFichajesPorTorneoClub(fichajes) {
         <div class="bloque-categoria-fichajes-club">
           <h4 class="fila-grupo-club-clickable" style="margin-bottom:4px; cursor:pointer;" onclick="toggleCategoriaFichajesClub('${categoriaKey}')">
             <span class="flecha-grupo-club">${categoriaExpandida ? '▾' : '▸'}</span>
-            ${escapeHtml(catRef.categoria_nombre || 'Sin categoría')} <span class="texto-ayuda">(${fichajesCategoria.length})</span>
+            ${escapeHtml(catRef.categoria_nombre || 'Sin división')} <span class="texto-ayuda">(${fichajesCategoria.length})</span>
           </h4>
           ${filas}
         </div>
@@ -3104,7 +3104,7 @@ function renderTorneos() {
 }
 
 async function eliminarTorneo(torneoId, nombreTorneo) {
-  if (!confirm(`¿Eliminar definitivamente el torneo "${nombreTorneo}"? Se borran también sus categorías, equipos inscriptos, fixture y estadísticas.`)) {
+  if (!confirm(`¿Eliminar definitivamente el torneo "${nombreTorneo}"? Se borran también sus divisiones, equipos inscriptos, fixture y estadísticas.`)) {
     return;
   }
   try {
@@ -3187,14 +3187,14 @@ async function guardarTorneo(e) {
   }
 }
 
-// ===================== CATEGORÍAS =====================
+// ===================== DIVISIONES =====================
 
 function verCategorias(torneoId, nombreTorneo) {
   torneoActualId = torneoId;
   mostrarFondoModal();
   torneoActualNombre = nombreTorneo;
   document.getElementById('panelCategorias').classList.remove('oculto');
-  document.getElementById('tituloCategorias').textContent = `Categorías de "${nombreTorneo}"`;
+  document.getElementById('tituloCategorias').textContent = `Divisiones de "${nombreTorneo}"`;
   document.getElementById('formCategoria').classList.add('oculto');
   document.getElementById('formSubcategoria').classList.add('oculto');
   categoriaActualId = null;
@@ -3226,10 +3226,10 @@ async function toggleTorneoHistorico(marcado) {
   }
 }
 
-// Carga (o recarga, ej. después de guardar/borrar una categoría o
-// subcategoría) las categorías del torneo y decide qué mostrar debajo de los
-// botones: mantiene la categoría/subcategoría elegida si sigue existiendo,
-// si no vuelve a la primera categoría del torneo.
+// Carga (o recarga, ej. después de guardar/borrar una división o
+// categoría) las divisiones del torneo y decide qué mostrar debajo de los
+// botones: mantiene la división/categoría elegida si sigue existiendo,
+// si no vuelve a la primera división del torneo.
 async function cargarCategorias(torneoId) {
   const cont = document.getElementById('tabsCategoriasLiga');
   cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
@@ -3237,7 +3237,7 @@ async function cargarCategorias(torneoId) {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
     categoriasCache = data.categorias;
 
-    // Una unidad (categoría sin subcategorías, o cada subcategoría) suma a
+    // Una unidad (división sin categorías, o cada categoría) suma a
     // la tabla general salvo que se haya destildado explícitamente.
     const unidadesSumables = categoriasCache.reduce((acc, c) => {
       if (c.subcategorias && c.subcategorias.length) {
@@ -3248,7 +3248,7 @@ async function cargarCategorias(torneoId) {
     hayTablaGeneralLiga = unidadesSumables >= 2;
 
     if (!categoriasCache.length) {
-      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay categorías en este torneo.</p>';
+      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay divisiones en este torneo.</p>';
       categoriaActualId = null;
       document.getElementById('tabsSubcategoriasLiga').classList.add('oculto');
       document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
@@ -3299,7 +3299,7 @@ function renderTabsSubcategoriasLiga() {
       <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">${ICONO_BASURA}</button>
     </span>
   `).join('');
-  cont.innerHTML = gruposSubcategorias + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Subcategoría</button>`;
+  cont.innerHTML = gruposSubcategorias + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Categoría</button>`;
 }
 
 function editarCategoria(categoriaId) {
@@ -3363,12 +3363,12 @@ function onElegirFotoCategoria(e) {
 }
 
 async function eliminarCategoria(categoriaId, nombreCategoria) {
-  if (!confirm(`¿Eliminar la categoría "${nombreCategoria}"? Se borran también sus subcategorías, equipos inscriptos, fixture y estadísticas.`)) {
+  if (!confirm(`¿Eliminar la división "${nombreCategoria}"? Se borran también sus categorías, equipos inscriptos, fixture y estadísticas.`)) {
     return;
   }
   try {
     await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaId}`, { method: 'DELETE' });
-    // Si el formulario de edición estaba abierto justo para esta categoría,
+    // Si el formulario de edición estaba abierto justo para esta división,
     // lo cerramos: de lo contrario quedaría un "Guardar" apuntando a un id
     // que ya no existe y el próximo submit fallaría con 404.
     if (document.getElementById('categoriaIdEdicion').value === categoriaId) {
@@ -3408,10 +3408,10 @@ async function guardarCategoria(e) {
   }
 }
 
-// ===================== SUBCATEGORÍAS =====================
-// Nivel extra y opcional atado a la categoría principal (ej: "2018", "2019",
-// "2020" dentro de la categoría "Baby Fútbol A"). Cuando una categoría tiene
-// subcategorías cargadas, hay que elegir una (ver seleccionarCategoriaLiga)
+// ===================== CATEGORÍAS =====================
+// Nivel extra y opcional atado a la división principal (ej: "2018", "2019",
+// "2020" dentro de la división "Baby Fútbol A"). Cuando una división tiene
+// categorías cargadas, hay que elegir una (ver seleccionarCategoriaLiga)
 // antes de ver su fixture/tabla/goleadores/tarjetas.
 
 function subcategoriasDeCategoriaActual() {
@@ -3469,7 +3469,7 @@ async function guardarSubcategoria(e) {
 }
 
 async function eliminarSubcategoria(subcategoriaId, nombre) {
-  if (!confirm(`¿Eliminar la subcategoría "${nombre}"? Se borran también los equipos (partidos y tabla) que estuvieran inscriptos puntualmente en ella.`)) {
+  if (!confirm(`¿Eliminar la categoría "${nombre}"? Se borran también los equipos (partidos y tabla) que estuvieran inscriptos puntualmente en ella.`)) {
     return;
   }
   try {
@@ -3480,13 +3480,13 @@ async function eliminarSubcategoria(subcategoriaId, nombre) {
   }
 }
 
-// ===================== SELECCIÓN: CATEGORÍA / SUBCATEGORÍA / TABLA GENERAL =====================
-// Un solo panel con las categorías del torneo como botones arriba de todo:
-// si la categoría elegida no tiene subcategorías, muestra directo su
+// ===================== SELECCIÓN: DIVISIÓN / CATEGORÍA / TABLA GENERAL =====================
+// Un solo panel con las divisiones del torneo como botones arriba de todo:
+// si la división elegida no tiene categorías, muestra directo su
 // fixture/tabla/goleadores/tarjetas; si tiene, primero hay que elegir una
-// subcategoría (no se auto-selecciona ninguna). Si el torneo suma 2 o más
+// categoría (no se auto-selecciona ninguna). Si el torneo suma 2 o más
 // unidades marcadas con "suma a tabla general", el último botón de la fila
-// de categorías es "Tabla general".
+// de divisiones es "Tabla general".
 
 function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
   mostrandoTablaGeneralLiga = false;
@@ -3505,7 +3505,7 @@ function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
   renderTabsSubcategoriasLiga();
 
   if (subcategorias.length && !subcategoriaActualId) {
-    mostrarMensajeSinSeleccionLiga('Elegí una subcategoría para ver su información.');
+    mostrarMensajeSinSeleccionLiga('Elegí una categoría para ver su información.');
   } else {
     mostrarBloqueDetalleCategoriaLiga();
   }
@@ -3547,7 +3547,7 @@ function mostrarBloqueDetalleCategoriaLiga() {
   document.getElementById('tituloDetalleCategoria').textContent = subcategoriaActualNombre
     ? `${categoriaActualNombre} — ${subcategoriaActualNombre}`
     : categoriaActualNombre;
-  // Los equipos y partidos son de la categoría/subcategoría anterior: se
+  // Los equipos y partidos son de la división/categoría anterior: se
   // vuelven a pedir al servidor para esta, así no arrastramos datos viejos.
   equiposCache = [];
   partidosCache = [];
@@ -3561,7 +3561,7 @@ function mostrarBloqueDetalleCategoriaLiga() {
 }
 
 // Qué pestaña (Tabla/Fixture/Goleadores/Tarjetas) está abierta ahora mismo
-// dentro del detalle de una categoría — se usa para saber qué volver a
+// dentro del detalle de una división — se usa para saber qué volver a
 // cargar cuando se cambia de ronda (Apertura/Clausura/General) desde el
 // selector compartido.
 let tabDetalleActual = 'tabla';
@@ -3671,15 +3671,15 @@ async function cargarEquipos() {
   const select = document.getElementById('selectClubInscribir');
   tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
   try {
-    // La navegación ya nos dejó parados en una categoría (sin subcategorías)
-    // o en una subcategoría puntual — subcategoriaActualId ya viene resuelto,
+    // La navegación ya nos dejó parados en una división (sin categorías)
+    // o en una categoría puntual — subcategoriaActualId ya viene resuelto,
     // no hace falta elegirla acá.
     const qs = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/equipos${qs}`);
     equiposCache = data.equipos;
 
     if (!equiposCache.length) {
-      tbody.innerHTML = `<tr><td colspan="3">Todavía no hay clubes inscriptos${subcategoriaActualNombre ? ` en "${escapeHtml(subcategoriaActualNombre)}"` : ' en esta categoría'}.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3">Todavía no hay clubes inscriptos${subcategoriaActualNombre ? ` en "${escapeHtml(subcategoriaActualNombre)}"` : ' en esta división'}.</td></tr>`;
     } else {
       tbody.innerHTML = equiposCache.map((eq) => `
         <tr>
@@ -3703,7 +3703,7 @@ async function cargarEquipos() {
 }
 
 async function eliminarEquipo(equipoId, nombreClub) {
-  if (!confirm(`¿Dar de baja a "${nombreClub}" de esta categoría? Se borran también sus partidos programados/jugados y su fila en la tabla de posiciones.`)) {
+  if (!confirm(`¿Dar de baja a "${nombreClub}" de esta división? Se borran también sus partidos programados/jugados y su fila en la tabla de posiciones.`)) {
     return;
   }
   try {
@@ -3725,9 +3725,9 @@ async function inscribirClub() {
     return;
   }
   // Inscribimos club por club (el backend valida cada uno por separado);
-  // si alguno falla (ej: ya estaba inscripto en otra categoría del mismo
+  // si alguno falla (ej: ya estaba inscripto en otra división del mismo
   // torneo) seguimos con el resto y mostramos qué pasó al final. La
-  // subcategoría ya viene resuelta por la navegación (subcategoriaActualId).
+  // categoría ya viene resuelta por la navegación (subcategoriaActualId).
   const fallidos = [];
   for (const clubId of clubIds) {
     try {
@@ -3754,7 +3754,7 @@ async function cargarPartidos() {
   contenedor.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
 
   // Aseguramos tener los equipos ya cargados para poblar los selects del form
-  // (ya filtrados a la subcategoría actual, si corresponde).
+  // (ya filtrados a la categoría actual, si corresponde).
   if (!equiposCache.length) {
     try {
       const qsEq = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
@@ -4100,7 +4100,7 @@ async function generarFixtureAutomatico(e) {
   const idaVuelta = document.getElementById('fixtureIdaVuelta').checked;
 
   // Los checkboxes de espejado sólo cuentan si su grupo está visible (evita
-  // que un valor viejo tildado de una categoría anterior se aplique acá).
+  // que un valor viejo tildado de una división anterior se aplique acá).
   const espejarSubcategorias = !document.getElementById('grupoFixtureEspejarSubcategorias').classList.contains('oculto')
     && document.getElementById('fixtureEspejarSubcategorias').checked;
   const espejarCategorias = !document.getElementById('grupoFixtureEspejarCategorias').classList.contains('oculto')
@@ -4125,7 +4125,7 @@ async function generarFixtureAutomatico(e) {
       });
     }
     document.getElementById('formGenerarFixture').classList.add('oculto');
-    const detalleEspejado = data.unidades ? ` (se aplicó el mismo fixture en ${data.unidades} categorías/subcategorías)` : '';
+    const detalleEspejado = data.unidades ? ` (se aplicó el mismo fixture en ${data.unidades} divisiones/categorías)` : '';
     alert(`Se generaron ${data.partidos_creados} partidos en ${data.jornadas} jornadas${detalleEspejado}.`);
     jornadaFixtureActual = 1;
     cargarPartidos();
@@ -4136,7 +4136,7 @@ async function generarFixtureAutomatico(e) {
 }
 
 async function vaciarFixture() {
-  if (!confirm('¿Vaciar el fixture de esta categoría? Se borran los partidos programados que todavía NO tienen resultado cargado (los ya jugados se conservan).')) {
+  if (!confirm('¿Vaciar el fixture de esta división? Se borran los partidos programados que todavía NO tienen resultado cargado (los ya jugados se conservan).')) {
     return;
   }
   try {
@@ -4270,7 +4270,7 @@ async function guardarResultadoConEstadisticas(e) {
 
 // ----- Goleadores y Tarjetas -----
 
-// Querystring compartido por goleadores/tarjetas: subcategoría (si hay) +
+// Querystring compartido por goleadores/tarjetas: categoría (si hay) +
 // ronda (Apertura/Clausura/General, sólo relevante si el torneo es de ese
 // formato — el backend ignora el parámetro si no aplica).
 function qsSubcategoriaYRonda() {
@@ -4289,7 +4289,7 @@ async function cargarGoleadores() {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/goleadores${qs}`);
     const goleadores = data.goleadores;
     if (!goleadores.length) {
-      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = goleadores.map((g) => `
@@ -4312,7 +4312,7 @@ async function cargarTarjetas() {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tarjetas${qs}`);
     const tarjetas = data.tarjetas;
     if (!tarjetas.length) {
-      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = tarjetas.map((t) => `
@@ -4351,7 +4351,7 @@ async function cargarTabla() {
     const tabla = data.tabla;
     tablaActualCache = tabla;
     if (!tabla.length) {
-      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = tabla.map((fila) => `
@@ -4448,7 +4448,7 @@ function mostrarGrupoSegmentoNoticia(segmento) {
 
 async function poblarSegmentacionNoticia() {
   const selectTorneo = document.getElementById('noticiaTorneo');
-  document.getElementById('noticiaCategoria').innerHTML = '<option value="">Todas las categorías del torneo</option>';
+  document.getElementById('noticiaCategoria').innerHTML = '<option value="">Todas las divisiones del torneo</option>';
   try {
     const torneos = torneosCache.length ? torneosCache : (await apiFetch('/liga/torneos')).torneos;
     selectTorneo.innerHTML = '<option value="">Elegí un torneo</option>' +
@@ -4472,15 +4472,15 @@ async function poblarCategoriasSegmentoNoticia() {
   const torneoId = document.getElementById('noticiaTorneo').value;
   const selectCategoria = document.getElementById('noticiaCategoria');
   if (!torneoId) {
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>';
     return;
   }
   try {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>' +
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>' +
       data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
   } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>';
   }
 }
 
@@ -4563,7 +4563,7 @@ function mostrarGrupoSegmentoNotificacion(segmento) {
 // desplegables de segmentación de la notificación.
 async function poblarSegmentacionNotificacion() {
   const selectTorneo = document.getElementById('notificacionTorneo');
-  document.getElementById('notificacionCategoria').innerHTML = '<option value="">Todas las categorías del torneo</option>';
+  document.getElementById('notificacionCategoria').innerHTML = '<option value="">Todas las divisiones del torneo</option>';
   try {
     // Si todavía no se visitó la pestaña Torneos esta sesión, torneosCache
     // puede estar vacío: se trae directo en ese caso.
@@ -4589,15 +4589,15 @@ async function poblarCategoriasSegmentoNotificacion() {
   const torneoId = document.getElementById('notificacionTorneo').value;
   const selectCategoria = document.getElementById('notificacionCategoria');
   if (!torneoId) {
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>';
     return;
   }
   try {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>' +
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>' +
       data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
   } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Todas las categorías del torneo</option>';
+    selectCategoria.innerHTML = '<option value="">Todas las divisiones del torneo</option>';
   }
 }
 

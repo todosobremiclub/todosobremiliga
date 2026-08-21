@@ -428,7 +428,7 @@ router.patch('/:clubId/activo', async (req, res) => {
 });
 
 // DELETE /liga/clubes/:clubId — saca al club de MI liga: borra la membresía
-// (club_liga) y todas sus inscripciones a categorías de torneos de esta Liga
+// (club_liga) y todas sus inscripciones a divisiones de torneos de esta Liga
 // (equipos_torneo, lo que en cascada borra también sus partidos y su tabla de
 // posiciones). El Club en sí (entidad global) NO se borra — si participa de
 // otra Liga, ahí sigue existiendo tal cual.
@@ -546,9 +546,9 @@ router.delete('/:clubId/canchas/:canchaId', async (req, res) => {
 });
 
 // GET /liga/clubes/:clubId/participaciones-editor — todos los torneos y
-// categorías de MI liga, marcando cuáles ya tiene el club (para el popup de
+// divisiones de MI liga, marcando cuáles ya tiene el club (para el popup de
 // selección múltiple: un club puede jugar Femenino, Masculino, Baby Fútbol, y
-// además solo algunas categorías o todas dentro de cada torneo).
+// además solo algunas divisiones o todas dentro de cada torneo).
 router.get('/:clubId/participaciones-editor', async (req, res) => {
   try {
     const pertenece = await query(
@@ -577,8 +577,8 @@ router.get('/:clubId/participaciones-editor', async (req, res) => {
        WHERE t.liga_id = $1 ORDER BY cs.orden ASC, cs.nombre ASC`,
       [req.ligaId]
     );
-    // Un equipo puede estar inscripto a nivel categoría (subcategoria_id NULL)
-    // o a nivel subcategoría — según si esa categoría tiene subcategorías.
+    // Un equipo puede estar inscripto a nivel división (subcategoria_id NULL)
+    // o a nivel categoría — según si esa división tiene categorías.
     const inscriptasResult = await query(
       `SELECT categoria_id, subcategoria_id FROM equipos_torneo et JOIN torneos t ON t.id = et.torneo_id
        WHERE et.club_id = $1 AND t.liga_id = $2`,
@@ -599,8 +599,8 @@ router.get('/:clubId/participaciones-editor', async (req, res) => {
             id: c.id,
             nombre: c.nombre,
             subcategorias,
-            // Solo tiene sentido cuando la categoría NO tiene subcategorías —
-            // si las tiene, la inscripción se hace por subcategoría (ver arriba).
+            // Solo tiene sentido cuando la división NO tiene categorías —
+            // si las tiene, la inscripción se hace por categoría (ver arriba).
             inscripta: subcategorias.length ? false : categoriasInscriptas.has(c.id)
           };
         })
@@ -614,12 +614,12 @@ router.get('/:clubId/participaciones-editor', async (req, res) => {
 });
 
 // PUT /liga/clubes/:clubId/participaciones — guarda de una el conjunto
-// completo de categorías/subcategorías en las que debe quedar inscripto el
+// completo de divisiones/categorías en las que debe quedar inscripto el
 // club (viene del popup de selección múltiple). Crea las que faltan y borra
 // las que se destildaron (esto último borra también sus partidos/tabla en esa
-// categoría/subcategoría). "selecciones" es un array de
+// división/categoría). "selecciones" es un array de
 // { categoria_id, subcategoria_id } — subcategoria_id va en null cuando esa
-// categoría no tiene subcategorías cargadas.
+// división no tiene categorías cargadas.
 router.put('/:clubId/participaciones', async (req, res) => {
   const { selecciones } = req.body;
   if (!Array.isArray(selecciones)) {
@@ -634,8 +634,8 @@ router.put('/:clubId/participaciones', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Club no encontrado en tu Liga' });
     }
 
-    // Solo se aceptan categorías que efectivamente pertenezcan a torneos de MI liga,
-    // y (cuando corresponde) subcategorías que pertenezcan a esa misma categoría.
+    // Solo se aceptan divisiones que efectivamente pertenezcan a torneos de MI liga,
+    // y (cuando corresponde) categorías que pertenezcan a esa misma división.
     const categoriaIds = [...new Set(selecciones.map((s) => s.categoria_id).filter(Boolean))];
     const categoriasValidasResult = await query(
       `SELECT c.id, c.torneo_id,
@@ -662,10 +662,10 @@ router.put('/:clubId/participaciones', async (req, res) => {
     const deseadas = [];
     for (const sel of selecciones) {
       const categoria = categoriasValidas.get(sel.categoria_id);
-      if (!categoria) continue; // categoría inexistente o de otra liga: se ignora
+      if (!categoria) continue; // división inexistente o de otra liga: se ignora
       if (categoria.cant_subcategorias > 0) {
         const subcategoria = sel.subcategoria_id ? subcategoriasValidas.get(sel.subcategoria_id) : null;
-        if (!subcategoria || subcategoria.categoria_id !== categoria.id) continue; // esta categoría exige subcategoría
+        if (!subcategoria || subcategoria.categoria_id !== categoria.id) continue; // esta división exige categoría
         deseadas.push({ torneo_id: categoria.torneo_id, categoria_id: categoria.id, subcategoria_id: subcategoria.id });
       } else {
         deseadas.push({ torneo_id: categoria.torneo_id, categoria_id: categoria.id, subcategoria_id: null });
@@ -759,7 +759,7 @@ router.put('/:clubId/modalidades', async (req, res) => {
 });
 
 // GET /liga/clubes/:clubId/participaciones — todas las combinaciones
-// torneo+categoría(+subcategoría) en las que ese club tiene un equipo
+// torneo+división(+categoría) en las que ese club tiene un equipo
 // inscripto DENTRO de MI liga. Un mismo club puede tener varios equipos a la
 // vez (ej. Baby Fútbol Sub 10 y Futsal Primera), esto lo muestra todo junto.
 router.get('/:clubId/participaciones', async (req, res) => {
@@ -793,10 +793,10 @@ router.get('/:clubId/participaciones', async (req, res) => {
 });
 
 // POST /liga/clubes/:clubId/inscribir — desde el Home de Clubes: anota este
-// club en una categoría (o subcategoría, si esa categoría tiene) puntual de
+// club en una división (o categoría, si esa división tiene) puntual de
 // un torneo de MI liga (mismo efecto que inscribirlo desde la pantalla de
 // Torneos, pero más cómodo si lo que tenés a mano es el Club y querés
-// sumarlo a varios torneos/categorías seguidos).
+// sumarlo a varios torneos/divisiones seguidos).
 router.post('/:clubId/inscribir', async (req, res) => {
   const { torneo_id, categoria_id, subcategoria_id, grupo } = req.body;
   if (!torneo_id || !categoria_id) {
@@ -818,18 +818,18 @@ router.post('/:clubId/inscribir', async (req, res) => {
       [torneo_id, categoria_id, req.ligaId]
     );
     if (!contexto.rows[0]) {
-      return res.status(404).json({ ok: false, error: 'Esa categoría no pertenece a un torneo de tu Liga' });
+      return res.status(404).json({ ok: false, error: 'Esa división no pertenece a un torneo de tu Liga' });
     }
     if (contexto.rows[0].cant_subcategorias > 0) {
       if (!subcategoria_id) {
-        return res.status(400).json({ ok: false, error: 'Esta categoría tiene subcategorías: elegí una para inscribir al club' });
+        return res.status(400).json({ ok: false, error: 'Esta división tiene categorías: elegí una para inscribir al club' });
       }
       const subOk = await query(
         'SELECT 1 FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
         [subcategoria_id, categoria_id]
       );
       if (!subOk.rows[0]) {
-        return res.status(400).json({ ok: false, error: 'Esa subcategoría no pertenece a esta categoría' });
+        return res.status(400).json({ ok: false, error: 'Esa categoría no pertenece a esta división' });
       }
     }
 
@@ -842,7 +842,7 @@ router.post('/:clubId/inscribir', async (req, res) => {
     res.status(201).json({ ok: true, equipo: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esa categoría' });
+      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esa división' });
     }
     console.error('Error en POST /liga/clubes/:clubId/inscribir:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -850,8 +850,8 @@ router.post('/:clubId/inscribir', async (req, res) => {
 });
 
 // POST /liga/clubes/inscribir-multiple — inscribe VARIOS clubes de una a la
-// misma categoría (o subcategoría) de un torneo. Pensado para cuando tildás
-// varios clubes en el Home y elegís "Asignar a categoría". Devuelve el
+// misma división (o categoría) de un torneo. Pensado para cuando tildás
+// varios clubes en el Home y elegís "Asignar a división". Devuelve el
 // detalle de qué se pudo inscribir y qué no (ej: ya estaba inscripto).
 router.post('/inscribir-multiple', async (req, res) => {
   const { club_ids, torneo_id, categoria_id, subcategoria_id, grupo } = req.body;
@@ -866,19 +866,19 @@ router.post('/inscribir-multiple', async (req, res) => {
       [torneo_id, categoria_id, req.ligaId]
     );
     if (!contexto.rows[0]) {
-      return res.status(404).json({ ok: false, error: 'Esa categoría no pertenece a un torneo de tu Liga' });
+      return res.status(404).json({ ok: false, error: 'Esa división no pertenece a un torneo de tu Liga' });
     }
     const tieneSubcategorias = contexto.rows[0].cant_subcategorias > 0;
     if (tieneSubcategorias) {
       if (!subcategoria_id) {
-        return res.status(400).json({ ok: false, error: 'Esta categoría tiene subcategorías: elegí una para inscribir a los clubes' });
+        return res.status(400).json({ ok: false, error: 'Esta división tiene categorías: elegí una para inscribir a los clubes' });
       }
       const subOk = await query(
         'SELECT 1 FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
         [subcategoria_id, categoria_id]
       );
       if (!subOk.rows[0]) {
-        return res.status(400).json({ ok: false, error: 'Esa subcategoría no pertenece a esta categoría' });
+        return res.status(400).json({ ok: false, error: 'Esa categoría no pertenece a esta división' });
       }
     }
 
@@ -892,11 +892,11 @@ router.post('/inscribir-multiple', async (req, res) => {
         resultados.push({ club_id: clubId, ok: false, error: 'No pertenece a tu Liga' });
         continue;
       }
-      // Antes se bloqueaba inscribir a un club en dos categorías DISTINTAS de
+      // Antes se bloqueaba inscribir a un club en dos divisiones DISTINTAS de
       // un mismo torneo; a pedido de la Liga esto ya no se restringe: un
-      // club puede tener equipo en varias categorías (y/o subcategorías) del
+      // club puede tener equipo en varias divisiones (y/o categorías) del
       // mismo torneo (ej: participa en Primera y también en Reserva como
-      // categorías separadas, no solo como subcategorías de una misma).
+      // divisiones separadas, no solo como categorías de una misma).
       try {
         await query(
           `INSERT INTO equipos_torneo (torneo_id, categoria_id, club_id, subcategoria_id, grupo)

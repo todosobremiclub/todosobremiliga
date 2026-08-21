@@ -6,7 +6,7 @@ const { query } = require('../db');
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
 // GET /liga/noticias — todas las noticias de mi Liga (cualquier estado),
-// con los nombres de club/torneo/categoría de la segmentación (si tiene)
+// con los nombres de club/torneo/división de la segmentación (si tiene)
 // para poder mostrarlos en el listado del Panel.
 router.get('/', async (req, res) => {
   try {
@@ -58,7 +58,7 @@ async function validarSegmentoNoticia(ligaId, segmento) {
         'SELECT 1 FROM categorias WHERE id = $1 AND torneo_id = $2',
         [segmento.segmento_categoria_id, segmento.segmento_torneo_id]
       );
-      if (!okCategoria.rows[0]) return 'Esa categoría no pertenece al torneo elegido';
+      if (!okCategoria.rows[0]) return 'Esa división no pertenece al torneo elegido';
     }
   }
   return null;

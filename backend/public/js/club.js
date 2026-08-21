@@ -382,14 +382,14 @@ async function onCambioTorneoFichaje() {
     const res = await fetch(`/web/torneos/${torneoId}/categorias`);
     const data = await res.json();
     if (!data.ok || !data.categorias.length) {
-      selectCategoria.innerHTML = '<option value="">Sin categorías</option>';
+      selectCategoria.innerHTML = '<option value="">Sin divisiones</option>';
       return;
     }
-    selectCategoria.innerHTML = '<option value="">Elegí una categoría...</option>' +
+    selectCategoria.innerHTML = '<option value="">Elegí una división...</option>' +
       data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
     selectCategoria.disabled = false;
   } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Error cargando categorías</option>';
+    selectCategoria.innerHTML = '<option value="">Error cargando divisiones</option>';
   }
 }
 
@@ -405,7 +405,7 @@ async function enviarSolicitudFichaje(e) {
   const categoriaId = document.getElementById('fichajeCategoria').value;
 
   if (!ligaId || !torneoId || !categoriaId) {
-    errorEl.textContent = 'Tenés que elegir una Liga, un Torneo y una Categoría.';
+    errorEl.textContent = 'Tenés que elegir una Liga, un Torneo y una División.';
     errorEl.classList.remove('oculto');
     return;
   }
@@ -416,7 +416,7 @@ async function enviarSolicitudFichaje(e) {
   }
 
   // Uno o varios jugadores (fichaje masivo), todos a la misma Liga/Torneo/
-  // Categoría; si alguno falla (ej: ya estaba fichado) seguimos con el resto
+  // División; si alguno falla (ej: ya estaba fichado) seguimos con el resto
   // y avisamos al final quiénes no se pudieron mandar.
   const fallidos = [];
   for (const jugadorId of fichajeJugadorIdsActual) {
@@ -493,7 +493,7 @@ function poblarFiltroCategoriaFichajes() {
     }
   });
   categorias.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
-  select.innerHTML = '<option value="">Todas las categorías</option>' +
+  select.innerHTML = '<option value="">Todas las divisiones</option>' +
     categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre || '-')}</option>`).join('');
   if (categorias.some((c) => c.id === actual)) select.value = actual;
 }
@@ -575,7 +575,7 @@ function abrirCarnet(fichajeId) {
           <div><span>Fecha de nacimiento</span><span>${formatearFecha(f.jugador_fecha_nacimiento)}</span></div>
           <div><span>Liga</span><span>${escapeHtml(f.liga_nombre || '-')}</span></div>
           <div><span>Torneo</span><span>${escapeHtml(f.torneo_nombre || '-')}</span></div>
-          <div><span>Categoría</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
+          <div><span>División</span><span>${escapeHtml(f.categoria_nombre || '-')}</span></div>
         </div>
         <div class="carnet-qr" id="carnetQrContainer"></div>
         <p class="carnet-codigo-texto">${escapeHtml(f.carnet_codigo_qr)}</p>

@@ -6,7 +6,7 @@ const { query } = require('../db');
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
 // Chequea que un torneo exista y pertenezca a mi liga. Devuelve el torneo o
-// null. Se usa antes de tocar categorías de ese torneo.
+// null. Se usa antes de tocar divisiones de ese torneo.
 async function buscarTorneoDeMiLiga(torneoId, ligaId) {
   const { rows } = await query(
     'SELECT * FROM torneos WHERE id = $1 AND liga_id = $2',
@@ -155,7 +155,7 @@ router.put('/:torneoId', async (req, res) => {
 });
 
 // DELETE /liga/torneos/:torneoId — borra el torneo y, en cascada, sus
-// categorías, subcategorías, equipos inscriptos, partidos y estadísticas.
+// divisiones, categorías, equipos inscriptos, partidos y estadísticas.
 router.delete('/:torneoId', async (req, res) => {
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
@@ -192,11 +192,11 @@ router.patch('/:torneoId/estado', async (req, res) => {
   }
 });
 
-// ===== CATEGORÍAS (anidadas dentro de un torneo) =====
+// ===== DIVISIONES (anidadas dentro de un torneo) =====
 
-// GET /liga/torneos/:torneoId/categorias — incluye, para cada categoría, sus
-// subcategorías (si tiene). El front usa esto para saber si una categoría se
-// gestiona "pelada" o a través de sus subcategorías.
+// GET /liga/torneos/:torneoId/categorias — incluye, para cada división, sus
+// categorías (si tiene). El front usa esto para saber si una división se
+// gestiona "pelada" o a través de sus categorías.
 router.get('/:torneoId/categorias', async (req, res) => {
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
@@ -224,11 +224,11 @@ router.get('/:torneoId/categorias', async (req, res) => {
 });
 
 // GET /liga/torneos/:torneoId/tabla-general — para torneos con varias
-// categorías (y/o subcategorías), suma en una sola tabla por club los
-// puntos de todas las categorías/subcategorías marcadas con
-// "suma_tabla_general" (ej: Baby Fútbol Categorías A-E, cada una con
-// subcategorías 2018/2019/2020: la tabla general ordena a los clubes por la
-// suma de puntos de todos sus equipos en las subcategorías que sumen).
+// divisiones (y/o categorías), suma en una sola tabla por club los
+// puntos de todas las divisiones/categorías marcadas con
+// "suma_tabla_general" (ej: Baby Fútbol Divisiones A-E, cada una con
+// categorías 2018/2019/2020: la tabla general ordena a los clubes por la
+// suma de puntos de todos sus equipos en las categorías que sumen).
 router.get('/:torneoId/tabla-general', async (req, res) => {
   try {
     const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
@@ -271,13 +271,13 @@ router.get('/:torneoId/tabla-general', async (req, res) => {
   }
 });
 
-// POST /liga/torneos/:torneoId/categorias — alta de una categoría
+// POST /liga/torneos/:torneoId/categorias — alta de una división
 router.post('/:torneoId/categorias', async (req, res) => {
   const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general, foto_url } = req.body;
   const generosValidos = ['masculino', 'femenino', 'mixto'];
 
   if (!nombre || !nombre.trim()) {
-    return res.status(400).json({ ok: false, error: 'El nombre de la categoría es obligatorio' });
+    return res.status(400).json({ ok: false, error: 'El nombre de la división es obligatorio' });
   }
   if (genero && !generosValidos.includes(genero)) {
     return res.status(400).json({ ok: false, error: `Género inválido. Válidos: ${generosValidos.join(', ')}` });
@@ -326,7 +326,7 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
        typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null, foto_url || null,
        req.params.categoriaId, req.params.torneoId]
     );
-    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'División no encontrada en ese torneo' });
     res.json({ ok: true, categoria: rows[0] });
   } catch (err) {
     console.error('Error en PUT /liga/torneos/:torneoId/categorias/:categoriaId:', err);
@@ -335,7 +335,7 @@ router.put('/:torneoId/categorias/:categoriaId', async (req, res) => {
 });
 
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId — borra la
-// categoría y, en cascada, sus subcategorías, equipos inscriptos, partidos y
+// división y, en cascada, sus categorías, equipos inscriptos, partidos y
 // estadísticas.
 router.delete('/:torneoId/categorias/:categoriaId', async (req, res) => {
   try {
@@ -346,7 +346,7 @@ router.delete('/:torneoId/categorias/:categoriaId', async (req, res) => {
       'DELETE FROM categorias WHERE id = $1 AND torneo_id = $2',
       [req.params.categoriaId, req.params.torneoId]
     );
-    if (!rowCount) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'División no encontrada en ese torneo' });
     res.json({ ok: true });
   } catch (err) {
     console.error('Error en DELETE /liga/torneos/:torneoId/categorias/:categoriaId:', err);
@@ -354,7 +354,7 @@ router.delete('/:torneoId/categorias/:categoriaId', async (req, res) => {
   }
 });
 
-// Chequea que una categoría exista y pertenezca a un torneo de mi liga.
+// Chequea que una división exista y pertenezca a un torneo de mi liga.
 async function buscarCategoriaDeMiLiga(categoriaId, torneoId, ligaId) {
   const { rows } = await query(
     `SELECT c.* FROM categorias c
@@ -365,22 +365,22 @@ async function buscarCategoriaDeMiLiga(categoriaId, torneoId, ligaId) {
   return rows[0] || null;
 }
 
-// ===== SUBCATEGORÍAS (anidadas dentro de una categoría) =====
-// Nivel extra y opcional de clasificación. Ej: la categoría "Fútbol Femenino"
-// del torneo "Copa Lamba" puede tener las subcategorías "Primera" y "Reserva".
-// Cuando una categoría tiene subcategorías cargadas, el club se inscribe a
-// nivel subcategoría (no directamente a la categoría) — ver
+// ===== CATEGORÍAS (anidadas dentro de una división) =====
+// Nivel extra y opcional de clasificación. Ej: la división "Fútbol Femenino"
+// del torneo "Copa Lamba" puede tener las categorías "Primera" y "Reserva".
+// Cuando una división tiene categorías cargadas, el club se inscribe a
+// nivel categoría (no directamente a la división) — ver
 // ligaClubesRoutes.js (participaciones).
 
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias
 router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res) => {
   const { nombre, orden, precio_inscripcion, suma_tabla_general } = req.body;
   if (!nombre || !nombre.trim()) {
-    return res.status(400).json({ ok: false, error: 'El nombre de la subcategoría es obligatorio' });
+    return res.status(400).json({ ok: false, error: 'El nombre de la categoría es obligatorio' });
   }
   try {
     const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
-    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    if (!categoria) return res.status(404).json({ ok: false, error: 'División no encontrada en ese torneo' });
 
     const { rows } = await query(
       `INSERT INTO categoria_subcategorias (categoria_id, nombre, orden, precio_inscripcion, suma_tabla_general)
@@ -393,7 +393,7 @@ router.post('/:torneoId/categorias/:categoriaId/subcategorias', async (req, res)
     res.status(201).json({ ok: true, subcategoria: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: 'Ya existe una subcategoría con ese nombre en esta categoría' });
+      return res.status(409).json({ ok: false, error: 'Ya existe una categoría con ese nombre en esta división' });
     }
     console.error('Error en POST subcategorias:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -405,7 +405,7 @@ router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', a
   const { nombre, orden, precio_inscripcion, suma_tabla_general } = req.body;
   try {
     const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
-    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    if (!categoria) return res.status(404).json({ ok: false, error: 'División no encontrada en ese torneo' });
 
     const { rows } = await query(
       `UPDATE categoria_subcategorias SET
@@ -420,11 +420,11 @@ router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', a
        typeof suma_tabla_general === 'boolean' ? suma_tabla_general : null,
        req.params.subcategoriaId, req.params.categoriaId]
     );
-    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Subcategoría no encontrada en esa categoría' });
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en esa división' });
     res.json({ ok: true, subcategoria: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: 'Ya existe una subcategoría con ese nombre en esta categoría' });
+      return res.status(409).json({ ok: false, error: 'Ya existe una categoría con ese nombre en esta división' });
     }
     console.error('Error en PUT subcategorias:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -432,18 +432,18 @@ router.put('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', a
 });
 
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId
-// Borrar una subcategoría borra en cascada los equipos (y sus partidos/tabla)
+// Borrar una categoría borra en cascada los equipos (y sus partidos/tabla)
 // que estuvieran inscriptos puntualmente en ella.
 router.delete('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId', async (req, res) => {
   try {
     const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
-    if (!categoria) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en ese torneo' });
+    if (!categoria) return res.status(404).json({ ok: false, error: 'División no encontrada en ese torneo' });
 
     const { rowCount } = await query(
       'DELETE FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
       [req.params.subcategoriaId, req.params.categoriaId]
     );
-    if (!rowCount) return res.status(404).json({ ok: false, error: 'Subcategoría no encontrada en esa categoría' });
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en esa división' });
     res.json({ ok: true });
   } catch (err) {
     console.error('Error en DELETE subcategorias:', err);

@@ -5,7 +5,7 @@ const { query } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
 
-// Chequea que la categoría pertenezca a un torneo de MI liga. Devuelve
+// Chequea que la división pertenezca a un torneo de MI liga. Devuelve
 // {torneo, categoria} o null.
 async function buscarCategoriaDeMiLiga(torneoId, categoriaId, ligaId) {
   const { rows } = await query(
@@ -18,18 +18,18 @@ async function buscarCategoriaDeMiLiga(torneoId, categoriaId, ligaId) {
   return rows[0] || null;
 }
 
-// ===== EQUIPOS_TORNEO (inscripción de un club a una categoría) =====
+// ===== EQUIPOS_TORNEO (inscripción de un club a una división) =====
 
 // GET /liga/torneos/:torneoId/categorias/:categoriaId/equipos
 router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     // subcategoria_id es opcional: si viene, filtra solo los equipos de esa
-    // subcategoría puntual (usado por la pantalla de "Gestionar equipos"
-    // cuando se entra desde una subcategoría); si no viene, trae TODOS los
-    // equipos de la categoría (vista general).
+    // categoría puntual (usado por la pantalla de "Gestionar equipos"
+    // cuando se entra desde una categoría); si no viene, trae TODOS los
+    // equipos de la división (vista general).
     const params = [req.params.torneoId, req.params.categoriaId];
     let filtroSub = '';
     if (req.query.subcategoria_id) {
@@ -56,8 +56,8 @@ router.get('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
 
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/equipos — inscribir un club
 // (el club_id tiene que ser uno de los clubes ya cargados en MI liga). Si la
-// categoría tiene subcategorías cargadas, es obligatorio indicar a cuál de
-// ellas se inscribe (el club NO puede quedar en la categoría "pelada").
+// división tiene categorías cargadas, es obligatorio indicar a cuál de
+// ellas se inscribe (el club NO puede quedar en la división "pelada").
 router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
   const { club_id, subcategoria_id, grupo } = req.body;
   if (!club_id) {
@@ -65,7 +65,7 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
   }
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const clubEnMiLiga = await query(
       'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
@@ -82,14 +82,14 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     let subcategoriaIdFinal = null;
     if (subcategorias.rows.length) {
       if (!subcategoria_id || !subcategorias.rows.some((s) => s.id === subcategoria_id)) {
-        return res.status(400).json({ ok: false, error: 'Esta categoría tiene subcategorías: elegí una para inscribir al club' });
+        return res.status(400).json({ ok: false, error: 'Esta división tiene categorías: elegí una para inscribir al club' });
       }
       subcategoriaIdFinal = subcategoria_id;
     }
 
     // Dentro de un mismo torneo, un club no puede quedar inscripto en dos
-    // categorías DISTINTAS (sí puede tener equipo en varias subcategorías de
-    // la MISMA categoría, ej: Primera y Reserva).
+    // divisiones DISTINTAS (sí puede tener equipo en varias categorías de
+    // la MISMA división, ej: Primera y Reserva).
     const otraCategoria = await query(
       `SELECT c.nombre AS categoria_nombre FROM equipos_torneo et
        JOIN categorias c ON c.id = et.categoria_id
@@ -100,7 +100,7 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     if (otraCategoria.rows[0]) {
       return res.status(409).json({
         ok: false,
-        error: `Ese club ya está inscripto en este torneo en la categoría "${otraCategoria.rows[0].categoria_nombre}". Un club no puede jugar en dos categorías distintas del mismo torneo.`
+        error: `Ese club ya está inscripto en este torneo en la división "${otraCategoria.rows[0].categoria_nombre}". Un club no puede jugar en dos divisiones distintas del mismo torneo.`
       });
     }
 
@@ -113,7 +113,7 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
     res.status(201).json({ ok: true, equipo: rows[0] });
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esta categoría/subcategoría' });
+      return res.status(409).json({ ok: false, error: 'Ese club ya está inscripto en esta división/categoría' });
     }
     console.error('Error en POST equipos:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -121,18 +121,18 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
 });
 
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoId —
-// da de baja a un club de la categoría. Se borran en cascada sus partidos y
+// da de baja a un club de la división. Se borran en cascada sus partidos y
 // su fila de tabla de posiciones (el resto del fixture no se re-numera).
 router.delete('/:torneoId/categorias/:categoriaId/equipos/:equipoId', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const { rowCount } = await query(
       'DELETE FROM equipos_torneo WHERE id = $1 AND torneo_id = $2 AND categoria_id = $3',
       [req.params.equipoId, req.params.torneoId, req.params.categoriaId]
     );
-    if (!rowCount) return res.status(404).json({ ok: false, error: 'Equipo no encontrado en esa categoría' });
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Equipo no encontrado en esa división' });
 
     // Los partidos y la fila de tabla del equipo borrado ya se fueron en
     // cascada; recalculamos para que los rivales que le habían ganado/perdido
@@ -152,12 +152,12 @@ router.delete('/:torneoId/categorias/:categoriaId/equipos/:equipoId', async (req
 router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
-    // Si la categoría tiene subcategorías, el fixture es siempre por
-    // subcategoría (los equipos ya pertenecen a una sola); subcategoria_id
+    // Si la división tiene categorías, el fixture es siempre por
+    // categoría (los equipos ya pertenecen a una sola); subcategoria_id
     // llega en la query string y filtra vía el equipo local (ambos equipos
-    // de un partido son siempre de la misma subcategoría).
+    // de un partido son siempre de la misma categoría).
     const subcategoriaId = req.query.subcategoria_id || null;
 
     const { rows } = await query(
@@ -228,9 +228,9 @@ router.put('/:torneoId/categorias/:categoriaId/jornadas/:jornada', async (req, r
   if (!Number.isInteger(jornada)) return res.status(400).json({ ok: false, error: 'Jornada inválida' });
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
-    // Borra la fila existente de esta (categoría, subcategoría, jornada) y,
+    // Borra la fila existente de esta (división, categoría, jornada) y,
     // si corresponde, la vuelve a insertar — más simple que un ON CONFLICT
     // sobre la combinación con subcategoria_id (que puede ser NULL).
     await query(
@@ -265,7 +265,7 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/arbitros', as
   }
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const partidoOk = await query(
       'SELECT 1 FROM partidos WHERE id = $1 AND torneo_id = $2 AND categoria_id = $3',
@@ -296,7 +296,7 @@ router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (re
   const { fecha, hora, sede, cancha_predio_id, cancha_club_id } = req.body;
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     if (cancha_predio_id) {
       const canchaOk = await query(
@@ -349,21 +349,21 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
-    // Los dos equipos tienen que ser de la misma subcategoría (o ninguno
-    // tener subcategoría, si la categoría no las usa) — un equipo de "2018"
+    // Los dos equipos tienen que ser de la misma categoría (o ninguno
+    // tener categoría, si la división no las usa) — un equipo de "2018"
     // no puede jugar contra uno de "2019".
     const equiposCheck = await query(
       'SELECT id, subcategoria_id FROM equipos_torneo WHERE id = ANY($1::uuid[]) AND torneo_id = $2 AND categoria_id = $3',
       [[equipo_local_id, equipo_visitante_id], req.params.torneoId, req.params.categoriaId]
     );
     if (equiposCheck.rows.length !== 2) {
-      return res.status(400).json({ ok: false, error: 'Alguno de los equipos elegidos no pertenece a esta categoría' });
+      return res.status(400).json({ ok: false, error: 'Alguno de los equipos elegidos no pertenece a esta división' });
     }
     const subcategoriasEquipos = new Set(equiposCheck.rows.map((r) => r.subcategoria_id || null));
     if (subcategoriasEquipos.size > 1) {
-      return res.status(400).json({ ok: false, error: 'Los dos equipos tienen que ser de la misma subcategoría' });
+      return res.status(400).json({ ok: false, error: 'Los dos equipos tienen que ser de la misma categoría' });
     }
 
     // Validación manual: que ninguno de los dos equipos ya tenga un partido
@@ -406,18 +406,18 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
 
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/fixture/generar
 // Genera automáticamente el fixture "todos contra todos" (round-robin, método
-// del círculo) para todos los equipos inscriptos y activos de la categoría.
+// del círculo) para todos los equipos inscriptos y activos de la división.
 // Rechaza si ya hay partidos cargados (hay que vaciar el fixture primero).
 router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, res) => {
   const { ida_vuelta, subcategoria_id } = req.body;
   const subcategoriaId = subcategoria_id || null;
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
-    // Todo lo de acá abajo se restringe a los equipos de la subcategoría
-    // indicada (o a los que no tienen subcategoría, si la categoría no las
-    // usa) — así un fixture "Baby Fútbol A" con subcategorías 2018/2019/2020
+    // Todo lo de acá abajo se restringe a los equipos de la categoría
+    // indicada (o a los que no tienen categoría, si la división no las
+    // usa) — así un fixture "Baby Fútbol A" con categorías 2018/2019/2020
     // genera un round-robin propio para cada una, sin mezclar equipos.
     const existentes = await query(
       `SELECT COUNT(*)::int AS cantidad FROM partidos p
@@ -428,7 +428,7 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
     if (existentes.rows[0].cantidad > 0) {
       return res.status(409).json({
         ok: false,
-        error: 'Ya hay un fixture cargado para esta categoría/subcategoría. Borralo primero (botón "Vaciar fixture") si querés generar uno nuevo.'
+        error: 'Ya hay un fixture cargado para esta división/categoría. Borralo primero (botón "Vaciar fixture") si querés generar uno nuevo.'
       });
     }
 
@@ -470,7 +470,7 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
   }
 });
 
-// Compara los club_id de varias "unidades" (categorías o subcategorías) que
+// Compara los club_id de varias "unidades" (divisiones o categorías) que
 // se van a espejar entre sí: para que tenga sentido armar el MISMO fixture
 // en todas, tienen que tener cargados exactamente los mismos clubes.
 // Devuelve un mensaje de error si no coinciden, o null si están OK.
@@ -488,10 +488,10 @@ function validarClubesIguales(unidades) {
 
 // POST /liga/torneos/:torneoId/fixture/generar-espejado — genera el MISMO
 // fixture (los mismos enfrentamientos entre clubes, jornada por jornada) en
-// varias categorías o subcategorías a la vez. Pensado para torneos donde el
+// varias divisiones o categorías a la vez. Pensado para torneos donde el
 // mismo grupo de clubes juega en paralelo en cada una — ej: "Baby Fútbol"
-// con categorías 2018/2019/2020 (mismos equipos en las tres), o una Zona con
-// subcategorías 2018/2019 adentro (mismos equipos de esa zona en las dos).
+// con divisiones 2018/2019/2020 (mismos equipos en las tres), o una Zona con
+// categorías 2018/2019 adentro (mismos equipos de esa zona en las dos).
 // Body: { nivel: 'categorias' | 'subcategorias', categoria_id (obligatorio
 // si nivel es 'subcategorias'), ida_vuelta }
 router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
@@ -508,8 +508,8 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
     // subcategoria_id (o null) y sus equipos ({id, club_id}) ya inscriptos.
     const unidades = [];
     if (nivel === 'categorias') {
-      // Sólo entran las categorías SIN subcategorías (las que tienen se
-      // espejan a nivel subcategoría, con el otro modo) — mezclar ambas
+      // Sólo entran las divisiones SIN categorías (las que tienen se
+      // espejan a nivel categoría, con el otro modo) — mezclar ambas
       // llevaría a duplicar o pisar la lógica de espejado.
       const categoriasResult = await query(
         `SELECT c.id, c.nombre FROM categorias c
@@ -518,7 +518,7 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
         [req.params.torneoId]
       );
       if (categoriasResult.rows.length < 2) {
-        return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 categorías (sin subcategorías) en este torneo para espejar el fixture entre ellas' });
+        return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 divisiones (sin categorías) en este torneo para espejar el fixture entre ellas' });
       }
       for (const cat of categoriasResult.rows) {
         const equiposResult = await query(
@@ -530,14 +530,14 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
     } else {
       if (!categoria_id) return res.status(400).json({ ok: false, error: 'Falta categoria_id' });
       const categoriaOk = await query('SELECT id, nombre FROM categorias WHERE id = $1 AND torneo_id = $2', [categoria_id, req.params.torneoId]);
-      if (!categoriaOk.rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en este torneo' });
+      if (!categoriaOk.rows[0]) return res.status(404).json({ ok: false, error: 'División no encontrada en este torneo' });
 
       const subcategoriasResult = await query(
         'SELECT id, nombre FROM categoria_subcategorias WHERE categoria_id = $1 ORDER BY orden ASC, nombre ASC',
         [categoria_id]
       );
       if (subcategoriasResult.rows.length < 2) {
-        return res.status(400).json({ ok: false, error: 'Esta categoría necesita al menos 2 subcategorías para espejar el fixture entre ellas' });
+        return res.status(400).json({ ok: false, error: 'Esta división necesita al menos 2 categorías para espejar el fixture entre ellas' });
       }
       for (const sub of subcategoriasResult.rows) {
         const equiposResult = await query(
@@ -579,7 +579,7 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
     // El sorteo se hace UNA sola vez, en base a los club_id (que son los
     // mismos en todas las unidades ya validado arriba); después se aplica
     // tal cual a cada unidad, traduciendo cada club_id al equipo_torneo_id
-    // que le corresponde en esa categoría/subcategoría puntual.
+    // que le corresponde en esa división/categoría puntual.
     const clubIds = unidades[0].equipos.map((e) => e.club_id);
     const esAperturaClausura = torneo.formato_juego === 'apertura_clausura';
     const idaVuelta = esAperturaClausura ? true : (ida_vuelta != null ? !!ida_vuelta : torneo.formato_juego === 'liguilla_ida_vuelta');
@@ -617,12 +617,12 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
 });
 
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId/fixture — vacía el
-// fixture de esta categoría. Solo borra los partidos que TODAVÍA no se
+// fixture de esta división. Solo borra los partidos que TODAVÍA no se
 // jugaron (los que ya tienen resultado cargado se conservan).
 router.delete('/:torneoId/categorias/:categoriaId/fixture', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
     const { rows } = await query(
@@ -646,7 +646,7 @@ router.delete('/:torneoId/categorias/:categoriaId/fixture', async (req, res) => 
 router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/jugadores', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const partidoResult = await query(
       `SELECT p.*, cl.id AS club_local_id, cl.nombre AS club_local_nombre,
@@ -691,7 +691,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/jugadores', a
 
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado
 // Cargar (o corregir) el resultado de un partido. Dispara el recálculo
-// automático de la tabla de posiciones de esa categoría. Opcionalmente
+// automático de la tabla de posiciones de esa división. Opcionalmente
 // recibe `estadisticas_jugadores`: [{jugador_id, equipo_torneo_id, goles,
 // tarjetas_amarillas, tarjetas_rojas}] — reemplaza por completo las
 // estadísticas cargadas para este partido (permite corregir la carga).
@@ -710,7 +710,7 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
 
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     if (ausenteLocal && ausenteVisitante) {
       // Ningún equipo se presentó: los dos pierden el partido, sin usar
@@ -782,7 +782,7 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
 router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
     // ronda: 'general' (default, todo el torneo) o 'apertura'/'clausura' para
@@ -813,7 +813,7 @@ router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => 
 router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
     const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
@@ -845,7 +845,7 @@ router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
 router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
-    if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     // ronda: 'general' (default), o 'apertura'/'clausura' para torneos con
     // formato "Apertura y Clausura".
@@ -855,7 +855,7 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     // los equipos inscriptos aparecen en la tabla desde el primer momento,
     // en 0, aunque todavía no se haya cargado ningún resultado (antes solo
     // aparecían los equipos que YA tenían una fila calculada en
-    // tabla_posiciones, así que una categoría sin partidos jugados no
+    // tabla_posiciones, así que una división sin partidos jugados no
     // mostraba tabla). El orden A-Z de club queda como desempate final, que
     // es justamente lo que se ve cuando todos los equipos están en 0.
     const { rows } = await query(

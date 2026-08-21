@@ -1,5 +1,5 @@
 // Página pública de perfil de un Club dentro de una Liga: datos básicos,
-// todos los torneos/categorías en los que participa (con acceso directo a
+// todos los torneos/divisiones en los que participa (con acceso directo a
 // la tabla/fixture de cada uno), su posición actual en cada tabla y su
 // próximo partido.
 

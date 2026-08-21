@@ -116,7 +116,7 @@
       </div>
 
       <!-- Solicitar fichaje para uno o varios jugadores (fichaje masivo:
-           mismo torneo + categoría para todos los tildados) -->
+           mismo torneo + división para todos los tildados) -->
       <div class="panel oculto" id="panelSolicitarFichaje">
         <div class="panel-header">
           <h2 id="tituloSolicitarFichaje">Pedir fichaje</h2>
@@ -133,7 +133,7 @@
               <select id="fichajeTorneo" required disabled></select>
             </div>
             <div>
-              <label for="fichajeCategoria">Categoría *</label>
+              <label for="fichajeCategoria">División *</label>
               <select id="fichajeCategoria" required disabled></select>
             </div>
           </div>
@@ -155,12 +155,12 @@
             <option value="">Todos los torneos</option>
           </select>
           <select id="filtroCategoriaFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
-            <option value="">Todas las categorías</option>
+            <option value="">Todas las divisiones</option>
           </select>
         </div>
         <table>
           <thead>
-            <tr><th>Foto</th><th>Jugador</th><th>Liga</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th></tr>
+            <tr><th>Foto</th><th>Jugador</th><th>Liga</th><th>Torneo</th><th>División</th><th>Estado</th><th>Carnet</th></tr>
           </thead>
           <tbody id="tablaFichajes"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>

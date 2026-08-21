@@ -1,4 +1,4 @@
-// Página pública de una Categoría: Tabla de posiciones + Fixture.
+// Página pública de una División: Tabla de posiciones + Fixture.
 
 function getParamsDeUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -25,7 +25,7 @@ function init() {
   }
 
   if (!torneoId || !categoriaId) {
-    document.getElementById('nombreCategoria').textContent = 'Categoría no especificada';
+    document.getElementById('nombreCategoria').textContent = 'División no especificada';
     document.getElementById('tablaPosiciones').innerHTML = '<tr><td colspan="9">Faltan datos en la URL.</td></tr>';
     return;
   }
@@ -57,7 +57,7 @@ async function cargarGoleadoresPublico() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/goleadores`);
     const data = await res.json();
     if (!data.ok || !data.goleadores.length) {
-      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no hay goles cargados en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = data.goleadores.map((g) => `
@@ -79,7 +79,7 @@ async function cargarTarjetasPublico() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/tarjetas`);
     const data = await res.json();
     if (!data.ok || !data.tarjetas.length) {
-      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4">Todavía no hay tarjetas cargadas en esta división.</td></tr>';
       return;
     }
     tbody.innerHTML = data.tarjetas.map((t) => `
@@ -130,7 +130,7 @@ async function cargarTabla() {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/tabla`);
     const data = await res.json();
     if (!data.ok || !data.tabla.length) {
-      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta categoría.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10">Todavía no hay datos de tabla para esta división.</td></tr>';
       return;
     }
     tablaCache = data.tabla;

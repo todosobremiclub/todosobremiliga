@@ -7,7 +7,7 @@ const { query } = require('../db');
 
 // GET /club/fichajes?torneo_id=...&categoria_id=... — todas las solicitudes
 // de fichaje de MI club (para ver el estado: pendiente / aprobado /
-// rechazado), opcionalmente filtradas por torneo y/o categoría
+// rechazado), opcionalmente filtradas por torneo y/o división
 router.get('/', async (req, res) => {
   const { torneo_id, categoria_id } = req.query;
   try {
@@ -47,9 +47,9 @@ router.get('/', async (req, res) => {
 });
 
 // POST /club/jugadores/:jugadorId/fichajes — solicitar la habilitación de un
-// jugador ante una Liga. El fichaje es SIEMPRE por categoría puntual dentro
-// de un torneo (un torneo puede tener varias categorías — ej. Baby Fútbol
-// con Sub 8, Sub 10, Sub 12 — y hay que fichar para la categoría exacta en
+// jugador ante una Liga. El fichaje es SIEMPRE por división puntual dentro
+// de un torneo (un torneo puede tener varias divisiones — ej. Baby Fútbol
+// con Sub 8, Sub 10, Sub 12 — y hay que fichar para la división exacta en
 // la que va a jugar), porque de ahí sale el carnet una vez aprobado.
 router.post('/:jugadorId/fichajes', async (req, res) => {
   const { liga_id, torneo_id, categoria_id, documentos } = req.body;
@@ -88,7 +88,7 @@ router.post('/:jugadorId/fichajes', async (req, res) => {
       [categoria_id, torneo_id]
     );
     if (!categoria.rows[0]) {
-      return res.status(404).json({ ok: false, error: 'Esa categoría no pertenece al torneo indicado' });
+      return res.status(404).json({ ok: false, error: 'Esa división no pertenece al torneo indicado' });
     }
 
     const { rows } = await query(

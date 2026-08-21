@@ -42,10 +42,10 @@
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
   .tabs-categorias-liga { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
   .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
-  /* Los botones de editar/eliminar de cada categoría/subcategoría quedan
+  /* Los botones de editar/eliminar de cada división/categoría quedan
      invisibles hasta que se pasa el mouse (o se hace foco, para que sigan
      siendo accesibles por teclado) sobre ese chip puntual — así el nombre de
-     la categoría queda como protagonista y no hay dos botones extra
+     la división queda como protagonista y no hay dos botones extra
      compitiendo visualmente al lado de cada una. */
   .tab-btn-categoria-grupo .btn-icono { opacity: 0; transition: opacity 0.15s ease; }
   .tab-btn-categoria-grupo:hover .btn-icono, .tab-btn-categoria-grupo:focus-within .btn-icono { opacity: 1; }
@@ -230,7 +230,7 @@
 
         <div class="barra-acciones-masivas" id="barraAccionesMasivasClubes">
           <span id="cantidadClubesSeleccionados">0 clubes seleccionados</span>
-          <button class="btn btn-secundario btn-pequeno" id="btnAsignarCategoriaMasivo">Asignar a categoría</button>
+          <button class="btn btn-secundario btn-pequeno" id="btnAsignarCategoriaMasivo">Asignar a división</button>
           <button class="btn btn-secundario btn-pequeno" id="btnLimpiarSeleccionClubes">Limpiar selección</button>
         </div>
 
@@ -496,16 +496,16 @@
 
     </div>
 
-    <!-- Fondo compartido por TODOS los popups del Panel Liga (Clubes, Torneos, Categorías, Participaciones) -->
+    <!-- Fondo compartido por TODOS los popups del Panel Liga (Clubes, Torneos, Divisiones, Participaciones) -->
     <div class="oculto fondo-modal-generico" id="fondoModalGenerico"></div>
 
-    <!-- Popup de Participaciones: elegir varios torneos y varias categorías por club -->
+    <!-- Popup de Participaciones: elegir varios torneos y varias divisiones por club -->
     <div class="oculto panel popup-modal" id="modalParticipacionesClub">
       <div class="panel-header">
         <h2 id="tituloParticipacionesClub">Participaciones del Club</h2>
         <button class="btn btn-secundario" id="btnCerrarParticipacionesClub">Cerrar</button>
       </div>
-      <p class="texto-ayuda">Un club puede presentar equipo en varios torneos y en varias categorías dentro de cada uno (ej: Femenino, Masculino, Baby Fútbol). Al tildar un torneo se marcan por defecto todas sus categorías; podés destildar las que no correspondan.</p>
+      <p class="texto-ayuda">Un club puede presentar equipo en varios torneos y en varias divisiones dentro de cada uno (ej: Femenino, Masculino, Baby Fútbol). Al tildar un torneo se marcan por defecto todas sus divisiones; podés destildar las que no correspondan.</p>
       <div id="listaParticipacionesTorneos"><p class="texto-ayuda">Cargando...</p></div>
       <button class="btn" id="btnGuardarParticipaciones" style="margin-top:12px;">Guardar participaciones</button>
       <p class="mensaje-error oculto" id="participacionesError"></p>
@@ -514,7 +514,7 @@
 
     <!-- Popup de Fichajes del Club: se abre al tocar el nombre del club en el
          listado de Clubes. Es de solo lectura — muestra en qué torneos está
-         registrado el club y, agrupados por torneo y categoría, los jugadores
+         registrado el club y, agrupados por torneo y división, los jugadores
          que tiene fichados en cada uno. -->
     <div class="oculto panel popup-modal popup-modal-ancho" id="modalFichajesClub">
       <div class="panel-header">
@@ -525,16 +525,16 @@
       <div id="listaFichajesPorTorneoClub"><p class="texto-ayuda">Cargando...</p></div>
     </div>
 
-    <!-- Popup de asignación masiva: tildar una o varias categorías/subcategorías
+    <!-- Popup de asignación masiva: tildar una o varias divisiones/categorías
          (de uno o varios torneos) para inscribir de una a todos los clubes
          tildados en el Home en TODAS las que se elijan. -->
     <div class="oculto panel popup-modal popup-modal-ancho" id="modalAsignarCategoriaMasivo">
       <div class="panel-header">
-        <h2>Asignar clubes a categorías</h2>
+        <h2>Asignar clubes a divisiones</h2>
         <button class="btn btn-secundario" id="btnCerrarAsignarMasivo">Cerrar</button>
       </div>
       <p class="texto-ayuda" id="resumenClubesAsignarMasivo"></p>
-      <p class="texto-ayuda">Tildá una o varias categorías (o subcategorías, si las tiene) — de uno o varios torneos — y los clubes seleccionados quedarán inscriptos en todas las que elijas. Dentro de un mismo torneo, un club solo puede tener una categoría (pero sí puede estar en varias subcategorías de esa misma categoría).</p>
+      <p class="texto-ayuda">Tildá una o varias divisiones (o categorías, si las tiene) — de uno o varios torneos — y los clubes seleccionados quedarán inscriptos en todas las que elijas. Dentro de un mismo torneo, un club solo puede tener una división (pero sí puede estar en varias categorías de esa misma división).</p>
       <div id="listaAsignarMasivoTorneos"><p class="texto-ayuda">Cargando...</p></div>
       <button class="btn" id="btnConfirmarAsignarMasivo" style="margin-top:12px;">Asignar</button>
       <p class="mensaje-error oculto" id="asignarMasivoError"></p>
@@ -647,14 +647,14 @@
         </div>
       </div>
 
-      <!-- Detalle de un torneo: sus categorías arriba como botones, y debajo
-           (según lo que esté elegido) subcategorías, el detalle de
+      <!-- Detalle de un torneo: sus divisiones arriba como botones, y debajo
+           (según lo que esté elegido) categorías, el detalle de
            fixture/tabla/goleadores/tarjetas, o la tabla general del torneo. -->
       <div class="panel oculto popup-modal popup-modal-ancho" id="panelCategorias">
         <div class="panel-header">
-          <h2 id="tituloCategorias">Categorías</h2>
+          <h2 id="tituloCategorias">Divisiones</h2>
           <div>
-            <button class="btn btn-secundario" id="btnMostrarFormCategoria">+ Nueva Categoría</button>
+            <button class="btn btn-secundario" id="btnMostrarFormCategoria">+ Nueva División</button>
             <button class="btn btn-secundario" id="btnCerrarCategorias">Cerrar</button>
           </div>
         </div>
@@ -681,7 +681,7 @@
           </label>
           <div class="form-grid una-columna">
             <div>
-              <label for="categoriaFotoArchivo">Foto de la categoría (se muestra en el panel de Liga y en el sitio público)</label>
+              <label for="categoriaFotoArchivo">Foto de la división (se muestra en el panel de Liga y en el sitio público)</label>
               <div class="logo-preview-wrap">
                 <img id="categoriaFotoPreview" class="oculto" alt="Foto">
                 <input type="file" id="categoriaFotoArchivo" accept="image/*">
@@ -689,22 +689,22 @@
               <input type="hidden" id="categoriaFotoUrl">
             </div>
           </div>
-          <p class="texto-ayuda">Las subcategorías (ej: Primera / Reserva) se cargan después, eligiendo la categoría ya creada abajo. Si la categoría tiene subcategorías, el precio de inscripción y el tilde de tabla general se definen en cada subcategoría en lugar de acá.</p>
+          <p class="texto-ayuda">Las categorías (ej: Primera / Reserva) se cargan después, eligiendo la división ya creada abajo. Si la división tiene categorías, el precio de inscripción y el tilde de tabla general se definen en cada categoría en lugar de acá.</p>
           <button type="submit" class="btn">Guardar</button>
           <button type="button" class="btn btn-secundario" id="btnCancelarFormCategoria">Cancelar</button>
           <p class="mensaje-error oculto" id="categoriaFormError"></p>
         </form>
 
-        <!-- Categorías del torneo, como botones. El último botón de esta fila
+        <!-- Divisiones del torneo, como botones. El último botón de esta fila
              es "Tabla general" cuando el torneo suma 2 o más unidades
-             (categorías sin subcategorías, o subcategorías) marcadas con el
+             (divisiones sin categorías, o categorías) marcadas con el
              tilde "Suma a la tabla general". -->
         <div id="tabsCategoriasLiga" class="tabs-categorias-liga">
           <p class="texto-ayuda">Cargando...</p>
         </div>
 
-        <!-- Subcategorías de la categoría elegida (si tiene, o para cargarle
-             la primera): siempre incluye el botón "+ Subcategoría" al final. -->
+        <!-- Categorías de la división elegida (si tiene, o para cargarle
+             la primera): siempre incluye el botón "+ Categoría" al final. -->
         <div id="tabsSubcategoriasLiga" class="tabs-categorias-liga oculto"></div>
 
         <form id="formSubcategoria" class="oculto">
@@ -729,21 +729,21 @@
 
         <p class="texto-ayuda oculto" id="mensajeSinSeleccionLiga"></p>
 
-        <!-- Tabla general del torneo: suma puntos de todas las categorías/
-             subcategorías marcadas como "suma_tabla_general" en una sola
+        <!-- Tabla general del torneo: suma puntos de todas las divisiones/
+             categorías marcadas como "suma_tabla_general" en una sola
              tabla por club. -->
         <div id="bloqueTablaGeneralLiga" class="oculto">
-          <p class="texto-ayuda">Suma los puntos de todas las categorías y subcategorías marcadas con el tilde "Suma a la tabla general".</p>
+          <p class="texto-ayuda">Suma los puntos de todas las divisiones y categorías marcadas con el tilde "Suma a la tabla general".</p>
           <table>
             <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
             <tbody id="tablaGeneralTorneo"><tr><td colspan="9">Cargando...</td></tr></tbody>
           </table>
         </div>
 
-        <!-- Detalle de la categoría/subcategoría elegida: equipos / fixture / tabla -->
+        <!-- Detalle de la división/categoría elegida: equipos / fixture / tabla -->
         <div id="bloqueDetalleCategoriaLiga" class="oculto">
           <div class="panel-header">
-            <h3 id="tituloDetalleCategoria" style="margin:0;">Categoría</h3>
+            <h3 id="tituloDetalleCategoria" style="margin:0;">División</h3>
             <button class="btn btn-secundario" id="btnAbrirGestionarEquipos">Gestionar equipos</button>
           </div>
 
@@ -784,16 +784,16 @@
               <p class="texto-ayuda oculto" id="ayudaFixtureAperturaClausura">Este torneo es "Apertura y Clausura": el fixture ya se genera dos veces (ida y vuelta) automáticamente, una por cada ronda.</p>
               <div class="form-grid oculto" id="grupoFixtureEspejarCategorias">
                 <div>
-                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarCategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las categorías de este torneo</label>
+                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarCategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las divisiones de este torneo</label>
                 </div>
               </div>
               <div class="form-grid oculto" id="grupoFixtureEspejarSubcategorias">
                 <div>
-                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarSubcategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las subcategorías de esta categoría</label>
+                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarSubcategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las categorías de esta división</label>
                 </div>
               </div>
-              <p class="texto-ayuda oculto" id="ayudaFixtureEspejado">Para espejar el fixture, todas esas categorías/subcategorías tienen que tener cargados exactamente los mismos clubes y ninguna puede tener ya un fixture generado.</p>
-              <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta categoría, sin que ningún equipo juegue dos veces en la misma jornada.</p>
+              <p class="texto-ayuda oculto" id="ayudaFixtureEspejado">Para espejar el fixture, todas esas divisiones/categorías tienen que tener cargados exactamente los mismos clubes y ninguna puede tener ya un fixture generado.</p>
+              <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta división, sin que ningún equipo juegue dos veces en la misma jornada.</p>
               <button type="submit" class="btn">Confirmar generación</button>
               <button type="button" class="btn btn-secundario" id="btnCancelarGenerarFixture">Cancelar</button>
             </form>
@@ -857,7 +857,7 @@
       </div>
     </div>
 
-    <!-- Gestionar equipos de una categoría/subcategoría: inscribir/dar de
+    <!-- Gestionar equipos de una división/categoría: inscribir/dar de
          baja clubes. Se abre encima de panelCategorias (que ya es un
          popup-modal), por eso tiene su propio z-index más alto y su propio
          fondo. -->
@@ -873,7 +873,7 @@
       </div>
       <p class="mensaje-error oculto" id="equipoFormError"></p>
       <table>
-        <thead><tr><th>Club</th><th>Subcategoría</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Club</th><th>Categoría</th><th>Acciones</th></tr></thead>
         <tbody id="tablaEquipos"><tr><td colspan="3">Cargando...</td></tr></tbody>
       </table>
     </div>
@@ -963,7 +963,7 @@
             <option value="">Todos los torneos</option>
           </select>
           <select id="filtroCategoriaFichajesLiga" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
-            <option value="">Todas las categorías</option>
+            <option value="">Todas las divisiones</option>
           </select>
         </div>
         <div class="barra-acciones-masivas" id="barraAccionesMasivasFichajes">
@@ -975,7 +975,7 @@
           <thead>
             <tr>
               <th><input type="checkbox" id="chkSeleccionarTodosFichajes"></th>
-              <th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>Categoría</th><th>Estado</th><th>Carnet</th><th>Acciones</th>
+              <th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>División</th><th>Estado</th><th>Carnet</th><th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tablaFichajesLiga"><tr><td colspan="9">Cargando...</td></tr></tbody>
@@ -983,7 +983,7 @@
       </div>
     </div>
 
-    <!-- Popup: editar torneo/categoría de un fichaje -->
+    <!-- Popup: editar torneo/división de un fichaje -->
     <div class="popup-modal oculto" id="modalEditarFichaje">
       <div class="panel-header">
         <h2>Editar fichaje</h2>
@@ -997,7 +997,7 @@
           <select id="editarFichajeTorneo"></select>
         </div>
         <div>
-          <label for="editarFichajeCategoria">Categoría</label>
+          <label for="editarFichajeCategoria">División</label>
           <select id="editarFichajeCategoria"></select>
         </div>
       </div>
@@ -1051,7 +1051,7 @@
                 <option value="club">Un club puntual (en su página pública)</option>
                 <option value="ciudad">Por ciudad (en la página de cada club)</option>
                 <option value="provincia">Por provincia (en la página de cada club)</option>
-                <option value="torneo">Por torneo / categoría (en la página del torneo)</option>
+                <option value="torneo">Por torneo / división (en la página del torneo)</option>
               </select>
             </div>
             <div class="oculto" id="grupoNoticiaClub">
@@ -1071,8 +1071,8 @@
               <select id="noticiaTorneo"><option value="">Elegí un torneo</option></select>
             </div>
             <div class="oculto" id="grupoNoticiaCategoria">
-              <label for="noticiaCategoria">Categoría (opcional)</label>
-              <select id="noticiaCategoria"><option value="">Todas las categorías del torneo</option></select>
+              <label for="noticiaCategoria">División (opcional)</label>
+              <select id="noticiaCategoria"><option value="">Todas las divisiones del torneo</option></select>
             </div>
           </div>
           <button type="submit" class="btn">Publicar</button>
@@ -1110,7 +1110,7 @@
                 <option value="club">Un club puntual</option>
                 <option value="ciudad">Por ciudad</option>
                 <option value="provincia">Por provincia</option>
-                <option value="torneo">Por torneo / categoría</option>
+                <option value="torneo">Por torneo / división</option>
               </select>
             </div>
             <div>
@@ -1139,8 +1139,8 @@
               <select id="notificacionTorneo"><option value="">Elegí un torneo</option></select>
             </div>
             <div class="oculto" id="grupoNotifCategoria">
-              <label for="notificacionCategoria">Categoría (opcional)</label>
-              <select id="notificacionCategoria"><option value="">Todas las categorías del torneo</option></select>
+              <label for="notificacionCategoria">División (opcional)</label>
+              <select id="notificacionCategoria"><option value="">Todas las divisiones del torneo</option></select>
             </div>
           </div>
           <label for="notificacionMensaje">Mensaje *</label>

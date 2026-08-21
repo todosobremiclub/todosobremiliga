@@ -8,7 +8,7 @@ const { query, getClient } = require('../db');
 
 // GET /liga/fichajes?estado=pendiente&torneo_id=...&categoria_id=...&club_id=... —
 // solicitudes de fichaje de MI liga (por defecto trae todas; se puede
-// filtrar por estado, torneo, categoría y/o club)
+// filtrar por estado, torneo, división y/o club)
 router.get('/', async (req, res) => {
   const { estado, torneo_id, categoria_id, club_id } = req.query;
   try {
@@ -113,7 +113,7 @@ router.patch('/:fichajeId/rechazar', async (req, res) => {
   }
 });
 
-// PUT /liga/fichajes/:fichajeId — la Liga corrige a qué torneo/categoría
+// PUT /liga/fichajes/:fichajeId — la Liga corrige a qué torneo/división
 // quedó fichado un jugador (por ejemplo, si el club se equivocó al pedirlo).
 router.put('/:fichajeId', async (req, res) => {
   const { torneo_id, categoria_id } = req.body;
@@ -130,7 +130,7 @@ router.put('/:fichajeId', async (req, res) => {
       [categoria_id, torneo_id, req.ligaId]
     );
     if (!contexto.rows[0]) {
-      return res.status(400).json({ ok: false, error: 'Esa categoría no pertenece a ese torneo de tu Liga' });
+      return res.status(400).json({ ok: false, error: 'Esa división no pertenece a ese torneo de tu Liga' });
     }
 
     const { rows } = await query(
