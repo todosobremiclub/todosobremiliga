@@ -1315,6 +1315,20 @@
         <button type="button" class="btn btn-secundario" id="btnCerrarCobrosClub">Cerrar</button>
       </div>
       <div id="resumenCobrosClubPorTorneo"><p class="texto-ayuda">Cargando...</p></div>
+
+      <form id="formPagoCobroClub" class="oculto">
+        <input type="hidden" id="pagoClubDeudaId">
+        <input type="hidden" id="pagoClubTorneoId">
+        <div class="form-grid">
+          <div><label for="pagoClubMonto">Monto a pagar *</label><input type="number" id="pagoClubMonto" step="0.01" min="0.01" required></div>
+          <div><label for="pagoClubFecha">Fecha</label><input type="date" id="pagoClubFecha"></div>
+          <div><label for="pagoClubComentario">Comentario</label><input type="text" id="pagoClubComentario"></div>
+        </div>
+        <button type="submit" class="btn">Registrar pago</button>
+        <button type="button" class="btn btn-secundario" id="btnCancelarFormPagoCobroClub">Cancelar</button>
+        <p class="mensaje-error oculto" id="pagoClubFormError"></p>
+      </form>
+
       <h3 style="margin-top:24px;">Pagos realizados</h3>
       <div id="listaPagosCobrosClub"><p class="texto-ayuda">Cargando...</p></div>
     </div>

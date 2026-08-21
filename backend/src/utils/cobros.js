@@ -31,9 +31,11 @@ async function generarDeudaInscripcion(torneoId, clubId) {
   return rows[0] || null;
 }
 
-// Se llama al crear un partido (alta manual o generación automática de
-// fixture). Genera la deuda "por partido" para los DOS clubes que juegan
-// (local y visitante), si el concepto está activo.
+// Se llama al CARGAR EL RESULTADO de un partido (no al programarlo): recién
+// ahí el partido efectivamente se jugó. Genera la deuda "por partido" para
+// los DOS clubes que jugaron (local y visitante), si el concepto está
+// activo -- así un fixture completo generado de entrada no le carga a los
+// clubes de una la deuda de fechas que todavía no se jugaron.
 async function generarDeudasPorPartido(torneoId, partidoId, clubLocalId, clubVisitanteId, descripcion) {
   const concepto = await buscarConceptoActivo(torneoId, 'por_partido');
   if (!concepto) return [];

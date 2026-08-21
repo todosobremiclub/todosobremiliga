@@ -406,14 +406,6 @@ router.post('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
        fecha || null, hora || null, sede || null, jornada || null]
     );
 
-    // Si el torneo tiene activado el cobro "por partido", este alta genera
-    // automáticamente la deuda para los dos clubes que juegan.
-    const clubLocalId = equiposCheck.rows.find((e) => e.id === equipo_local_id)?.club_id;
-    const clubVisitanteId = equiposCheck.rows.find((e) => e.id === equipo_visitante_id)?.club_id;
-    if (clubLocalId && clubVisitanteId) {
-      await generarDeudasPorPartido(req.params.torneoId, rows[0].id, clubLocalId, clubVisitanteId);
-    }
-
     res.status(201).json({ ok: true, partido: rows[0] });
   } catch (err) {
     console.error('Error en POST partidos:', err);
@@ -472,13 +464,11 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
       const jornada = i + 1;
       const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
       for (const [localId, visitanteId] of rondas[i]) {
-        const { rows: partidoRows } = await query(
+        await query(
           `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING id`,
+           VALUES ($1, $2, $3, $4, $5, $6)`,
           [req.params.torneoId, req.params.categoriaId, localId, visitanteId, jornada, ronda]
         );
-        await generarDeudasPorPartido(req.params.torneoId, partidoRows[0].id, clubIdPorEquipo.get(localId), clubIdPorEquipo.get(visitanteId));
         cantidadCreados += 1;
       }
     }
@@ -613,13 +603,11 @@ router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
         const jornada = i + 1;
         const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
         for (const [clubLocalId, clubVisitanteId] of rondas[i]) {
-          const { rows: partidoRows } = await query(
+          await query(
             `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id`,
+             VALUES ($1, $2, $3, $4, $5, $6)`,
             [req.params.torneoId, unidad.categoria_id, equipoIdPorClub.get(clubLocalId), equipoIdPorClub.get(clubVisitanteId), jornada, ronda]
           );
-          await generarDeudasPorPartido(req.params.torneoId, partidoRows[0].id, clubLocalId, clubVisitanteId);
           cantidadCreados += 1;
         }
       }
@@ -764,6 +752,21 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
     const partido = rows[0];
+
+    // Si el torneo tiene activado el cobro "por partido", la deuda se genera
+    // acá -- al cargar el resultado, es decir cuando el partido efectivamente
+    // se jugó -- y no al programarlo. Así un fixture completo generado de
+    // entrada no le carga a los clubes la deuda de fechas que todavía no se
+    // jugaron.
+    const equiposPartido = await query(
+      'SELECT id, club_id FROM equipos_torneo WHERE id = ANY($1::uuid[])',
+      [[partido.equipo_local_id, partido.equipo_visitante_id]]
+    );
+    const clubLocalId = equiposPartido.rows.find((e) => e.id === partido.equipo_local_id)?.club_id;
+    const clubVisitanteId = equiposPartido.rows.find((e) => e.id === partido.equipo_visitante_id)?.club_id;
+    if (clubLocalId && clubVisitanteId) {
+      await generarDeudasPorPartido(req.params.torneoId, partido.id, clubLocalId, clubVisitanteId);
+    }
 
     if (Array.isArray(estadisticas_jugadores)) {
       await query('DELETE FROM partido_estadisticas_jugador WHERE partido_id = $1', [req.params.partidoId]);

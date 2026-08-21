@@ -681,6 +681,10 @@ function conectarEventos() {
     document.getElementById('modalCobrosClub').classList.add('oculto');
     document.getElementById('modalFichajesClub').classList.remove('oculto');
   });
+  document.getElementById('formPagoCobroClub').addEventListener('submit', guardarPagoCobroClub);
+  document.getElementById('btnCancelarFormPagoCobroClub').addEventListener('click', () => {
+    document.getElementById('formPagoCobroClub').classList.add('oculto');
+  });
 }
 
 function cambiarTab(nombre) {
@@ -5335,7 +5339,11 @@ async function generarCargoMensual() {
 // la tab Cobros (que mira un torneo para todos los clubes), este mira un
 // club para todos los torneos. -----
 
+let clubCobrosActualId = null;
+
 async function abrirCobrosClub(clubId, nombreClub) {
+  clubCobrosActualId = clubId;
+  document.getElementById('formPagoCobroClub').classList.add('oculto');
   document.getElementById('modalCobrosClub').classList.remove('oculto');
   document.getElementById('tituloCobrosClub').textContent = `Deuda y pagos de "${nombreClub}"`;
   const contResumen = document.getElementById('resumenCobrosClubPorTorneo');
@@ -5381,7 +5389,7 @@ function renderResumenCobrosClubPorTorneo(deudas) {
           </span>
         </h3>
         <table>
-          <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             ${deudasTorneo.map((d) => `
               <tr>
@@ -5391,6 +5399,7 @@ function renderResumenCobrosClubPorTorneo(deudas) {
                 <td>${formatearMonto(d.total_pagado)}</td>
                 <td>${formatearMonto(d.saldo)}</td>
                 <td>${estadoTexto[d.estado] || d.estado}</td>
+                <td>${d.estado !== 'pagada' ? `<button type="button" class="btn btn-secundario btn-pequeno" onclick="mostrarFormPagoCobroClub('${d.torneo_id}', '${d.id}', ${d.saldo})">Registrar pago</button>` : ''}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -5422,6 +5431,49 @@ function renderPagosCobrosClub(pagos) {
       </tbody>
     </table>
   `;
+}
+
+function mostrarFormPagoCobroClub(torneoId, deudaId, saldo) {
+  document.getElementById('pagoClubTorneoId').value = torneoId;
+  document.getElementById('pagoClubDeudaId').value = deudaId;
+  document.getElementById('pagoClubMonto').value = saldo;
+  document.getElementById('pagoClubMonto').max = saldo;
+  document.getElementById('pagoClubFecha').value = '';
+  document.getElementById('pagoClubComentario').value = '';
+  document.getElementById('pagoClubFormError').classList.add('oculto');
+  document.getElementById('formPagoCobroClub').classList.remove('oculto');
+  document.getElementById('formPagoCobroClub').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function guardarPagoCobroClub(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('pagoClubFormError');
+  errorEl.classList.add('oculto');
+  const torneoId = document.getElementById('pagoClubTorneoId').value;
+  const cuerpo = {
+    deuda_id: document.getElementById('pagoClubDeudaId').value,
+    monto: Number(document.getElementById('pagoClubMonto').value),
+    fecha: document.getElementById('pagoClubFecha').value || null,
+    comentario: document.getElementById('pagoClubComentario').value.trim() || null
+  };
+  try {
+    await apiFetch(`/liga/cobros/${torneoId}/pagos`, { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formPagoCobroClub').classList.add('oculto');
+    const [dataDeudas, dataPagos] = await Promise.all([
+      apiFetch(`/liga/cobros/clubes/${clubCobrosActualId}/deudas`),
+      apiFetch(`/liga/cobros/clubes/${clubCobrosActualId}/pagos`)
+    ]);
+    renderResumenCobrosClubPorTorneo(dataDeudas.deudas);
+    renderPagosCobrosClub(dataPagos.pagos);
+    // Si la tab "Cobros" (u otra pantalla que dependa de estos datos) está
+    // mirando el mismo torneo, la refrescamos también.
+    if (cobrosTorneoId === torneoId) {
+      await Promise.all([cargarResumenCobros(), cargarPagosCobros()]);
+    }
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
