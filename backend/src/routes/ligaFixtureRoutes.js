@@ -639,6 +639,9 @@ router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => 
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
+    // ronda: 'general' (default, todo el torneo) o 'apertura'/'clausura' para
+    // torneos con ese formato — mismo criterio que la tabla de posiciones.
+    const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
     const { rows } = await query(
       `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre, SUM(e.goles)::int AS goles
        FROM partido_estadisticas_jugador e
@@ -647,10 +650,11 @@ router.get('/:torneoId/categorias/:categoriaId/goleadores', async (req, res) => 
        JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND ($4 = 'general' OR p.ronda = $4)
        GROUP BY j.id, j.nombre, j.apellido, c.nombre
        HAVING SUM(e.goles) > 0
        ORDER BY goles DESC, j.apellido ASC`,
-      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId, ronda]
     );
     res.json({ ok: true, goleadores: rows });
   } catch (err) {
@@ -666,6 +670,7 @@ router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
     if (!contexto) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
+    const ronda = ['general', 'apertura', 'clausura'].includes(req.query.ronda) ? req.query.ronda : 'general';
     const { rows } = await query(
       `SELECT j.id AS jugador_id, j.nombre, j.apellido, c.nombre AS club_nombre,
               SUM(e.tarjetas_amarillas)::int AS tarjetas_amarillas, SUM(e.tarjetas_rojas)::int AS tarjetas_rojas
@@ -675,10 +680,11 @@ router.get('/:torneoId/categorias/:categoriaId/tarjetas', async (req, res) => {
        JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
        JOIN clubes c ON c.id = et.club_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND ($4 = 'general' OR p.ronda = $4)
        GROUP BY j.id, j.nombre, j.apellido, c.nombre
        HAVING SUM(e.tarjetas_amarillas) > 0 OR SUM(e.tarjetas_rojas) > 0
        ORDER BY tarjetas_rojas DESC, tarjetas_amarillas DESC, j.apellido ASC`,
-      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId, ronda]
     );
     res.json({ ok: true, tarjetas: rows });
   } catch (err) {

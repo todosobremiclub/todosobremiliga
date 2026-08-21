@@ -733,6 +733,15 @@
             <button class="tab-btn" id="tabBtnTarjetas">Tarjetas</button>
           </div>
 
+          <!-- Selector de ronda (Apertura/Clausura/General): compartido por
+               las cuatro pestañas de arriba, sólo visible en torneos con
+               formato "Apertura y Clausura". -->
+          <div class="tabs oculto" id="tabsRondaTabla" style="margin-top:-4px;">
+            <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
+            <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
+            <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
+          </div>
+
           <!-- Fixture -->
           <div id="subSeccionFixture" class="oculto">
             <div class="panel-header">
@@ -791,11 +800,6 @@
 
           <!-- Tabla de posiciones -->
           <div id="subSeccionTabla" class="oculto">
-            <div class="tabs oculto" id="tabsRondaTabla">
-              <button class="tab-btn" id="tabBtnRondaApertura">Apertura</button>
-              <button class="tab-btn" id="tabBtnRondaClausura">Clausura</button>
-              <button class="tab-btn activo" id="tabBtnRondaGeneral">General</button>
-            </div>
             <table>
               <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
               <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>

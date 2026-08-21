@@ -2668,6 +2668,10 @@ async function verFichajesClub(clubId, nombreClub) {
   const contLista = document.getElementById('listaFichajesPorTorneoClub');
   contResumen.innerHTML = '';
   contLista.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  // Arranca todo retraído cada vez que se abre el popup: clubes con muchos
+  // socios en varias categorías no deben mostrar de entrada una lista larga.
+  torneosFichajesClubExpandidos.clear();
+  categoriasFichajesClubExpandidas.clear();
   try {
     const [dataParticipaciones, dataFichajes] = await Promise.all([
       apiFetch(`/liga/clubes/${clubId}/participaciones`),
@@ -2696,7 +2700,28 @@ function renderResumenTorneosRegistradosClub(participaciones) {
     `).join('');
 }
 
+// Torneos y categorías retraídos/expandidos dentro del popup de fichajes de
+// un club — se reinician (todo retraído) cada vez que se abre el popup, ver
+// verFichajesClub().
+const torneosFichajesClubExpandidos = new Set();
+const categoriasFichajesClubExpandidas = new Set();
+
+function toggleTorneoFichajesClub(torneoKey) {
+  if (torneosFichajesClubExpandidos.has(torneoKey)) torneosFichajesClubExpandidos.delete(torneoKey);
+  else torneosFichajesClubExpandidos.add(torneoKey);
+  renderFichajesPorTorneoClub(fichajesPorTorneoClubCache);
+}
+
+function toggleCategoriaFichajesClub(categoriaKey) {
+  if (categoriasFichajesClubExpandidas.has(categoriaKey)) categoriasFichajesClubExpandidas.delete(categoriaKey);
+  else categoriasFichajesClubExpandidas.add(categoriaKey);
+  renderFichajesPorTorneoClub(fichajesPorTorneoClubCache);
+}
+
+let fichajesPorTorneoClubCache = [];
+
 function renderFichajesPorTorneoClub(fichajes) {
+  fichajesPorTorneoClubCache = fichajes;
   const cont = document.getElementById('listaFichajesPorTorneoClub');
   if (!fichajes.length) {
     cont.innerHTML = '<p class="texto-ayuda">Este club todavía no tiene jugadores fichados.</p>';
@@ -2710,16 +2735,21 @@ function renderFichajesPorTorneoClub(fichajes) {
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
 
   cont.innerHTML = torneosOrdenados.map((torneoRef) => {
+    const torneoKey = torneoRef.torneo_id || 'sin-torneo';
     const fichajesTorneo = fichajes.filter((f) => f.torneo_id === torneoRef.torneo_id);
+    const torneoExpandido = torneosFichajesClubExpandidos.has(torneoKey);
+
     const categoriasOrdenadas = Array.from(new Set(fichajesTorneo.map((f) => f.categoria_id || '')))
       .map((categoriaId) => fichajesTorneo.find((f) => (f.categoria_id || '') === categoriaId))
       .sort((a, b) => (a.categoria_nombre || '').localeCompare(b.categoria_nombre || ''));
 
-    const bloquesCategorias = categoriasOrdenadas.map((catRef) => {
+    const bloquesCategorias = !torneoExpandido ? '' : categoriasOrdenadas.map((catRef) => {
+      const categoriaKey = `${torneoKey}::${catRef.categoria_id || 'sin-categoria'}`;
+      const categoriaExpandida = categoriasFichajesClubExpandidas.has(categoriaKey);
       const fichajesCategoria = fichajesTorneo
         .filter((f) => (f.categoria_id || '') === (catRef.categoria_id || ''))
         .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
-      const filas = fichajesCategoria.map((f) => `
+      const filas = !categoriaExpandida ? '' : fichajesCategoria.map((f) => `
         <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
           ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
           <span style="flex:1;">
@@ -2733,7 +2763,10 @@ function renderFichajesPorTorneoClub(fichajes) {
       `).join('');
       return `
         <div class="bloque-categoria-fichajes-club">
-          <h4 style="margin-bottom:4px;">${escapeHtml(catRef.categoria_nombre || 'Sin categoría')} <span class="texto-ayuda">(${fichajesCategoria.length})</span></h4>
+          <h4 class="fila-grupo-club-clickable" style="margin-bottom:4px; cursor:pointer;" onclick="toggleCategoriaFichajesClub('${categoriaKey}')">
+            <span class="flecha-grupo-club">${categoriaExpandida ? '▾' : '▸'}</span>
+            ${escapeHtml(catRef.categoria_nombre || 'Sin categoría')} <span class="texto-ayuda">(${fichajesCategoria.length})</span>
+          </h4>
           ${filas}
         </div>
       `;
@@ -2741,7 +2774,10 @@ function renderFichajesPorTorneoClub(fichajes) {
 
     return `
       <div class="bloque-torneo-fichajes-club">
-        <h3>${escapeHtml(torneoRef.torneo_nombre || 'Sin torneo')} <span class="texto-ayuda">(${fichajesTorneo.length} fichado(s))</span></h3>
+        <h3 class="fila-grupo-club-clickable" style="cursor:pointer;" onclick="toggleTorneoFichajesClub('${torneoKey}')">
+          <span class="flecha-grupo-club">${torneoExpandido ? '▾' : '▸'}</span>
+          ${escapeHtml(torneoRef.torneo_nombre || 'Sin torneo')} <span class="texto-ayuda">(${fichajesTorneo.length} fichado(s))</span>
+        </h3>
         ${bloquesCategorias}
       </div>
     `;
@@ -3477,7 +3513,14 @@ function mostrarBloqueDetalleCategoriaLiga() {
   cambiarTabDetalle('tabla');
 }
 
+// Qué pestaña (Tabla/Fixture/Goleadores/Tarjetas) está abierta ahora mismo
+// dentro del detalle de una categoría — se usa para saber qué volver a
+// cargar cuando se cambia de ronda (Apertura/Clausura/General) desde el
+// selector compartido.
+let tabDetalleActual = 'tabla';
+
 function cambiarTabDetalle(nombre) {
+  tabDetalleActual = nombre;
   const secciones = {
     fixture: 'subSeccionFixture', tabla: 'subSeccionTabla',
     goleadores: 'subSeccionGoleadores', tarjetas: 'subSeccionTarjetas'
@@ -3490,11 +3533,11 @@ function cambiarTabDetalle(nombre) {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
+  // El selector de ronda es compartido por las cuatro pestañas: se muestra
+  // en todas ellas (no sólo en Tabla) cuando el torneo es Apertura/Clausura.
+  document.getElementById('tabsRondaTabla').classList.toggle('oculto', !torneoActualEsAperturaClausura());
   if (nombre === 'fixture') cargarPartidos();
-  if (nombre === 'tabla') {
-    document.getElementById('tabsRondaTabla').classList.toggle('oculto', !torneoActualEsAperturaClausura());
-    cargarTabla();
-  }
+  if (nombre === 'tabla') cargarTabla();
   if (nombre === 'goleadores') cargarGoleadores();
   if (nombre === 'tarjetas') cargarTarjetas();
 }
@@ -3553,7 +3596,19 @@ function cambiarRondaTabla(ronda) {
   Object.keys(botones).forEach((key) => {
     document.getElementById(botones[key]).classList.toggle('activo', key === ronda);
   });
-  cargarTabla();
+  // El selector es compartido: hay que recargar la pestaña que esté abierta
+  // en este momento (Tabla, Fixture, Goleadores o Tarjetas), no siempre la
+  // tabla de posiciones.
+  if (tabDetalleActual === 'fixture') {
+    jornadaFixtureActual = 1;
+    cargarPartidos();
+  } else if (tabDetalleActual === 'goleadores') {
+    cargarGoleadores();
+  } else if (tabDetalleActual === 'tarjetas') {
+    cargarTarjetas();
+  } else {
+    cargarTabla();
+  }
 }
 
 async function cargarEquipos() {
@@ -3706,7 +3761,13 @@ async function cargarPartidos() {
 
     document.getElementById('navegadorJornadas').classList.remove('oculto');
     document.getElementById('bloqueDescripcionJornada').classList.remove('oculto');
-    const jornadasDisponibles = Array.from(new Set(partidosCache.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
+    const jornadasDisponibles = jornadasDisponiblesSegunRonda();
+    if (!jornadasDisponibles.length) {
+      document.getElementById('navegadorJornadas').classList.add('oculto');
+      document.getElementById('bloqueDescripcionJornada').classList.add('oculto');
+      contenedor.innerHTML = '<p class="texto-ayuda">Todavía no hay partidos programados para esta ronda.</p>';
+      return;
+    }
     if (!jornadasDisponibles.includes(jornadaFixtureActual)) {
       jornadaFixtureActual = jornadasDisponibles[0];
     }
@@ -3731,8 +3792,19 @@ async function guardarDescripcionJornada() {
   }
 }
 
+// Jornadas disponibles según la ronda elegida (Apertura/Clausura/General):
+// en torneos "Apertura y Clausura" los números de jornada se repiten entre
+// rondas, así que hay que filtrar por partido.ronda antes de listarlas.
+function jornadasDisponiblesSegunRonda() {
+  const esAperturaClausura = torneoActualEsAperturaClausura();
+  const partidos = (esAperturaClausura && rondaTablaActual !== 'general')
+    ? partidosCache.filter((p) => p.ronda === rondaTablaActual)
+    : partidosCache;
+  return Array.from(new Set(partidos.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
+}
+
 function cambiarJornadaFixture(delta) {
-  const jornadasDisponibles = Array.from(new Set(partidosCache.map((p) => p.jornada != null ? p.jornada : 0))).sort((a, b) => a - b);
+  const jornadasDisponibles = jornadasDisponiblesSegunRonda();
   const idx = jornadasDisponibles.indexOf(jornadaFixtureActual);
   const nuevoIdx = idx + delta;
   if (nuevoIdx < 0 || nuevoIdx >= jornadasDisponibles.length) return;
@@ -3754,7 +3826,10 @@ function opcionesCanchasPredio(canchaPredioIdSeleccionada) {
 function renderJornadaFixture(jornadasDisponibles) {
   const contenedor = document.getElementById('contenedorPartidosJornada');
   const esAperturaClausura = torneoActualEsAperturaClausura();
-  const partidosJornada = partidosCache.filter((p) => (p.jornada != null ? p.jornada : 0) === jornadaFixtureActual);
+  const partidosJornada = partidosCache.filter((p) =>
+    (p.jornada != null ? p.jornada : 0) === jornadaFixtureActual
+    && (!esAperturaClausura || rondaTablaActual === 'general' || p.ronda === rondaTablaActual)
+  );
   const rondaLabel = { apertura: ' (Apertura)', clausura: ' (Clausura)' };
   const ronda = partidosJornada[0] && partidosJornada[0].ronda;
   document.getElementById('tituloJornadaActual').textContent =
@@ -4118,11 +4193,22 @@ async function guardarResultadoConEstadisticas(e) {
 
 // ----- Goleadores y Tarjetas -----
 
+// Querystring compartido por goleadores/tarjetas: subcategoría (si hay) +
+// ronda (Apertura/Clausura/General, sólo relevante si el torneo es de ese
+// formato — el backend ignora el parámetro si no aplica).
+function qsSubcategoriaYRonda() {
+  const params = new URLSearchParams();
+  if (subcategoriaActualId) params.set('subcategoria_id', subcategoriaActualId);
+  if (torneoActualEsAperturaClausura()) params.set('ronda', rondaTablaActual);
+  const texto = params.toString();
+  return texto ? `?${texto}` : '';
+}
+
 async function cargarGoleadores() {
   const tbody = document.getElementById('tablaGoleadores');
   tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
   try {
-    const qs = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
+    const qs = qsSubcategoriaYRonda();
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/goleadores${qs}`);
     const goleadores = data.goleadores;
     if (!goleadores.length) {
@@ -4145,7 +4231,7 @@ async function cargarTarjetas() {
   const tbody = document.getElementById('tablaTarjetas');
   tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
   try {
-    const qs = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
+    const qs = qsSubcategoriaYRonda();
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tarjetas${qs}`);
     const tarjetas = data.tarjetas;
     if (!tarjetas.length) {
