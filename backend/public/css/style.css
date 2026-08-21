@@ -539,6 +539,8 @@ button.btn-peligro:hover { background: #fee2e2; }
 
 .card-link {
   display: block;
+  position: relative;
+  overflow: hidden;
   background: var(--blanco);
   border-radius: var(--radio);
   padding: 18px;
@@ -550,8 +552,30 @@ button.btn-peligro:hover { background: #fee2e2; }
 
 .card-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 
-.card-link h3 {
+/* Marca de agua muy suave con el logo del torneo (o el de la división, en
+   los botones de división del sitio público) — sólo se pinta si el elemento
+   trae la variable --foto-fondo cargada (ver JS que genera estas tarjetas). */
+.card-link.con-foto-fondo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--foto-fondo);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.08;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.card-link h3,
+.card-link p {
+  position: relative;
+  z-index: 1;
   margin: 0 0 4px;
+}
+
+.card-link h3 {
   font-size: 15px;
   color: var(--azul-oscuro);
 }

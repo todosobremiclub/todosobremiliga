@@ -123,7 +123,9 @@ async function cargarCategorias() {
 function renderTabsCategorias() {
   const cont = document.getElementById('tabsCategorias');
   const botonesCategorias = categoriasCache.map((c) => `
-    <button class="tab-btn tab-btn-categoria ${!mostrandoTablaGeneral && categoriaSeleccionadaId === c.id ? 'activo' : ''}" onclick="seleccionarCategoria('${c.id}')">${c.foto_url ? `<img src="${c.foto_url}" alt="" class="foto-mini-tab-categoria">` : ''}${escapeHtml(c.nombre)}</button>
+    <button class="tab-btn tab-btn-categoria ${c.foto_url ? 'con-foto-fondo' : ''} ${!mostrandoTablaGeneral && categoriaSeleccionadaId === c.id ? 'activo' : ''}" ${c.foto_url ? `style="--foto-fondo: url('${escapeHtml(c.foto_url)}')"` : ''} onclick="seleccionarCategoria('${c.id}')">
+      <span class="contenido-tab-categoria">${c.foto_url ? `<img src="${c.foto_url}" alt="" class="foto-mini-tab-categoria">` : ''}${escapeHtml(c.nombre)}</span>
+    </button>
   `).join('');
   const botonGeneral = hayTablaGeneral
     ? `<button class="tab-btn tab-btn-categoria tab-btn-general ${mostrandoTablaGeneral ? 'activo' : ''}" onclick="seleccionarTablaGeneral()">Tabla general</button>`

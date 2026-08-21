@@ -41,7 +41,7 @@ router.get('/ligas/:slug', async (req, res) => {
 router.get('/ligas/:slug/torneos', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin
+      `SELECT t.id, t.nombre, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin, t.logo_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
        WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva'

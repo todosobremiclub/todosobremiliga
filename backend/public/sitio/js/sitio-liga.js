@@ -43,7 +43,7 @@ async function init() {
       return;
     }
     contenedorTorneos.innerHTML = dataTorneos.torneos.map((t) => `
-      <a class="card-link" href="/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}">
+      <a class="card-link ${t.logo_url ? 'con-foto-fondo' : ''}" ${t.logo_url ? `style="--foto-fondo: url('${escapeHtml(t.logo_url)}')"` : ''} href="/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}">
         <h3>${escapeHtml(t.nombre)}</h3>
         <p>${escapeHtml(t.deporte)} · ${escapeHtml(t.temporada || '')} · ${escapeHtml(t.estado || 'planificado')}</p>
       </a>
