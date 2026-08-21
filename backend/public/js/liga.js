@@ -420,6 +420,25 @@ function conectarEventos() {
     const esAperturaClausura = torneoActualEsAperturaClausura();
     document.getElementById('grupoFixtureIdaVuelta').classList.toggle('oculto', esAperturaClausura);
     document.getElementById('ayudaFixtureAperturaClausura').classList.toggle('oculto', !esAperturaClausura);
+
+    // Ofrece espejar el fixture (mismos rivales) contra otras
+    // categorías/subcategorías sólo cuando tiene sentido: si esta categoría
+    // tiene subcategorías, se espeja contra las OTRAS subcategorías de la
+    // MISMA categoría (ej: Zona A con 2018/2019); si no tiene subcategorías,
+    // se espeja contra las OTRAS categorías del torneo sin subcategorías
+    // (ej: Baby Fútbol con categorías 2018/2019/2020).
+    const categoria = categoriasCache.find((c) => c.id === categoriaActualId);
+    const tieneSubcategorias = !!(categoria && categoria.subcategorias && categoria.subcategorias.length);
+    const puedeEspejarSubcategorias = tieneSubcategorias && !!subcategoriaActualId && categoria.subcategorias.length > 1;
+    const categoriasPeladas = categoriasCache.filter((c) => !(c.subcategorias && c.subcategorias.length));
+    const puedeEspejarCategorias = !tieneSubcategorias && categoriasPeladas.length > 1;
+
+    document.getElementById('grupoFixtureEspejarSubcategorias').classList.toggle('oculto', !puedeEspejarSubcategorias);
+    document.getElementById('grupoFixtureEspejarCategorias').classList.toggle('oculto', !puedeEspejarCategorias);
+    document.getElementById('ayudaFixtureEspejado').classList.toggle('oculto', !puedeEspejarSubcategorias && !puedeEspejarCategorias);
+    document.getElementById('fixtureEspejarSubcategorias').checked = false;
+    document.getElementById('fixtureEspejarCategorias').checked = false;
+
     document.getElementById('formGenerarFixture').classList.remove('oculto');
   });
   document.getElementById('btnCancelarGenerarFixture').addEventListener('click', () => {
@@ -4079,13 +4098,35 @@ async function generarFixtureAutomatico(e) {
   const errorEl = document.getElementById('fixtureAccionError');
   errorEl.classList.add('oculto');
   const idaVuelta = document.getElementById('fixtureIdaVuelta').checked;
+
+  // Los checkboxes de espejado sólo cuentan si su grupo está visible (evita
+  // que un valor viejo tildado de una categoría anterior se aplique acá).
+  const espejarSubcategorias = !document.getElementById('grupoFixtureEspejarSubcategorias').classList.contains('oculto')
+    && document.getElementById('fixtureEspejarSubcategorias').checked;
+  const espejarCategorias = !document.getElementById('grupoFixtureEspejarCategorias').classList.contains('oculto')
+    && document.getElementById('fixtureEspejarCategorias').checked;
+
   try {
-    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/fixture/generar`, {
-      method: 'POST',
-      body: JSON.stringify({ ida_vuelta: idaVuelta, subcategoria_id: subcategoriaActualId || undefined })
-    });
+    let data;
+    if (espejarSubcategorias) {
+      data = await apiFetch(`/liga/torneos/${torneoActualId}/fixture/generar-espejado`, {
+        method: 'POST',
+        body: JSON.stringify({ ida_vuelta: idaVuelta, nivel: 'subcategorias', categoria_id: categoriaActualId })
+      });
+    } else if (espejarCategorias) {
+      data = await apiFetch(`/liga/torneos/${torneoActualId}/fixture/generar-espejado`, {
+        method: 'POST',
+        body: JSON.stringify({ ida_vuelta: idaVuelta, nivel: 'categorias' })
+      });
+    } else {
+      data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/fixture/generar`, {
+        method: 'POST',
+        body: JSON.stringify({ ida_vuelta: idaVuelta, subcategoria_id: subcategoriaActualId || undefined })
+      });
+    }
     document.getElementById('formGenerarFixture').classList.add('oculto');
-    alert(`Se generaron ${data.partidos_creados} partidos en ${data.jornadas} jornadas.`);
+    const detalleEspejado = data.unidades ? ` (se aplicó el mismo fixture en ${data.unidades} categorías/subcategorías)` : '';
+    alert(`Se generaron ${data.partidos_creados} partidos en ${data.jornadas} jornadas${detalleEspejado}.`);
     jornadaFixtureActual = 1;
     cargarPartidos();
   } catch (err) {

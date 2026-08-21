@@ -782,6 +782,17 @@
                 </div>
               </div>
               <p class="texto-ayuda oculto" id="ayudaFixtureAperturaClausura">Este torneo es "Apertura y Clausura": el fixture ya se genera dos veces (ida y vuelta) automáticamente, una por cada ronda.</p>
+              <div class="form-grid oculto" id="grupoFixtureEspejarCategorias">
+                <div>
+                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarCategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las categorías de este torneo</label>
+                </div>
+              </div>
+              <div class="form-grid oculto" id="grupoFixtureEspejarSubcategorias">
+                <div>
+                  <label class="check-inline"><input type="checkbox" id="fixtureEspejarSubcategorias" style="width:auto;">Generar el mismo fixture (mismos rivales) en TODAS las subcategorías de esta categoría</label>
+                </div>
+              </div>
+              <p class="texto-ayuda oculto" id="ayudaFixtureEspejado">Para espejar el fixture, todas esas categorías/subcategorías tienen que tener cargados exactamente los mismos clubes y ninguna puede tener ya un fixture generado.</p>
               <p class="texto-ayuda">Se genera automáticamente un fixture "todos contra todos" con todos los clubes inscriptos en esta categoría, sin que ningún equipo juegue dos veces en la misma jornada.</p>
               <button type="submit" class="btn">Confirmar generación</button>
               <button type="button" class="btn btn-secundario" id="btnCancelarGenerarFixture">Cancelar</button>

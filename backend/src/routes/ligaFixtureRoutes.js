@@ -470,6 +470,152 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
   }
 });
 
+// Compara los club_id de varias "unidades" (categorías o subcategorías) que
+// se van a espejar entre sí: para que tenga sentido armar el MISMO fixture
+// en todas, tienen que tener cargados exactamente los mismos clubes.
+// Devuelve un mensaje de error si no coinciden, o null si están OK.
+function validarClubesIguales(unidades) {
+  const [primera, ...resto] = unidades;
+  const clubesPrimera = new Set(primera.equipos.map((e) => e.club_id));
+  for (const unidad of resto) {
+    const clubesUnidad = new Set(unidad.equipos.map((e) => e.club_id));
+    if (clubesUnidad.size !== clubesPrimera.size || [...clubesPrimera].some((id) => !clubesUnidad.has(id))) {
+      return `"${primera.nombre}" y "${unidad.nombre}" no tienen exactamente los mismos clubes inscriptos. Para generar un fixture espejado, todas las unidades elegidas tienen que tener cargados los mismos equipos.`;
+    }
+  }
+  return null;
+}
+
+// POST /liga/torneos/:torneoId/fixture/generar-espejado — genera el MISMO
+// fixture (los mismos enfrentamientos entre clubes, jornada por jornada) en
+// varias categorías o subcategorías a la vez. Pensado para torneos donde el
+// mismo grupo de clubes juega en paralelo en cada una — ej: "Baby Fútbol"
+// con categorías 2018/2019/2020 (mismos equipos en las tres), o una Zona con
+// subcategorías 2018/2019 adentro (mismos equipos de esa zona en las dos).
+// Body: { nivel: 'categorias' | 'subcategorias', categoria_id (obligatorio
+// si nivel es 'subcategorias'), ida_vuelta }
+router.post('/:torneoId/fixture/generar-espejado', async (req, res) => {
+  const { nivel, categoria_id, ida_vuelta } = req.body;
+  if (!['categorias', 'subcategorias'].includes(nivel)) {
+    return res.status(400).json({ ok: false, error: "Falta indicar nivel: 'categorias' o 'subcategorias'" });
+  }
+  try {
+    const torneoResult = await query('SELECT * FROM torneos WHERE id = $1 AND liga_id = $2', [req.params.torneoId, req.ligaId]);
+    const torneo = torneoResult.rows[0];
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado en tu Liga' });
+
+    // Arma la lista de "unidades" a espejar: cada una con su categoria_id, su
+    // subcategoria_id (o null) y sus equipos ({id, club_id}) ya inscriptos.
+    const unidades = [];
+    if (nivel === 'categorias') {
+      // Sólo entran las categorías SIN subcategorías (las que tienen se
+      // espejan a nivel subcategoría, con el otro modo) — mezclar ambas
+      // llevaría a duplicar o pisar la lógica de espejado.
+      const categoriasResult = await query(
+        `SELECT c.id, c.nombre FROM categorias c
+         WHERE c.torneo_id = $1 AND NOT EXISTS (SELECT 1 FROM categoria_subcategorias cs WHERE cs.categoria_id = c.id)
+         ORDER BY c.orden ASC, c.nombre ASC`,
+        [req.params.torneoId]
+      );
+      if (categoriasResult.rows.length < 2) {
+        return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 categorías (sin subcategorías) en este torneo para espejar el fixture entre ellas' });
+      }
+      for (const cat of categoriasResult.rows) {
+        const equiposResult = await query(
+          'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NULL',
+          [req.params.torneoId, cat.id]
+        );
+        unidades.push({ nombre: cat.nombre, categoria_id: cat.id, subcategoria_id: null, equipos: equiposResult.rows });
+      }
+    } else {
+      if (!categoria_id) return res.status(400).json({ ok: false, error: 'Falta categoria_id' });
+      const categoriaOk = await query('SELECT id, nombre FROM categorias WHERE id = $1 AND torneo_id = $2', [categoria_id, req.params.torneoId]);
+      if (!categoriaOk.rows[0]) return res.status(404).json({ ok: false, error: 'Categoría no encontrada en este torneo' });
+
+      const subcategoriasResult = await query(
+        'SELECT id, nombre FROM categoria_subcategorias WHERE categoria_id = $1 ORDER BY orden ASC, nombre ASC',
+        [categoria_id]
+      );
+      if (subcategoriasResult.rows.length < 2) {
+        return res.status(400).json({ ok: false, error: 'Esta categoría necesita al menos 2 subcategorías para espejar el fixture entre ellas' });
+      }
+      for (const sub of subcategoriasResult.rows) {
+        const equiposResult = await query(
+          'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND subcategoria_id = $3 AND activo = TRUE',
+          [req.params.torneoId, categoria_id, sub.id]
+        );
+        unidades.push({ nombre: sub.nombre, categoria_id, subcategoria_id: sub.id, equipos: equiposResult.rows });
+      }
+    }
+
+    const sinEquiposSuficientes = unidades.find((u) => u.equipos.length < 2);
+    if (sinEquiposSuficientes) {
+      return res.status(400).json({
+        ok: false,
+        error: `"${sinEquiposSuficientes.nombre}" tiene menos de 2 equipos inscriptos. Todas las unidades a espejar necesitan al menos 2 equipos.`
+      });
+    }
+
+    const errorClubes = validarClubesIguales(unidades);
+    if (errorClubes) return res.status(400).json({ ok: false, error: errorClubes });
+
+    // Ninguna de las unidades puede tener ya un fixture cargado (mismo
+    // chequeo que la generación individual, pero repetido por cada una).
+    for (const unidad of unidades) {
+      const existentes = await query(
+        `SELECT COUNT(*)::int AS cantidad FROM partidos p
+         JOIN equipos_torneo el ON el.id = p.equipo_local_id
+         WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+        [req.params.torneoId, unidad.categoria_id, unidad.subcategoria_id]
+      );
+      if (existentes.rows[0].cantidad > 0) {
+        return res.status(409).json({
+          ok: false,
+          error: `"${unidad.nombre}" ya tiene un fixture cargado. Vaciá el fixture de todas las unidades elegidas antes de generar uno nuevo espejado.`
+        });
+      }
+    }
+
+    // El sorteo se hace UNA sola vez, en base a los club_id (que son los
+    // mismos en todas las unidades ya validado arriba); después se aplica
+    // tal cual a cada unidad, traduciendo cada club_id al equipo_torneo_id
+    // que le corresponde en esa categoría/subcategoría puntual.
+    const clubIds = unidades[0].equipos.map((e) => e.club_id);
+    const esAperturaClausura = torneo.formato_juego === 'apertura_clausura';
+    const idaVuelta = esAperturaClausura ? true : (ida_vuelta != null ? !!ida_vuelta : torneo.formato_juego === 'liguilla_ida_vuelta');
+    const rondas = generarRoundRobin(clubIds, idaVuelta);
+    const mitadRondas = esAperturaClausura ? rondas.length / 2 : null;
+
+    let cantidadCreados = 0;
+    for (const unidad of unidades) {
+      const equipoIdPorClub = new Map(unidad.equipos.map((e) => [e.club_id, e.id]));
+      for (let i = 0; i < rondas.length; i++) {
+        const jornada = i + 1;
+        const ronda = esAperturaClausura ? (i < mitadRondas ? 'apertura' : 'clausura') : null;
+        for (const [clubLocalId, clubVisitanteId] of rondas[i]) {
+          await query(
+            `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, ronda)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [req.params.torneoId, unidad.categoria_id, equipoIdPorClub.get(clubLocalId), equipoIdPorClub.get(clubVisitanteId), jornada, ronda]
+          );
+          cantidadCreados += 1;
+        }
+      }
+    }
+
+    res.status(201).json({
+      ok: true,
+      partidos_creados: cantidadCreados,
+      jornadas: rondas.length,
+      unidades: unidades.length,
+      ida_vuelta: idaVuelta
+    });
+  } catch (err) {
+    console.error('Error en POST fixture/generar-espejado:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId/fixture — vacía el
 // fixture de esta categoría. Solo borra los partidos que TODAVÍA no se
 // jugaron (los que ya tienen resultado cargado se conservan).
