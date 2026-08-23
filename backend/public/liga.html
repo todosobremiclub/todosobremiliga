@@ -89,6 +89,8 @@
   #headerLiga img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
   #headerLiga h2 { margin: 0; font-size: 20px; }
   #headerLiga p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+  #headerLigaLogoLink { display: inline-block; cursor: pointer; transition: opacity 0.15s; }
+  #headerLigaLogoLink:hover { opacity: 0.85; }
   .bloque-equipo-stats { margin-bottom: 16px; }
   .bloque-equipo-stats h4 { margin: 0 0 8px; font-size: 13px; color: var(--gris-600); }
   .fila-jugador-stats { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--gris-100); font-size: 13px; }
@@ -187,7 +189,9 @@
 
   <div class="contenido">
     <div id="headerLiga" class="oculto" style="background: linear-gradient(135deg, #1d4ed8, #1e3a8a);">
-      <img id="headerLigaLogo" class="oculto" alt="Logo">
+      <a id="headerLigaLogoLink" class="oculto" target="_blank" title="Ver el sitio público de la Liga">
+        <img id="headerLigaLogo" class="oculto" alt="Logo">
+      </a>
       <div>
         <h2 id="headerLigaNombre">Mi Liga</h2>
         <p>Panel de gestión de la Liga</p>

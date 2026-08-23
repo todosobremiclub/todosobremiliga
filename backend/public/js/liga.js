@@ -122,11 +122,18 @@ async function cargarPerfilLiga() {
     header.classList.remove('oculto');
     document.getElementById('headerLigaNombre').textContent = liga.nombre;
     const logo = document.getElementById('headerLigaLogo');
+    const logoLink = document.getElementById('headerLigaLogoLink');
     if (liga.logo_url) {
       logo.src = liga.logo_url;
       logo.classList.remove('oculto');
     } else {
       logo.classList.add('oculto');
+    }
+    if (liga.slug && liga.logo_url) {
+      logoLink.href = `/sitio/liga.html?slug=${encodeURIComponent(liga.slug)}`;
+      logoLink.classList.remove('oculto');
+    } else {
+      logoLink.classList.add('oculto');
     }
 
     // Fondo "cancha de noche" (mismo estilo que el login) pero con los
