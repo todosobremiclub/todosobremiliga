@@ -30,6 +30,7 @@ function init() {
 function conectarEventos() {
   document.getElementById('tabBtnJugadores').addEventListener('click', () => cambiarTab('jugadores'));
   document.getElementById('tabBtnFichajes').addEventListener('click', () => cambiarTab('fichajes'));
+  document.getElementById('tabBtnMisTorneos').addEventListener('click', () => cambiarTab('misTorneos'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
   document.getElementById('tabBtnDocumentos').addEventListener('click', () => cambiarTab('documentos'));
   document.getElementById('formDocumentoClub').addEventListener('submit', subirDocumentoClub);
@@ -91,11 +92,11 @@ function conectarEventos() {
 
 function cambiarTab(nombre) {
   const secciones = {
-    jugadores: 'seccionJugadores', fichajes: 'seccionFichajes',
+    jugadores: 'seccionJugadores', fichajes: 'seccionFichajes', misTorneos: 'seccionMisTorneos',
     notificaciones: 'seccionNotificaciones', documentos: 'seccionDocumentos'
   };
   const botones = {
-    jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes',
+    jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes', misTorneos: 'tabBtnMisTorneos',
     notificaciones: 'tabBtnNotificaciones', documentos: 'tabBtnDocumentos'
   };
   Object.keys(secciones).forEach((key) => {
@@ -103,8 +104,70 @@ function cambiarTab(nombre) {
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
   if (nombre === 'fichajes') cargarFichajes();
+  if (nombre === 'misTorneos') cargarMisTorneos();
   if (nombre === 'notificaciones') cargarNotificacionesClub();
   if (nombre === 'documentos') cargarDocumentosClub();
+}
+
+// ===================== MIS TORNEOS =====================
+
+async function cargarMisTorneos() {
+  const contenedor = document.getElementById('listaMisTorneos');
+  contenedor.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const data = await apiFetch('/club/torneos');
+    renderMisTorneos(data.torneos);
+  } catch (err) {
+    contenedor.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderMisTorneos(torneos) {
+  const contenedor = document.getElementById('listaMisTorneos');
+  if (!torneos.length) {
+    contenedor.innerHTML = '<p class="texto-ayuda">Tu club todavía no está inscripto en ningún torneo.</p>';
+    return;
+  }
+
+  const ligasOrdenadas = Array.from(new Set(torneos.map((t) => t.liga_nombre)));
+
+  contenedor.innerHTML = ligasOrdenadas.map((ligaNombre) => {
+    const deLaLiga = torneos.filter((t) => t.liga_nombre === ligaNombre);
+    const tarjetas = deLaLiga.map((t) => {
+      const urlTorneo = (tab) => {
+        const params = new URLSearchParams({ id: t.torneo_id, nombre: t.torneo_nombre, categoriaId: t.categoria_id, tab });
+        if (t.subcategoria_id) params.set('subcategoriaId', t.subcategoria_id);
+        return `/sitio/torneo.html?${params.toString()}`;
+      };
+      const divisionTexto = t.subcategoria_nombre ? `${t.categoria_nombre} · ${t.subcategoria_nombre}` : t.categoria_nombre;
+      const jugadores = t.jugadores || [];
+      const listaJugadores = jugadores.length
+        ? `<ul class="lista-jugadores-fichados-club">${jugadores.slice(0, 6).map((j) => `<li>${escapeHtml(j.apellido)}, ${escapeHtml(j.nombre)}</li>`).join('')}${jugadores.length > 6 ? `<li>... y ${jugadores.length - 6} más</li>` : ''}</ul>`
+        : '';
+      return `
+        <div class="tarjeta-torneo-club">
+          <h4>${escapeHtml(t.torneo_nombre)}</h4>
+          <div class="division-torneo-club">${escapeHtml(divisionTexto)}</div>
+          <div class="jugadores-fichados-club">
+            <strong>${t.jugadores_fichados}</strong> jugador(es) fichado(s)
+            ${listaJugadores}
+          </div>
+          <div class="links-torneo-club">
+            <a href="${urlTorneo('tabla')}" target="_blank">Tabla</a>
+            <a href="${urlTorneo('fixture')}" target="_blank">Fixture</a>
+            <a href="${urlTorneo('goleadores')}" target="_blank">Goleadores</a>
+            <a href="${urlTorneo('tarjetas')}" target="_blank">Tarjetas</a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="grupo-liga-torneos">
+        <h3>${escapeHtml(ligaNombre)}</h3>
+        <div class="grid-torneos-club">${tarjetas}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ===================== DOCUMENTOS =====================
@@ -515,10 +578,12 @@ async function enviarSolicitudFichaje(e) {
           subcategoria_id: subcategoriaId || undefined
         })
       });
-      if (respuesta.aviso_otros_torneos && respuesta.aviso_otros_torneos.length) {
+      if (respuesta.aviso_otros_fichajes && respuesta.aviso_otros_fichajes.length) {
         const jugador = jugadoresCache.find((j) => j.id === jugadorId);
         const nombreJugador = jugador ? `${jugador.nombre} ${jugador.apellido}` : jugadorId;
-        const otros = respuesta.aviso_otros_torneos.map((o) => `${o.torneo_nombre} (${o.club_nombre})`).join(', ');
+        const otros = respuesta.aviso_otros_fichajes
+          .map((o) => `${o.torneo_nombre}${o.categoria_nombre ? ' - ' + o.categoria_nombre : ''}${o.subcategoria_nombre ? ' (' + o.subcategoria_nombre + ')' : ''} (${o.club_nombre})`)
+          .join(', ');
         avisos.push(`${nombreJugador} ya figura fichado en: ${otros}`);
       }
     } catch (err) {

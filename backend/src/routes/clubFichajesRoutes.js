@@ -126,20 +126,23 @@ router.post('/:jugadorId/fichajes', async (req, res) => {
     }
 
     // Aviso informativo (no bloqueante): mismo DNI ya fichado en OTRO torneo
-    // de la misma Liga. Sirve para que la Liga detecte un jugador que se
-    // quiere fichar por más de un club/torneo dentro de su misma Liga.
+    // Y/O en OTRA división/categoría de la misma Liga. Sirve para que la
+    // Liga detecte un jugador que se quiere fichar por más de un club, o en
+    // más de una división/categoría, dentro de su misma Liga.
     const { rows: otrosFichajes } = await query(
       `SELECT f.id, f.estado, f.torneo_id, t.nombre AS torneo_nombre,
+              cat.nombre AS categoria_nombre, sub.nombre AS subcategoria_nombre,
               cl.id AS club_id, cl.nombre AS club_nombre
        FROM fichajes f
        JOIN jugadores j ON j.id = f.jugador_id
        JOIN torneos t ON t.id = f.torneo_id
        JOIN clubes cl ON cl.id = f.club_id
+       LEFT JOIN categorias cat ON cat.id = f.categoria_id
+       LEFT JOIN categoria_subcategorias sub ON sub.id = f.subcategoria_id
        WHERE j.dni = (SELECT dni FROM jugadores WHERE id = $1)
          AND f.liga_id = $2
-         AND f.torneo_id <> $3
          AND f.estado IN ('pendiente', 'aprobado')`,
-      [req.params.jugadorId, liga_id, torneo_id]
+      [req.params.jugadorId, liga_id]
     );
 
     const { rows } = await query(
@@ -152,7 +155,7 @@ router.post('/:jugadorId/fichajes', async (req, res) => {
     res.status(201).json({
       ok: true,
       fichaje: rows[0],
-      aviso_otros_torneos: otrosFichajes.length ? otrosFichajes : undefined,
+      aviso_otros_fichajes: otrosFichajes.length ? otrosFichajes : undefined,
     });
   } catch (err) {
     console.error('Error en POST fichajes:', err);

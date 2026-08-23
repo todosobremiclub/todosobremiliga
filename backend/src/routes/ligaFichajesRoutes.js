@@ -22,21 +22,28 @@ router.get('/', async (req, res) => {
              (
                SELECT json_agg(json_build_object(
                  'torneo_id', t2.id, 'torneo_nombre', t2.nombre,
+                 'categoria_nombre', cat2.nombre, 'subcategoria_nombre', sub2.nombre,
                  'club_id', c2.id, 'club_nombre', c2.nombre,
                  'estado', f2.estado
                ))
                FROM fichajes f2
                JOIN torneos t2 ON t2.id = f2.torneo_id
                JOIN clubes c2 ON c2.id = f2.club_id
+               LEFT JOIN categorias cat2 ON cat2.id = f2.categoria_id
+               LEFT JOIN categoria_subcategorias sub2 ON sub2.id = f2.subcategoria_id
                WHERE f2.liga_id = f.liga_id
-                 AND f2.jugador_id <> f.jugador_id
-                 AND f2.torneo_id <> f.torneo_id
+                 AND f2.id <> f.id
                  AND f2.estado IN ('pendiente', 'aprobado')
+                 AND (
+                   f2.torneo_id IS DISTINCT FROM f.torneo_id
+                   OR f2.categoria_id IS DISTINCT FROM f.categoria_id
+                   OR f2.subcategoria_id IS DISTINCT FROM f.subcategoria_id
+                 )
                  AND EXISTS (
                    SELECT 1 FROM jugadores j2
                    WHERE j2.id = f2.jugador_id AND j2.dni = j.dni
                  )
-             ) AS otros_torneos_mismo_dni
+             ) AS otros_fichajes_mismo_dni
       FROM fichajes f
       JOIN jugadores j ON j.id = f.jugador_id
       JOIN clubes c ON c.id = f.club_id

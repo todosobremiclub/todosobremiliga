@@ -8,9 +8,10 @@
 <style>
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
   .tab-btn {
-    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--gris-300); border-radius: var(--radio);
     padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
   }
+  .tab-btn:hover { background: rgba(255,255,255,0.09); }
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
   .carnet-info { font-size: 12px; color: var(--gris-600); }
   .carnet-codigo { font-family: monospace; background: var(--gris-100); padding: 2px 6px; border-radius: 4px; }
@@ -19,7 +20,7 @@
   .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
   .foto-jugador-mini.sin-foto, .carnet-foto.sin-foto { display: inline-flex; align-items: center; justify-content: center; }
   .foto-jugador-mini.sin-foto svg, .carnet-foto.sin-foto svg { width: 60%; height: 60%; color: var(--gris-300); }
-  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: var(--blanco); }
+  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.045); }
   .tarjeta-carnet .carnet-header { padding: 12px 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
   .tarjeta-carnet .carnet-header img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.3); }
   .tarjeta-carnet .carnet-header strong { font-size: 14px; }
@@ -30,9 +31,26 @@
   .tarjeta-carnet .carnet-datos div { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--gris-200); }
   .tarjeta-carnet .carnet-qr { display: flex; justify-content: center; margin: 10px 0; }
   .tarjeta-carnet .carnet-codigo-texto { font-family: monospace; font-size: 11px; color: var(--gris-600); word-break: break-all; }
+  .grupo-liga-torneos { margin-bottom: 20px; }
+  .grupo-liga-torneos h3 { font-size: 15px; color: var(--azul-oscuro); margin: 0 0 10px; }
+  .grid-torneos-club { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .tarjeta-torneo-club {
+    background: rgba(255,255,255,0.045); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    padding: 14px 16px;
+  }
+  .tarjeta-torneo-club h4 { margin: 0 0 2px; font-size: 14px; color: var(--gris-900); }
+  .tarjeta-torneo-club .division-torneo-club { font-size: 12px; color: var(--gris-600); margin-bottom: 8px; }
+  .tarjeta-torneo-club .jugadores-fichados-club { font-size: 12px; color: var(--gris-600); margin-bottom: 10px; }
+  .tarjeta-torneo-club .jugadores-fichados-club strong { color: var(--gris-900); }
+  .tarjeta-torneo-club .links-torneo-club { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tarjeta-torneo-club .links-torneo-club a {
+    font-size: 12px; text-decoration: none; padding: 5px 10px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--gris-300); color: var(--azul-oscuro);
+  }
+  .lista-jugadores-fichados-club { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--gris-600); }
 </style>
 </head>
-<body>
+<body class="club-fondo-cancha">
   <div class="topbar">
     <h1>Todo Sobre mi Liga — Panel Club</h1>
     <div class="usuario-info">
@@ -45,6 +63,7 @@
     <div class="tabs">
       <button class="tab-btn activo" id="tabBtnJugadores">Jugadores</button>
       <button class="tab-btn" id="tabBtnFichajes">Fichajes y Carnets</button>
+      <button class="tab-btn" id="tabBtnMisTorneos">Mis Torneos</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
       <button class="tab-btn" id="tabBtnDocumentos">Documentos</button>
     </div>
@@ -174,6 +193,17 @@
           </thead>
           <tbody id="tablaFichajes"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN MIS TORNEOS ===== -->
+    <div id="seccionMisTorneos" class="oculto">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Mis Torneos</h2>
+        </div>
+        <p class="texto-ayuda">Todos los torneos en los que tu club está inscripto, agrupados por Liga. Desde acá podés ver cuántos jugadores tenés fichados en cada uno y acceder a la Tabla, Fixture, Goleadores y Tarjetas públicas.</p>
+        <div id="listaMisTorneos"><p class="texto-ayuda">Cargando...</p></div>
       </div>
     </div>
 

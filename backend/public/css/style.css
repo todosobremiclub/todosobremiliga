@@ -160,7 +160,7 @@ h1, h2, .topbar h1, .panel h2, .sitio-header h1 {
    propios de CADA Liga en vez de los azul/verde fijos. Los colores reales se
    escriben desde JS (cargarPerfilLiga en liga.js) apenas se conoce la Liga;
    estos valores de acá son solo el fallback mientras carga. ===== */
-body.liga-fondo-cancha {
+body.liga-fondo-cancha, body.club-fondo-cancha {
   min-height: 100vh;
   position: relative;
   background:
@@ -170,7 +170,7 @@ body.liga-fondo-cancha {
     linear-gradient(180deg, #0a0e17 0%, #0d1220 55%, #0a0e17 100%);
 }
 
-body.liga-fondo-cancha::before {
+body.liga-fondo-cancha::before, body.club-fondo-cancha::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -184,8 +184,8 @@ body.liga-fondo-cancha::before {
   mask-image: radial-gradient(circle at 50% 100%, #000 0%, transparent 70%);
 }
 
-body.liga-fondo-cancha .topbar,
-body.liga-fondo-cancha .contenido {
+body.liga-fondo-cancha .topbar, body.club-fondo-cancha .topbar,
+body.liga-fondo-cancha .contenido, body.club-fondo-cancha .contenido {
   position: relative;
   z-index: 1;
 }
@@ -742,7 +742,7 @@ button.btn-peligro:hover { background: #fee2e2; }
    NO se toca var(--blanco) en sí: sigue haciendo falta tal cual está para
    texto/íconos blancos sobre superficies de color (botones, tabs activos).
    =========================================================================== */
-body.liga-fondo-cancha {
+body.liga-fondo-cancha, body.club-fondo-cancha {
   --gris-900: #e7ebf3;
   --gris-600: #a9b1c4;
   --gris-300: rgba(255,255,255,0.14);
@@ -751,14 +751,14 @@ body.liga-fondo-cancha {
 }
 
 /* Topbar y tarjetas: vidrio esmerilado en vez de blanco sólido. */
-body.liga-fondo-cancha .topbar {
+body.liga-fondo-cancha .topbar, body.club-fondo-cancha .topbar {
   background: rgba(255,255,255,0.045);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--gris-300);
 }
 
-body.liga-fondo-cancha .panel {
+body.liga-fondo-cancha .panel, body.club-fondo-cancha .panel {
   background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.09);
   backdrop-filter: blur(14px);
@@ -766,66 +766,66 @@ body.liga-fondo-cancha .panel {
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-body.liga-fondo-cancha .card-link,
-body.liga-fondo-cancha .boton-grande,
-body.liga-fondo-cancha .noticia-card,
-body.liga-fondo-cancha .tarjeta-carnet {
+body.liga-fondo-cancha .card-link, body.club-fondo-cancha .card-link,
+body.liga-fondo-cancha .boton-grande, body.club-fondo-cancha .boton-grande,
+body.liga-fondo-cancha .noticia-card, body.club-fondo-cancha .noticia-card,
+body.liga-fondo-cancha .tarjeta-carnet, body.club-fondo-cancha .tarjeta-carnet {
   background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.09);
 }
 
-body.liga-fondo-cancha .card-link:hover,
-body.liga-fondo-cancha .boton-grande:hover {
+body.liga-fondo-cancha .card-link:hover, body.club-fondo-cancha .card-link:hover,
+body.liga-fondo-cancha .boton-grande:hover, body.club-fondo-cancha .boton-grande:hover {
   box-shadow: 0 8px 22px rgba(0,0,0,0.4);
 }
 
 /* Botones secundarios/peligro: fondo sólido blanco -> vidrio. El botón
    primario (button.btn, azul sólido) no necesita cambios. */
-body.liga-fondo-cancha button.btn-secundario,
-body.liga-fondo-cancha button.btn-peligro,
-body.liga-fondo-cancha .topbar button {
+body.liga-fondo-cancha button.btn-secundario, body.club-fondo-cancha button.btn-secundario,
+body.liga-fondo-cancha button.btn-peligro, body.club-fondo-cancha button.btn-peligro,
+body.liga-fondo-cancha .topbar button, body.club-fondo-cancha .topbar button {
   background: rgba(255,255,255,0.06);
 }
-body.liga-fondo-cancha button.btn-secundario:hover { background: rgba(255,255,255,0.11); }
-body.liga-fondo-cancha button.btn-peligro { color: #ff8080; border-color: #ff8080; }
-body.liga-fondo-cancha button.btn-peligro:hover { background: rgba(255,128,128,0.14); }
-body.liga-fondo-cancha button.btn {
+body.liga-fondo-cancha button.btn-secundario:hover, body.club-fondo-cancha button.btn-secundario:hover { background: rgba(255,255,255,0.11); }
+body.liga-fondo-cancha button.btn-peligro, body.club-fondo-cancha button.btn-peligro { color: #ff8080; border-color: #ff8080; }
+body.liga-fondo-cancha button.btn-peligro:hover, body.club-fondo-cancha button.btn-peligro:hover { background: rgba(255,128,128,0.14); }
+body.liga-fondo-cancha button.btn, body.club-fondo-cancha button.btn {
   box-shadow: 0 6px 16px rgba(29,78,216,0.35);
 }
-body.liga-fondo-cancha button.btn:hover {
+body.liga-fondo-cancha button.btn:hover, body.club-fondo-cancha button.btn:hover {
   box-shadow: 0 8px 20px rgba(29,78,216,0.45);
 }
 
 /* Inputs y selects: no usaban ninguna variable de fondo (quedaban blancos
    por default del navegador), así que van explícitos. */
-body.liga-fondo-cancha input,
-body.liga-fondo-cancha select,
-body.liga-fondo-cancha textarea {
+body.liga-fondo-cancha input, body.club-fondo-cancha input,
+body.liga-fondo-cancha select, body.club-fondo-cancha select,
+body.liga-fondo-cancha textarea, body.club-fondo-cancha textarea {
   background: rgba(255,255,255,0.05);
   color: var(--gris-900);
 }
-body.liga-fondo-cancha input::placeholder,
-body.liga-fondo-cancha textarea::placeholder { color: #6d7590; }
-body.liga-fondo-cancha input:focus,
-body.liga-fondo-cancha select:focus,
-body.liga-fondo-cancha textarea:focus {
+body.liga-fondo-cancha input::placeholder, body.club-fondo-cancha input::placeholder,
+body.liga-fondo-cancha textarea::placeholder, body.club-fondo-cancha textarea::placeholder { color: #6d7590; }
+body.liga-fondo-cancha input:focus, body.club-fondo-cancha input:focus,
+body.liga-fondo-cancha select:focus, body.club-fondo-cancha select:focus,
+body.liga-fondo-cancha textarea:focus, body.club-fondo-cancha textarea:focus {
   outline: none;
   border-color: var(--azul);
   background: rgba(255,255,255,0.08);
 }
-body.liga-fondo-cancha input[type="color"] { background: none; }
-body.liga-fondo-cancha input[type="checkbox"],
-body.liga-fondo-cancha input[type="radio"] { accent-color: var(--azul); }
+body.liga-fondo-cancha input[type="color"], body.club-fondo-cancha input[type="color"] { background: none; }
+body.liga-fondo-cancha input[type="checkbox"], body.club-fondo-cancha input[type="checkbox"],
+body.liga-fondo-cancha input[type="radio"], body.club-fondo-cancha input[type="radio"] { accent-color: var(--azul); }
 
 /* Badges de estado: de chips pasteles a chips de vidrio con color sólido de
    texto -- se notan mucho más sobre una tarjeta oscura. */
-body.liga-fondo-cancha .badge-activo { background: rgba(22,163,74,0.16); color: #52d17f; }
-body.liga-fondo-cancha .badge-inactivo { background: rgba(220,38,38,0.16); color: #ff8080; }
-body.liga-fondo-cancha .badge-pendiente { background: rgba(217,165,32,0.18); color: #f2c34c; }
-body.liga-fondo-cancha .badge-alerta { background: rgba(234,88,12,0.18); color: #fb923c; }
+body.liga-fondo-cancha .badge-activo, body.club-fondo-cancha .badge-activo { background: rgba(22,163,74,0.16); color: #52d17f; }
+body.liga-fondo-cancha .badge-inactivo, body.club-fondo-cancha .badge-inactivo { background: rgba(220,38,38,0.16); color: #ff8080; }
+body.liga-fondo-cancha .badge-pendiente, body.club-fondo-cancha .badge-pendiente { background: rgba(217,165,32,0.18); color: #f2c34c; }
+body.liga-fondo-cancha .badge-alerta, body.club-fondo-cancha .badge-alerta { background: rgba(234,88,12,0.18); color: #fb923c; }
 
 /* Filas de tabla / tarjetas clickeables: el hover oscurecía un poco (pensado
    para fondo blanco); sobre vidrio oscuro tiene que aclarar en vez. */
-body.liga-fondo-cancha .fila-equipo-clickable:hover { background: rgba(255,255,255,0.05); }
-body.liga-fondo-cancha .club-swatch { border-color: rgba(255,255,255,0.25); }
+body.liga-fondo-cancha .fila-equipo-clickable:hover, body.club-fondo-cancha .fila-equipo-clickable:hover { background: rgba(255,255,255,0.05); }
+body.liga-fondo-cancha .club-swatch, body.club-fondo-cancha .club-swatch { border-color: rgba(255,255,255,0.25); }
 

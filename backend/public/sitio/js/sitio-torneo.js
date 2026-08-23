@@ -12,7 +12,8 @@ function getParamsDeUrl() {
     torneoId: params.get('id'),
     nombre: params.get('nombre'),
     categoriaId: params.get('categoriaId'),
-    subcategoriaId: params.get('subcategoriaId')
+    subcategoriaId: params.get('subcategoriaId'),
+    tab: params.get('tab')
   };
 }
 
@@ -28,12 +29,17 @@ let tablaCache = [];
 // defecto.
 let categoriaIdDesdeUrl = null;
 let subcategoriaIdDesdeUrl = null;
+// Pestaña pedida por URL (ej. "fixture", "goleadores", "tarjetas" al entrar
+// desde "Mis Torneos" del Panel Club) — si viene, se abre esa en vez de la
+// pestaña "Tabla" por defecto. Sólo se usa una vez, al cargar la página.
+let tabInicialDesdeUrl = null;
 
 async function init() {
-  const { torneoId, nombre, categoriaId, subcategoriaId } = getParamsDeUrl();
+  const { torneoId, nombre, categoriaId, subcategoriaId, tab } = getParamsDeUrl();
   torneoIdActual = torneoId;
   categoriaIdDesdeUrl = categoriaId;
   subcategoriaIdDesdeUrl = subcategoriaId;
+  tabInicialDesdeUrl = tab;
 
   if (nombre) document.getElementById('nombreTorneo').textContent = nombre;
 
@@ -192,7 +198,10 @@ function mostrarBloqueContenidoCategoria() {
   document.getElementById('mensajeSinSeleccion').classList.add('oculto');
   document.getElementById('bloqueTablaGeneral').classList.add('oculto');
   document.getElementById('bloqueContenidoCategoria').classList.remove('oculto');
-  cambiarTab('tabla');
+  const tabsValidas = ['tabla', 'fixture', 'goleadores', 'tarjetas'];
+  const tabInicial = tabsValidas.includes(tabInicialDesdeUrl) ? tabInicialDesdeUrl : 'tabla';
+  tabInicialDesdeUrl = null; // sólo se usa la primera vez
+  cambiarTab(tabInicial);
 }
 
 function cambiarTab(nombre) {

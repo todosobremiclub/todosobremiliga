@@ -80,6 +80,8 @@ app.use('/club/fichajes', requireAuth, requireRole('super_admin', 'club_admin'),
 app.use('/club/jugadores', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubFichajesRoutes'));
 // Ligas en las que participa mi club (para armar el desplegable al pedir un fichaje).
 app.use('/club/ligas', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubLigasRoutes'));
+// Torneos en los que participa mi club (pestaña "Mis Torneos" del Panel Club).
+app.use('/club/torneos', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubTorneosRoutes'));
 // Documentos del club (los puede subir tanto el club_admin como la Liga).
 app.use('/club/documentos', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubDocumentosRoutes'));
 
