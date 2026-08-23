@@ -86,30 +86,51 @@ router.get('/', async (req, res) => {
 
 // PATCH /liga/fichajes/:fichajeId/aprobar — aprueba el fichaje y genera
 // automáticamente el carnet digital del jugador para ese torneo.
+//
+// IMPORTANTE: va todo en una transacción. Antes, el UPDATE del estado y el
+// INSERT del carnet eran dos consultas sueltas: si el fichaje no tenía
+// torneo_id cargado (dato viejo/incompleto), el INSERT fallaba por la
+// restricción NOT NULL de carnets.torneo_id, pero el UPDATE ya había
+// quedado confirmado -> quedaba un fichaje "aprobado" sin carnet y sin
+// forma de generarlo de nuevo salvo por SQL a mano. Con la transacción, si
+// falla el carnet, se revierte también el cambio de estado.
 router.patch('/:fichajeId/aprobar', async (req, res) => {
+  const client = await getClient();
   try {
-    const fichajeResult = await query(
-      'SELECT * FROM fichajes WHERE id = $1 AND liga_id = $2',
+    await client.query('BEGIN');
+    const fichajeResult = await client.query(
+      'SELECT * FROM fichajes WHERE id = $1 AND liga_id = $2 FOR UPDATE',
       [req.params.fichajeId, req.ligaId]
     );
     const fichaje = fichajeResult.rows[0];
-    if (!fichaje) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    if (!fichaje) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    }
     if (fichaje.estado === 'aprobado') {
+      await client.query('ROLLBACK');
       return res.status(409).json({ ok: false, error: 'Ese fichaje ya estaba aprobado' });
     }
+    if (!fichaje.torneo_id || !fichaje.categoria_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        error: 'Este fichaje no tiene Torneo y/o División asignados: completalos con "Editar" antes de aprobarlo.',
+      });
+    }
 
-    const actualizado = await query(
+    const actualizado = await client.query(
       `UPDATE fichajes SET estado = 'aprobado', aprobado_por = $1, fecha_resolucion = NOW(), motivo_rechazo = NULL
        WHERE id = $2 RETURNING *`,
       [req.usuario.id, req.params.fichajeId]
     );
 
     // Genera el carnet digital, si todavía no existe uno para este fichaje.
-    const carnetExistente = await query('SELECT * FROM carnets WHERE fichaje_id = $1', [req.params.fichajeId]);
+    const carnetExistente = await client.query('SELECT * FROM carnets WHERE fichaje_id = $1', [req.params.fichajeId]);
     let carnet = carnetExistente.rows[0];
     if (!carnet) {
       const codigoQr = crypto.randomUUID();
-      const carnetResult = await query(
+      const carnetResult = await client.query(
         `INSERT INTO carnets (jugador_id, torneo_id, fichaje_id, codigo_qr)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
@@ -117,10 +138,50 @@ router.patch('/:fichajeId/aprobar', async (req, res) => {
       );
       carnet = carnetResult.rows[0];
     }
+    await client.query('COMMIT');
 
     res.json({ ok: true, fichaje: actualizado.rows[0], carnet });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (e) { /* noop */ }
     console.error('Error en PATCH aprobar fichaje:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /liga/fichajes/:fichajeId/generar-carnet — para un fichaje que ya
+// quedó "aprobado" pero, por un dato viejo/incompleto, se quedó sin carnet
+// (ver comentario arriba de /aprobar). Antes de usar esto hay que haber
+// completado Torneo y División con "Editar".
+router.patch('/:fichajeId/generar-carnet', async (req, res) => {
+  try {
+    const fichajeResult = await query('SELECT * FROM fichajes WHERE id = $1 AND liga_id = $2', [req.params.fichajeId, req.ligaId]);
+    const fichaje = fichajeResult.rows[0];
+    if (!fichaje) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    if (fichaje.estado !== 'aprobado') {
+      return res.status(400).json({ ok: false, error: 'Sólo se puede generar el carnet de un fichaje aprobado' });
+    }
+    if (!fichaje.torneo_id || !fichaje.categoria_id) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Este fichaje no tiene Torneo y/o División asignados: completalos con "Editar" antes de generar el carnet.',
+      });
+    }
+    const carnetExistente = await query('SELECT * FROM carnets WHERE fichaje_id = $1', [req.params.fichajeId]);
+    if (carnetExistente.rows[0]) {
+      return res.json({ ok: true, carnet: carnetExistente.rows[0] });
+    }
+    const codigoQr = crypto.randomUUID();
+    const carnetResult = await query(
+      `INSERT INTO carnets (jugador_id, torneo_id, fichaje_id, codigo_qr)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [fichaje.jugador_id, fichaje.torneo_id, req.params.fichajeId, codigoQr]
+    );
+    res.json({ ok: true, carnet: carnetResult.rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH generar-carnet:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

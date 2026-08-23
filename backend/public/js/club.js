@@ -741,6 +741,8 @@ function renderFichajes() {
       carnetHtml = `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnet('${f.id}')">Ver carnet</button>`;
     } else if (f.estado === 'rechazado' && f.motivo_rechazo) {
       carnetHtml = `<span class="carnet-info">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>`;
+    } else if (f.estado === 'aprobado') {
+      carnetHtml = '<span class="carnet-info">Todavía sin generar, avisale a la Liga</span>';
     }
     return `
       <tr>

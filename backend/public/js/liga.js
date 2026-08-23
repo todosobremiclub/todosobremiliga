@@ -1413,10 +1413,16 @@ function renderFichajesLiga() {
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
         <td>${escapeHtml(f.categoria_nombre || '-')}</td>
         <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
-        <td>${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : '-'}</td>
+        <td>${f.carnet_codigo_qr
+          ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>`
+          : (f.estado === 'aprobado'
+              ? (f.torneo_id && f.categoria_id
+                  ? `<button class="btn btn-pequeno" onclick="generarCarnetFichaje('${f.id}')">Generar carnet</button>`
+                  : `<span class="badge badge-alerta" title="Este fichaje quedó aprobado sin Torneo/División asignados. Completalos con Editar para poder generar el carnet.">⚠ Sin carnet</span>`)
+              : '-')}</td>
         <td>
           ${f.estado === 'pendiente' ? `
-            <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')">Aprobar</button>
+            <button class="btn btn-pequeno" onclick="aprobarFichaje('${f.id}')" ${(!f.torneo_id || !f.categoria_id) ? 'title="Falta Torneo/División: completalos con Editar antes de aprobar"' : ''}>Aprobar</button>
             <button class="btn btn-peligro btn-pequeno" onclick="rechazarFichaje('${f.id}')">Rechazar</button>
           ` : (f.motivo_rechazo ? `<span class="texto-ayuda">Motivo: ${escapeHtml(f.motivo_rechazo)}</span>` : '')}
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="abrirEditarFichaje('${f.id}')">${ICONO_LAPIZ}</button>
@@ -1620,6 +1626,15 @@ async function aprobarFichaje(fichajeId) {
     await apiFetch(`/liga/fichajes/${fichajeId}/aprobar`, { method: 'PATCH' });
     cargarFichajesLiga();
     cargarStatsClubes();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function generarCarnetFichaje(fichajeId) {
+  try {
+    await apiFetch(`/liga/fichajes/${fichajeId}/generar-carnet`, { method: 'PATCH' });
+    cargarFichajesLiga();
   } catch (err) {
     alert('Error: ' + err.message);
   }
