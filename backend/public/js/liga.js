@@ -1794,15 +1794,27 @@ async function abrirImpagosMes() {
     const data = await apiFetch('/liga/cobros/resumen-impagos-mes');
     document.getElementById('impagosMesPeriodo').textContent = data.periodo;
     if (!data.impagos.length) {
-      tbody.innerHTML = '<tr><td colspan="4">No hay impagos de la cuota mensual en este período. 🎉</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3">No hay impagos en este período. 🎉</td></tr>';
       return;
     }
-    tbody.innerHTML = data.impagos.map((i) => `
+    // Un club puede deber más de un concepto en el mismo torneo (ej: inscripción
+    // + cuota mensual) -- los agrupamos en una sola línea con los conceptos
+    // separados por "+" y el total sumado, en vez de una fila por deuda.
+    const grupos = new Map();
+    data.impagos.forEach((i) => {
+      const clave = `${i.club_id}|${i.torneo_id}`;
+      if (!grupos.has(clave)) {
+        grupos.set(clave, { club_nombre: i.club_nombre, torneo_nombre: i.torneo_nombre, conceptos: [], total: 0 });
+      }
+      const grupo = grupos.get(clave);
+      grupo.conceptos.push(i.concepto_descripcion || 'Cuota mensual');
+      grupo.total += Number(i.saldo);
+    });
+    tbody.innerHTML = [...grupos.values()].map((g) => `
       <tr>
-        <td>${escapeHtml(i.club_nombre)}</td>
-        <td>${escapeHtml(i.torneo_nombre)}</td>
-        <td>${escapeHtml(i.concepto_descripcion || 'Cuota mensual')}</td>
-        <td>$${Number(i.saldo).toLocaleString('es-AR')}</td>
+        <td>${escapeHtml(g.club_nombre)} <span class="texto-ayuda">(${escapeHtml(g.torneo_nombre)})</span></td>
+        <td>${escapeHtml(g.conceptos.join(' + '))}</td>
+        <td>$${g.total.toLocaleString('es-AR')}</td>
       </tr>
     `).join('');
   } catch (err) {

@@ -561,16 +561,16 @@
     <!-- Popup de Impagos del mes: se abre al tocar el botón "Impagos del mes"
          arriba del listado de Clubes participantes. Lista los clubes que
          todavía deben la cuota mensual del período en curso. -->
-    <div class="oculto panel popup-modal" id="modalImpagosMes">
+    <div class="oculto panel popup-modal popup-modal-ancho" id="modalImpagosMes">
       <div class="panel-header">
         <h2>Impagos del mes (<span id="impagosMesPeriodo"></span>)</h2>
         <button class="btn btn-secundario" id="btnCerrarImpagosMes">Cerrar</button>
       </div>
       <table class="tabla">
         <thead>
-          <tr><th>Club</th><th>Torneo</th><th>Concepto</th><th>Monto adeudado</th></tr>
+          <tr><th>Club (torneo)</th><th>Conceptos que adeuda</th><th>Total adeudado</th></tr>
         </thead>
-        <tbody id="tablaImpagosMes"><tr><td colspan="4">Cargando...</td></tr></tbody>
+        <tbody id="tablaImpagosMes"><tr><td colspan="3">Cargando...</td></tr></tbody>
       </table>
     </div>
 
