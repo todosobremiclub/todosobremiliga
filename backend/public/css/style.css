@@ -813,6 +813,16 @@ body.liga-fondo-cancha textarea:focus, body.club-fondo-cancha textarea:focus {
   border-color: var(--azul);
   background: rgba(255,255,255,0.08);
 }
+/* Las opciones de un <select> las pinta el sistema operativo, no el
+   navegador: el <select> cerrado toma el fondo oscuro de arriba, pero la
+   listita desplegada quedaba blanca por default (ilegible con el texto
+   claro que usan las demás reglas de este bloque). Fijando background/color
+   en <option> se corrige en Chrome/Edge/Firefox -- lo único que sigue sin
+   poder tocarse por CSS es el resaltado de la opción bajo el mouse. */
+body.liga-fondo-cancha select option, body.club-fondo-cancha select option {
+  background: #171d2c;
+  color: #e7ebf3;
+}
 body.liga-fondo-cancha input[type="color"], body.club-fondo-cancha input[type="color"] { background: none; }
 body.liga-fondo-cancha input[type="checkbox"], body.club-fondo-cancha input[type="checkbox"],
 body.liga-fondo-cancha input[type="radio"], body.club-fondo-cancha input[type="radio"] { accent-color: var(--azul); }
