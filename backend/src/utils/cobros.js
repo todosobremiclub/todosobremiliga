@@ -6,6 +6,20 @@
 
 const { query } = require('../db');
 
+// 'YYYY-MM' del mes en curso, en hora Argentina (evita depender del huso del
+// servidor de Render, que corre en UTC). Se usa tanto para el job automático
+// (cobrosMensual.js) como para el resumen de "impagos del mes" del Panel Liga.
+function periodoActualArgentina() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(new Date());
+  const anio = partes.find((p) => p.type === 'year').value;
+  const mes = partes.find((p) => p.type === 'month').value;
+  return `${anio}-${mes}`;
+}
+
 // Busca el concepto de un tipo para un torneo, solo si está activo.
 async function buscarConceptoActivo(torneoId, tipo) {
   const { rows } = await query(
@@ -81,6 +95,7 @@ async function generarDeudasMensual(torneoId, periodo) {
 }
 
 module.exports = {
+  periodoActualArgentina,
   buscarConceptoActivo,
   generarDeudaInscripcion,
   generarDeudasPorPartido,

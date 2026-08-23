@@ -15,20 +15,7 @@
 
 const cron = require('node-cron');
 const { query } = require('../db');
-const { generarDeudasMensual } = require('../utils/cobros');
-
-// 'YYYY-MM' del mes en curso, en hora Argentina (evita depender del huso del
-// servidor de Render, que corre en UTC).
-function periodoActualArgentina() {
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric',
-    month: '2-digit'
-  }).formatToParts(new Date());
-  const anio = partes.find((p) => p.type === 'year').value;
-  const mes = partes.find((p) => p.type === 'month').value;
-  return `${anio}-${mes}`;
-}
+const { generarDeudasMensual, periodoActualArgentina } = require('../utils/cobros');
 
 async function ejecutarGeneracionMensualAutomatica() {
   const periodo = periodoActualArgentina();

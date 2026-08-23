@@ -18,7 +18,6 @@ let totalClubesActual = 0;
 let ordenClubesCampo = 'nombre';
 let ordenClubesDireccion = 'asc';
 let clubesSeleccionadosIds = new Set();
-let modalidadesLigaCache = [];
 let tiposGastoCache = [];
 let tiposIngresoCache = [];
 let cuentasLigaCache = [];
@@ -92,6 +91,7 @@ function init() {
   cargarPerfilLiga();
   cargarFiltrosDisponiblesClubes();
   cargarClubes();
+  cargarStatsClubes();
   actualizarBadgePostulacionesPendientes();
   actualizarBadgeFichajesPendientes();
 }
@@ -200,11 +200,22 @@ function conectarEventos() {
     document.getElementById('modalFichajesClub').classList.add('oculto');
     ocultarFondoModal();
   });
+  document.getElementById('statClubesActivos').addEventListener('click', () => {
+    document.getElementById('filtroClubesInactivos').checked = false;
+    paginaClubesActual = 1;
+    cargarClubes();
+  });
+  document.getElementById('statImpagosMes').addEventListener('click', abrirImpagosMes);
+  document.getElementById('statFichajesPendientes').addEventListener('click', () => cambiarTab('fichajes'));
+  document.getElementById('btnCerrarImpagosMes').addEventListener('click', () => {
+    document.getElementById('modalImpagosMes').classList.add('oculto');
+    ocultarFondoModal();
+  });
   document.getElementById('fondoModalGenerico').addEventListener('click', () => {
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
      'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'panelCategorias', 'modalEditarFichaje',
-     'panelDeudasClub', 'modalCobrosClub'
+     'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
     torneoActualId = null;
@@ -239,9 +250,9 @@ function conectarEventos() {
     e.stopPropagation();
     toggleDropdownPanel('provincia');
   });
-  document.getElementById('btnDropdownModalidad').addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleDropdownPanel('modalidad');
+  document.getElementById('filtroClubesTorneo').addEventListener('change', () => {
+    paginaClubesActual = 1;
+    cargarClubes();
   });
   document.addEventListener('click', (e) => {
     // Cierra cualquier dropdown de filtro abierto si se hace click afuera.
@@ -1607,6 +1618,7 @@ async function aprobarFichaje(fichajeId) {
   try {
     await apiFetch(`/liga/fichajes/${fichajeId}/aprobar`, { method: 'PATCH' });
     cargarFichajesLiga();
+    cargarStatsClubes();
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -1621,6 +1633,7 @@ async function rechazarFichaje(fichajeId) {
       body: JSON.stringify({ motivo_rechazo: motivo.trim() || undefined })
     });
     cargarFichajesLiga();
+    cargarStatsClubes();
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -1725,18 +1738,74 @@ async function cargarFiltrosDisponiblesClubes() {
   } catch (err) {
     // si falla, los filtros quedan vacíos (no bloquea el resto de la pantalla)
   }
-  cargarFiltroModalidadesClubes();
+  cargarFiltroTorneosClubes();
 }
 
-// Trae las categorías de torneo (modalidades) configuradas en Configuración,
-// para poder filtrar los Clubes por ellas (ej: "traeme solo los que juegan Senior").
-async function cargarFiltroModalidadesClubes() {
+// Trae los torneos de la Liga para poder filtrar los Clubes por torneo (ej:
+// "traeme solo los clubes inscriptos en el Torneo Apertura 2026").
+async function cargarFiltroTorneosClubes() {
+  const select = document.getElementById('filtroClubesTorneo');
   try {
-    const data = await apiFetch('/liga/configuracion/modalidades');
-    modalidadesLigaCache = data.modalidades;
-    armarDropdownMultiple('modalidad', data.modalidades.map((m) => ({ value: m.id, label: m.nombre })));
+    const torneos = torneosCache.length ? torneosCache : (await apiFetch('/liga/torneos')).torneos;
+    const actual = select.value;
+    select.innerHTML = '<option value="">Todos los torneos</option>' +
+      torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('');
+    if (actual && torneos.some((t) => t.id === actual)) select.value = actual;
   } catch (err) {
-    // si falla, el filtro queda vacío
+    // si falla, el filtro queda con solo la opción "Todos los torneos"
+  }
+}
+
+// Actualiza los tres botones-resumen de arriba de "Clubes participantes":
+// clubes activos, impagos del mes en curso (cuota mensual) y fichajes
+// pendientes de aprobar. Cada número se trae por separado para que si uno
+// falla no rompa a los otros dos.
+async function cargarStatsClubes() {
+  apiFetch('/liga/clubes?pagina=1&por_pagina=1')
+    .then((data) => { document.getElementById('statClubesActivosNumero').textContent = data.total; })
+    .catch(() => { document.getElementById('statClubesActivosNumero').textContent = '–'; });
+
+  apiFetch('/liga/cobros/resumen-impagos-mes')
+    .then((data) => {
+      const el = document.getElementById('statImpagosMesNumero');
+      el.textContent = data.cantidad_clubes;
+      document.getElementById('statImpagosMes').classList.toggle('sin-pendientes', data.cantidad_clubes === 0);
+    })
+    .catch(() => { document.getElementById('statImpagosMesNumero').textContent = '–'; });
+
+  apiFetch('/liga/fichajes?estado=pendiente')
+    .then((data) => {
+      const el = document.getElementById('statFichajesPendientesNumero');
+      el.textContent = data.fichajes.length;
+      document.getElementById('statFichajesPendientes').classList.toggle('sin-pendientes', data.fichajes.length === 0);
+    })
+    .catch(() => { document.getElementById('statFichajesPendientesNumero').textContent = '–'; });
+}
+
+// Abre el popup de "Impagos del mes": clubes que todavía deben la cuota
+// mensual del período en curso, con el torneo, el concepto y el monto.
+async function abrirImpagosMes() {
+  mostrarFondoModal();
+  document.getElementById('modalImpagosMes').classList.remove('oculto');
+  const tbody = document.getElementById('tablaImpagosMes');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/cobros/resumen-impagos-mes');
+    document.getElementById('impagosMesPeriodo').textContent = data.periodo;
+    if (!data.impagos.length) {
+      tbody.innerHTML = '<tr><td colspan="4">No hay impagos de la cuota mensual en este período. 🎉</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.impagos.map((i) => `
+      <tr>
+        <td>${escapeHtml(i.club_nombre)}</td>
+        <td>${escapeHtml(i.torneo_nombre)}</td>
+        <td>${escapeHtml(i.concepto_descripcion || 'Cuota mensual')}</td>
+        <td>$${Number(i.saldo).toLocaleString('es-AR')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -1746,7 +1815,7 @@ async function cargarClubes() {
   const texto = document.getElementById('buscadorClubes').value.trim();
   const ciudades = valoresDropdown('ciudad');
   const provincias = valoresDropdown('provincia');
-  const modalidades = valoresDropdown('modalidad');
+  const torneoId = document.getElementById('filtroClubesTorneo').value;
   const canchaTecho = document.getElementById('filtroClubesCancha').value;
   const incluirInactivos = document.getElementById('filtroClubesInactivos').checked;
   const soloReglamentaria = document.getElementById('filtroClubesReglamentaria').checked;
@@ -1761,7 +1830,7 @@ async function cargarClubes() {
     if (texto) params.set('q', texto);
     ciudades.forEach((c) => params.append('ciudad', c));
     provincias.forEach((p) => params.append('provincia', p));
-    modalidades.forEach((m) => params.append('modalidad_id', m));
+    if (torneoId) params.set('torneo_id', torneoId);
     if (canchaTecho) params.set('cancha_techo', canchaTecho);
     if (incluirInactivos) params.set('incluir_inactivos', 'true');
     if (soloReglamentaria) params.set('cancha_reglamentaria', 'true');
@@ -5181,6 +5250,7 @@ async function guardarPagoCobro(e) {
     await apiFetch(`/liga/cobros/${cobrosTorneoId}/pagos`, { method: 'POST', body: JSON.stringify(cuerpo) });
     document.getElementById('formPagoCobro').classList.add('oculto');
     await Promise.all([cargarDeudasClub(), cargarResumenCobros(), cargarPagosCobros()]);
+    cargarStatsClubes();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -5261,6 +5331,7 @@ async function eliminarPagoCobro(pagoId) {
     if (cobrosClubDeudasActualId && !document.getElementById('panelDeudasClub').classList.contains('oculto')) {
       await cargarDeudasClub();
     }
+    cargarStatsClubes();
   } catch (err) {
     alert('Error: ' + err.message);
   }
@@ -5499,6 +5570,7 @@ async function guardarPagoCobroClub(e) {
     if (cobrosTorneoId === torneoId) {
       await Promise.all([cargarResumenCobros(), cargarPagosCobros()]);
     }
+    cargarStatsClubes();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
