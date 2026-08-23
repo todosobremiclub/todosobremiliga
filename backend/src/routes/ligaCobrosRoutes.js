@@ -8,15 +8,17 @@ const TIPOS_VALIDOS = ['inscripcion', 'mensual', 'por_partido'];
 
 // GET /liga/cobros/resumen-impagos-mes — a diferencia del resto de rutas de
 // este archivo (que miran UN torneo), esta mira TODOS los torneos de la Liga
-// a la vez: devuelve, para el período del mes en curso, cada deuda de "cuota
-// mensual" que todavía tiene saldo pendiente (esté parcial o totalmente sin
-// pagar). Pensada para el botón "Impagos del mes" del Panel Liga.
+// a la vez: devuelve toda deuda con saldo pendiente -- de inscripción, por
+// partido (las que ya se generaron, o sea de partidos ya jugados), y de
+// cuota mensual pero SOLO la del período en curso (las mensuales de meses
+// anteriores ya deberían estar resueltas o son harina de otro costal).
+// Pensada para el botón "Impagos del mes" del Panel Liga.
 router.get('/resumen-impagos-mes', async (req, res) => {
   try {
     const periodo = periodoActualArgentina();
     const { rows } = await query(
       `SELECT d.id AS deuda_id, d.club_id, c.nombre AS club_nombre,
-              d.torneo_id, t.nombre AS torneo_nombre,
+              d.torneo_id, t.nombre AS torneo_nombre, d.tipo,
               d.descripcion AS concepto_descripcion, d.monto,
               COALESCE(pg.total_pagado, 0) AS total_pagado,
               d.monto - COALESCE(pg.total_pagado, 0) AS saldo
@@ -26,7 +28,8 @@ router.get('/resumen-impagos-mes', async (req, res) => {
        LEFT JOIN LATERAL (
          SELECT SUM(monto) AS total_pagado FROM club_pagos WHERE deuda_id = d.id
        ) pg ON true
-       WHERE t.liga_id = $1 AND d.tipo = 'mensual' AND d.periodo = $2
+       WHERE t.liga_id = $1
+         AND (d.tipo <> 'mensual' OR d.periodo = $2)
          AND d.monto - COALESCE(pg.total_pagado, 0) > 0.009
        ORDER BY c.nombre ASC, t.nombre ASC`,
       [req.ligaId, periodo]

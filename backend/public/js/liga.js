@@ -323,6 +323,7 @@ function conectarEventos() {
     document.getElementById('clubCanchaTamanio').disabled = e.target.checked;
   });
 
+  document.getElementById('btnExportarClubesExcel').addEventListener('click', descargarExcelClubes);
   document.getElementById('btnDescargarPlantillaClubes').addEventListener('click', descargarPlantillaClubes);
   document.getElementById('btnMostrarCargaMasiva').addEventListener('click', () => {
     document.getElementById('cargaMasivaError').classList.add('oculto');
@@ -2106,6 +2107,24 @@ async function eliminarClub(clubId, nombreClub) {
   try {
     await apiFetch(`/liga/clubes/${clubId}`, { method: 'DELETE' });
     cargarClubes();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function descargarExcelClubes() {
+  try {
+    const res = await fetch('/liga/clubes/exportar', { headers: { Authorization: 'Bearer ' + getToken() } });
+    if (!res.ok) throw new Error('No se pudo descargar el Excel');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'clubes.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   } catch (err) {
     alert('Error: ' + err.message);
   }

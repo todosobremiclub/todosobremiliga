@@ -187,6 +187,63 @@ async function crearCanchaPrincipal(client, clubId, { tipo_techo, tamanio, piso,
   );
 }
 
+// GET /liga/clubes/exportar — descarga un Excel con TODOS los clubes de mi
+// Liga (activos e inactivos) y su información completa. A diferencia del
+// listado paginado de la pantalla, no aplica ningún filtro.
+router.get('/exportar', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.nombre, c.direccion, c.ciudad, c.provincia, c.telefono, c.email,
+              cl.activo AS activo_en_liga, cl.fecha_alta,
+              cc.tipo_techo AS cancha_tipo_techo, cc.tamanio AS cancha_tamanio, cc.piso AS cancha_piso,
+              cc.cancha_reglamentaria AS cancha_reglamentaria, cc.direccion AS cancha_direccion,
+              tc.nombre AS cancha_tipo_cancha_nombre
+       FROM club_liga cl
+       JOIN clubes c ON c.id = cl.club_id
+       LEFT JOIN clubes_canchas cc ON cc.club_id = c.id AND cc.es_principal = TRUE
+       LEFT JOIN tipos_cancha tc ON tc.id = cc.tipo_cancha_id
+       WHERE cl.liga_id = $1
+       ORDER BY c.nombre ASC`,
+      [req.ligaId]
+    );
+
+    const encabezados = [
+      'Nombre', 'Dirección', 'Ciudad', 'Provincia', 'Teléfono', 'Email',
+      'Estado en tu Liga', 'Fecha de alta',
+      'Cancha: techada o aire libre', 'Cancha: tamaño', 'Cancha: piso', 'Cancha reglamentaria (40x20)',
+      'Cancha: dirección', 'Cancha: tipo'
+    ];
+    const filas = rows.map((c) => [
+      c.nombre || '',
+      c.direccion || '',
+      c.ciudad || '',
+      c.provincia || '',
+      c.telefono || '',
+      c.email || '',
+      c.activo_en_liga ? 'Activo' : 'Inactivo',
+      c.fecha_alta ? new Date(c.fecha_alta).toLocaleDateString('es-AR') : '',
+      c.cancha_tipo_techo === 'techada' ? 'Techada' : c.cancha_tipo_techo === 'aire_libre' ? 'Aire libre' : '',
+      c.cancha_tamanio || '',
+      c.cancha_piso || '',
+      c.cancha_reglamentaria ? 'Sí' : 'No',
+      c.cancha_direccion || '',
+      c.cancha_tipo_cancha_nombre || ''
+    ]);
+
+    const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...filas]);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, 'Clubes');
+    const buffer = XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="clubes.xlsx"');
+    res.send(buffer);
+  } catch (err) {
+    console.error('Error en GET /liga/clubes/exportar:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /liga/clubes/plantilla — descarga la plantilla Excel para carga masiva
 router.get('/plantilla', (req, res) => {
   try {
