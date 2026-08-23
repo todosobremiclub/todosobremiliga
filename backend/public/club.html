@@ -109,9 +109,9 @@
 
         <table>
           <thead>
-            <tr><th><input type="checkbox" id="checkTodosJugadores"></th><th>Foto</th><th>Nombre</th><th>DNI</th><th>Fecha de nacimiento</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th><input type="checkbox" id="checkTodosJugadores"></th><th>Foto</th><th>Nombre</th><th>DNI</th><th>Fecha de nacimiento</th><th>Año Nac.</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="tablaJugadores"><tr><td colspan="8">Cargando...</td></tr></tbody>
+          <tbody id="tablaJugadores"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -136,6 +136,10 @@
               <label for="fichajeCategoria">División *</label>
               <select id="fichajeCategoria" required disabled></select>
             </div>
+            <div>
+              <label for="fichajeSubcategoria">Categoría</label>
+              <select id="fichajeSubcategoria" disabled></select>
+            </div>
           </div>
           <button type="submit" class="btn">Enviar solicitud de fichaje</button>
           <p class="mensaje-error oculto" id="fichajeFormError"></p>
@@ -151,18 +155,24 @@
         <h2>Fichajes solicitados</h2>
         <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
           <input type="text" id="buscadorFichajes" placeholder="Buscar por apellido o nombre..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <select id="filtroLigaFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todas las ligas</option>
+          </select>
           <select id="filtroTorneoFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
             <option value="">Todos los torneos</option>
           </select>
           <select id="filtroCategoriaFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
             <option value="">Todas las divisiones</option>
           </select>
+          <select id="filtroSubcategoriaFichajes" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todas las categorías</option>
+          </select>
         </div>
         <table>
           <thead>
-            <tr><th>Foto</th><th>Jugador</th><th>Liga</th><th>Torneo</th><th>División</th><th>Estado</th><th>Carnet</th></tr>
+            <tr><th>Foto</th><th>Jugador</th><th>Liga</th><th>Torneo</th><th>División</th><th>Categoría</th><th>Estado</th><th>Carnet</th></tr>
           </thead>
-          <tbody id="tablaFichajes"><tr><td colspan="7">Cargando...</td></tr></tbody>
+          <tbody id="tablaFichajes"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>

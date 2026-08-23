@@ -10,14 +10,14 @@
   .agenda-calendario-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
   .agenda-calendario-header h3 { margin: 0; font-size: 15px; color: var(--gris-700); }
   .agenda-calendario-semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: stretch; }
-  .agenda-dia-columna { border: 1px solid var(--gris-200); border-radius: var(--radio); min-height: 160px; background: var(--gris-50, #f8f9fb); display: flex; flex-direction: column; }
+  .agenda-dia-columna { border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radio); min-height: 160px; background: rgba(255,255,255,0.03); display: flex; flex-direction: column; }
   .agenda-dia-columna.agenda-dia-hoy { border-color: var(--azul); box-shadow: 0 0 0 1px var(--azul) inset; }
   .agenda-dia-encabezado { padding: 8px 10px; border-bottom: 1px solid var(--gris-200); text-align: center; }
   .agenda-dia-nombre { font-size: 11px; font-weight: 700; color: var(--gris-600); text-transform: uppercase; letter-spacing: .03em; }
   .agenda-dia-numero { font-size: 15px; font-weight: 800; color: var(--gris-900); }
   .agenda-dia-hoy .agenda-dia-numero { color: var(--azul); }
   .agenda-dia-eventos { padding: 6px; display: flex; flex-direction: column; gap: 6px; flex: 1; cursor: pointer; }
-  .agenda-evento-item { position: relative; background: var(--blanco); border: 1px solid var(--gris-300); border-left: 3px solid var(--azul); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+  .agenda-evento-item { position: relative; background: rgba(255,255,255,0.06); border: 1px solid var(--gris-300); border-left: 3px solid var(--azul); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
   .agenda-evento-item .agenda-evento-hora { font-weight: 700; color: var(--gris-700); }
   .agenda-evento-item .agenda-evento-titulo { color: var(--gris-900); }
   .agenda-evento-item .agenda-evento-lugar { color: var(--gris-600); font-size: 11px; }
@@ -36,9 +36,10 @@
   .th-orden { cursor: pointer; user-select: none; }
   .th-orden:hover { text-decoration: underline; }
   .tab-btn {
-    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: var(--radio);
+    background: rgba(255,255,255,0.05); border: 1px solid var(--gris-300); border-radius: var(--radio);
     padding: 8px 16px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--gris-600);
   }
+  .tab-btn:hover { background: rgba(255,255,255,0.09); }
   .tab-btn.activo { background: var(--azul); color: var(--blanco); border-color: var(--azul); }
   .tabs-categorias-liga { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
   .tab-btn-categoria-grupo { display: inline-flex; align-items: center; gap: 3px; }
@@ -60,7 +61,7 @@
   .bloque-categoria-fichajes-club { margin-top: 10px; margin-left: 12px; }
   .fila-grupo-club-clickable { margin: 0; font-size: 14px; }
   .flecha-grupo-club { display: inline-block; width: 16px; color: var(--azul); }
-  .chip-torneo-registrado { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--azul-100, #dbeafe); background: var(--azul-50, #eff6ff); border-radius: 999px; font-size: 12px; margin: 0 6px 6px 0; }
+  .chip-torneo-registrado { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid rgba(110,161,255,0.35); background: rgba(110,161,255,0.12); color: var(--gris-900); border-radius: 999px; font-size: 12px; margin: 0 6px 6px 0; }
   .campo-color { display: flex; align-items: center; gap: 8px; }
   .campo-color input[type="color"] { width: 40px; height: 32px; padding: 2px; border: 1px solid var(--gris-300); border-radius: 6px; cursor: pointer; }
   .campo-color span { font-size: 12px; color: var(--gris-600); font-family: monospace; }
@@ -70,7 +71,7 @@
   .foto-jugador-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); vertical-align: middle; }
   .foto-jugador-mini.sin-foto, .carnet-foto.sin-foto { display: inline-flex; align-items: center; justify-content: center; }
   .foto-jugador-mini.sin-foto svg, .carnet-foto.sin-foto svg { width: 60%; height: 60%; color: var(--gris-300); }
-  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: var(--blanco); }
+  .tarjeta-carnet { border: 1px solid var(--gris-300); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.045); }
   .tarjeta-carnet .carnet-header { padding: 12px 16px; color: #fff; display: flex; align-items: center; gap: 10px; }
   .tarjeta-carnet .carnet-header img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.3); }
   .tarjeta-carnet .carnet-header strong { font-size: 14px; }
@@ -103,8 +104,10 @@
   .popup-modal {
     position: fixed; top: 5%; left: 50%; transform: translateX(-50%);
     width: min(700px, 94vw); max-height: 88vh; overflow-y: auto;
-    z-index: 60; box-shadow: 0 10px 40px rgba(0,0,0,0.35);
-    background: var(--blanco); border-radius: var(--radio); padding: 20px;
+    z-index: 60; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    background: linear-gradient(180deg, #161c2b, #10141f);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: var(--radio); padding: 20px;
   }
   .popup-modal-ancho { width: min(980px, 96vw); }
   .btn-icono {
@@ -135,32 +138,35 @@
   .fila-stats-clubes { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
   .stat-tile {
     flex: 1 1 150px; min-width: 130px; text-align: left; cursor: pointer;
-    background: #fff; border: 1px solid var(--gris-300); border-radius: 8px;
+    background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.09);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: 8px;
     padding: 6px 12px; display: flex; flex-direction: row; align-items: baseline; gap: 8px;
     transition: box-shadow 0.15s, border-color 0.15s;
   }
-  .stat-tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: var(--azul); }
-  .stat-tile-numero { font-size: 16px; font-weight: 700; color: var(--azul); }
+  .stat-tile:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.35); border-color: var(--azul); }
+  .stat-tile-numero { font-family: var(--fuente-deportiva); font-size: 20px; font-weight: 800; color: #6ea1ff; }
   .stat-tile-label { font-size: 12px; color: var(--gris-600, #555); }
-  .stat-tile-alerta .stat-tile-numero { color: var(--rojo, #dc2626); }
-  .stat-tile-alerta.sin-pendientes .stat-tile-numero { color: var(--verde, #16a34a); }
+  .stat-tile-alerta .stat-tile-numero { color: #ff8080; }
+  .stat-tile-alerta.sin-pendientes .stat-tile-numero { color: #52d17f; }
   /* Filtro desplegable de selección múltiple (Ciudad / Provincia): un botón
      compacto que al hacer click despliega una lista de checkboxes, en vez
      de un <select multiple> grande que ocupaba mucho lugar en pantalla. */
   .dropdown-multi { position: relative; display: inline-block; }
   .dropdown-multi-boton {
     padding: 8px 10px; border: 1px solid var(--gris-300); border-radius: 6px; font-size: 13px;
-    background: var(--blanco); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.05); color: var(--gris-900); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
     min-width: 140px; justify-content: space-between;
   }
+  .dropdown-multi-boton:hover { background: rgba(255,255,255,0.09); }
   .dropdown-multi-contador {
     background: var(--azul); color: #fff; border-radius: 999px; font-size: 11px;
     padding: 0 6px; min-width: 16px; text-align: center;
   }
   .dropdown-multi-panel {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 65;
-    background: var(--blanco); border: 1px solid var(--gris-300); border-radius: 8px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.15); padding: 8px; min-width: 200px;
+    background: linear-gradient(180deg, #161c2b, #10141f); border: 1px solid var(--gris-300); border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45); padding: 8px; min-width: 200px;
     max-height: 220px; overflow-y: auto;
   }
   .dropdown-multi-opcion {

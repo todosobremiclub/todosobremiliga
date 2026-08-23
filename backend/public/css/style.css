@@ -404,6 +404,7 @@ tr:hover td { background: var(--gris-100); }
 .badge-activo { background: #dcfce7; color: var(--verde); }
 .badge-inactivo { background: #fee2e2; color: var(--rojo); }
 .badge-pendiente { background: #fef9c3; color: #854d0e; }
+.badge-alerta { background: #ffedd5; color: #9a3412; cursor: help; margin-left: 4px; }
 
 button.btn {
   background: var(--azul);
@@ -721,3 +722,110 @@ button.btn-peligro:hover { background: #fee2e2; }
   color: var(--gris-900);
   white-space: pre-wrap;
 }
+
+/* ===========================================================================
+   PANEL LIGA — "Vidrio sobre cancha": el Panel de Liga (liga.html, marcado
+   con body.liga-fondo-cancha) extiende el fondo oscuro tipo "cancha de
+   noche" que ya tenía el login a TODAS sus tarjetas: en vez de paneles
+   blancos flotando sobre el fondo oscuro, ahora los paneles, la topbar, las
+   tablas y los botones son de vidrio esmerilado sobre ese mismo fondo.
+
+   Truco central: como casi todo el resto de la hoja de estilos ya usa las
+   variables --gris-900/--gris-600/--gris-300/--gris-100/--azul-oscuro para
+   texto, bordes y fondos sutiles, alcanza con REDEFINIR esas variables acá
+   (scopeadas a body.liga-fondo-cancha) para que la mayoría de los
+   componentes (agenda, carnet, tarjetas de torneo, boton-grande, etc.) se
+   vean bien en oscuro SIN tener que tocar cada regla una por una. Después
+   sólo hace falta arreglar a mano los pocos lugares que usan var(--blanco)
+   como fondo de tarjeta (topbar, panel, card-link, boton-grande,
+   noticia-card) y los inputs (que no usaban ninguna variable de fondo).
+   NO se toca var(--blanco) en sí: sigue haciendo falta tal cual está para
+   texto/íconos blancos sobre superficies de color (botones, tabs activos).
+   =========================================================================== */
+body.liga-fondo-cancha {
+  --gris-900: #e7ebf3;
+  --gris-600: #a9b1c4;
+  --gris-300: rgba(255,255,255,0.14);
+  --gris-100: rgba(255,255,255,0.055);
+  --azul-oscuro: #7fb3ff;
+}
+
+/* Topbar y tarjetas: vidrio esmerilado en vez de blanco sólido. */
+body.liga-fondo-cancha .topbar {
+  background: rgba(255,255,255,0.045);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--gris-300);
+}
+
+body.liga-fondo-cancha .panel {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.09);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+body.liga-fondo-cancha .card-link,
+body.liga-fondo-cancha .boton-grande,
+body.liga-fondo-cancha .noticia-card,
+body.liga-fondo-cancha .tarjeta-carnet {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+
+body.liga-fondo-cancha .card-link:hover,
+body.liga-fondo-cancha .boton-grande:hover {
+  box-shadow: 0 8px 22px rgba(0,0,0,0.4);
+}
+
+/* Botones secundarios/peligro: fondo sólido blanco -> vidrio. El botón
+   primario (button.btn, azul sólido) no necesita cambios. */
+body.liga-fondo-cancha button.btn-secundario,
+body.liga-fondo-cancha button.btn-peligro,
+body.liga-fondo-cancha .topbar button {
+  background: rgba(255,255,255,0.06);
+}
+body.liga-fondo-cancha button.btn-secundario:hover { background: rgba(255,255,255,0.11); }
+body.liga-fondo-cancha button.btn-peligro { color: #ff8080; border-color: #ff8080; }
+body.liga-fondo-cancha button.btn-peligro:hover { background: rgba(255,128,128,0.14); }
+body.liga-fondo-cancha button.btn {
+  box-shadow: 0 6px 16px rgba(29,78,216,0.35);
+}
+body.liga-fondo-cancha button.btn:hover {
+  box-shadow: 0 8px 20px rgba(29,78,216,0.45);
+}
+
+/* Inputs y selects: no usaban ninguna variable de fondo (quedaban blancos
+   por default del navegador), así que van explícitos. */
+body.liga-fondo-cancha input,
+body.liga-fondo-cancha select,
+body.liga-fondo-cancha textarea {
+  background: rgba(255,255,255,0.05);
+  color: var(--gris-900);
+}
+body.liga-fondo-cancha input::placeholder,
+body.liga-fondo-cancha textarea::placeholder { color: #6d7590; }
+body.liga-fondo-cancha input:focus,
+body.liga-fondo-cancha select:focus,
+body.liga-fondo-cancha textarea:focus {
+  outline: none;
+  border-color: var(--azul);
+  background: rgba(255,255,255,0.08);
+}
+body.liga-fondo-cancha input[type="color"] { background: none; }
+body.liga-fondo-cancha input[type="checkbox"],
+body.liga-fondo-cancha input[type="radio"] { accent-color: var(--azul); }
+
+/* Badges de estado: de chips pasteles a chips de vidrio con color sólido de
+   texto -- se notan mucho más sobre una tarjeta oscura. */
+body.liga-fondo-cancha .badge-activo { background: rgba(22,163,74,0.16); color: #52d17f; }
+body.liga-fondo-cancha .badge-inactivo { background: rgba(220,38,38,0.16); color: #ff8080; }
+body.liga-fondo-cancha .badge-pendiente { background: rgba(217,165,32,0.18); color: #f2c34c; }
+body.liga-fondo-cancha .badge-alerta { background: rgba(234,88,12,0.18); color: #fb923c; }
+
+/* Filas de tabla / tarjetas clickeables: el hover oscurecía un poco (pensado
+   para fondo blanco); sobre vidrio oscuro tiene que aclarar en vez. */
+body.liga-fondo-cancha .fila-equipo-clickable:hover { background: rgba(255,255,255,0.05); }
+body.liga-fondo-cancha .club-swatch { border-color: rgba(255,255,255,0.25); }
+

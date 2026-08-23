@@ -1409,7 +1409,7 @@ function renderFichajesLiga() {
         <td><input type="checkbox" class="chk-fichaje-fila" data-fichaje-id="${f.id}" ${fichajesSeleccionadosIds.has(f.id) ? 'checked' : ''} onchange="toggleSeleccionFichaje('${f.id}', this.checked)"></td>
         <td>${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}</td>
         <td>${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)} ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}</td>
-        <td>${escapeHtml(f.jugador_dni || '-')}</td>
+        <td>${escapeHtml(f.jugador_dni || '-')} ${f.otros_torneos_mismo_dni && f.otros_torneos_mismo_dni.length ? `<span class="badge badge-alerta" title="Mismo DNI ya fichado en: ${escapeHtml(f.otros_torneos_mismo_dni.map((o) => `${o.torneo_nombre} (${o.club_nombre})`).join(', '))}">⚠ Otro torneo</span>` : ''}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
         <td>${escapeHtml(f.categoria_nombre || '-')}</td>
         <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>

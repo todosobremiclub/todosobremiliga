@@ -10,20 +10,39 @@ const { query, getClient } = require('../db');
 // solicitudes de fichaje de MI liga (por defecto trae todas; se puede
 // filtrar por estado, torneo, división y/o club)
 router.get('/', async (req, res) => {
-  const { estado, torneo_id, categoria_id, club_id } = req.query;
+  const { estado, torneo_id, categoria_id, subcategoria_id, club_id } = req.query;
   try {
     let sql = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
              j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento, j.activo AS jugador_activo,
              c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
-             t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre,
+             t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre, sub.nombre AS subcategoria_nombre,
              car.codigo_qr AS carnet_codigo_qr, car.vigente_desde AS carnet_vigente_desde,
-             car.vigente_hasta AS carnet_vigente_hasta, car.activo AS carnet_activo
+             car.vigente_hasta AS carnet_vigente_hasta, car.activo AS carnet_activo,
+             (
+               SELECT json_agg(json_build_object(
+                 'torneo_id', t2.id, 'torneo_nombre', t2.nombre,
+                 'club_id', c2.id, 'club_nombre', c2.nombre,
+                 'estado', f2.estado
+               ))
+               FROM fichajes f2
+               JOIN torneos t2 ON t2.id = f2.torneo_id
+               JOIN clubes c2 ON c2.id = f2.club_id
+               WHERE f2.liga_id = f.liga_id
+                 AND f2.jugador_id <> f.jugador_id
+                 AND f2.torneo_id <> f.torneo_id
+                 AND f2.estado IN ('pendiente', 'aprobado')
+                 AND EXISTS (
+                   SELECT 1 FROM jugadores j2
+                   WHERE j2.id = f2.jugador_id AND j2.dni = j.dni
+                 )
+             ) AS otros_torneos_mismo_dni
       FROM fichajes f
       JOIN jugadores j ON j.id = f.jugador_id
       JOIN clubes c ON c.id = f.club_id
       LEFT JOIN torneos t ON t.id = f.torneo_id
       LEFT JOIN categorias cat ON cat.id = f.categoria_id
+      LEFT JOIN categoria_subcategorias sub ON sub.id = f.subcategoria_id
       LEFT JOIN carnets car ON car.fichaje_id = f.id
       WHERE f.liga_id = $1
     `;
@@ -39,6 +58,10 @@ router.get('/', async (req, res) => {
     if (categoria_id) {
       params.push(categoria_id);
       sql += ` AND f.categoria_id = $${params.length}`;
+    }
+    if (subcategoria_id) {
+      params.push(subcategoria_id);
+      sql += ` AND f.subcategoria_id = $${params.length}`;
     }
     if (club_id) {
       params.push(club_id);
@@ -116,7 +139,7 @@ router.patch('/:fichajeId/rechazar', async (req, res) => {
 // PUT /liga/fichajes/:fichajeId — la Liga corrige a qué torneo/división
 // quedó fichado un jugador (por ejemplo, si el club se equivocó al pedirlo).
 router.put('/:fichajeId', async (req, res) => {
-  const { torneo_id, categoria_id } = req.body;
+  const { torneo_id, categoria_id, subcategoria_id } = req.body;
   if (!torneo_id || !categoria_id) {
     return res.status(400).json({ ok: false, error: 'Faltan torneo_id y/o categoria_id' });
   }
@@ -133,9 +156,19 @@ router.put('/:fichajeId', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Esa división no pertenece a ese torneo de tu Liga' });
     }
 
+    if (subcategoria_id) {
+      const subcontexto = await query(
+        'SELECT 1 FROM categoria_subcategorias WHERE id = $1 AND categoria_id = $2',
+        [subcategoria_id, categoria_id]
+      );
+      if (!subcontexto.rows[0]) {
+        return res.status(400).json({ ok: false, error: 'Esa categoría no pertenece a esa división' });
+      }
+    }
+
     const { rows } = await query(
-      `UPDATE fichajes SET torneo_id = $1, categoria_id = $2 WHERE id = $3 AND liga_id = $4 RETURNING *`,
-      [torneo_id, categoria_id, req.params.fichajeId, req.ligaId]
+      `UPDATE fichajes SET torneo_id = $1, categoria_id = $2, subcategoria_id = $3 WHERE id = $4 AND liga_id = $5 RETURNING *`,
+      [torneo_id, categoria_id, subcategoria_id || null, req.params.fichajeId, req.ligaId]
     );
     res.json({ ok: true, fichaje: rows[0] });
   } catch (err) {
