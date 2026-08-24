@@ -5666,6 +5666,18 @@ function destruirChart(chart) {
   return null;
 }
 
+// Envuelve la creación de un gráfico para que, si Chart.js no cargó (o
+// cualquier otro error puntual del gráfico) no corte el resto de la carga
+// del reporte (totales, selects, etc.).
+function crearChartSeguro(fn) {
+  try {
+    return fn();
+  } catch (err) {
+    console.error('No se pudo crear un gráfico de Reportes:', err);
+    return null;
+  }
+}
+
 function cargarReportes() {
   aplicarTemaChartsReportes();
   cargarReporteClubesPorTorneo();
@@ -5688,14 +5700,14 @@ async function cargarReporteClubesPorTorneo() {
     document.getElementById('repClubesTotal').textContent = data.total_clubes;
 
     chartClubesPorTorneo = destruirChart(chartClubesPorTorneo);
-    chartClubesPorTorneo = new Chart(document.getElementById('chartClubesPorTorneo'), {
+    chartClubesPorTorneo = crearChartSeguro(() => new Chart(document.getElementById('chartClubesPorTorneo'), {
       type: 'pie',
       data: {
         labels: reportesClubesArbol.map((t) => t.torneo_nombre),
         datasets: [{ data: reportesClubesArbol.map((t) => t.total_clubes), backgroundColor: PALETA_REPORTES }],
       },
       options: { plugins: { legend: { position: 'bottom' } } },
-    });
+    }));
 
     const select = document.getElementById('repClubesTorneoSelect');
     select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
@@ -5728,14 +5740,14 @@ function onCambioRepClubesTorneo(torneoId) {
 
   wrapCategoria.classList.remove('oculto');
   chartClubesPorCategoria = destruirChart(chartClubesPorCategoria);
-  chartClubesPorCategoria = new Chart(document.getElementById('chartClubesPorCategoria'), {
+  chartClubesPorCategoria = crearChartSeguro(() => new Chart(document.getElementById('chartClubesPorCategoria'), {
     type: 'pie',
     data: {
       labels: torneo.categorias.map((c) => c.categoria_nombre),
       datasets: [{ data: torneo.categorias.map((c) => c.total_clubes), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
-  });
+  }));
 
   const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
   if (tieneSubcategorias) {
@@ -5763,14 +5775,14 @@ function onCambioRepClubesCategoria(torneo, categoriaId) {
   }
   wrapSubcategoria.classList.remove('oculto');
   chartClubesPorSubcategoria = destruirChart(chartClubesPorSubcategoria);
-  chartClubesPorSubcategoria = new Chart(document.getElementById('chartClubesPorSubcategoria'), {
+  chartClubesPorSubcategoria = crearChartSeguro(() => new Chart(document.getElementById('chartClubesPorSubcategoria'), {
     type: 'pie',
     data: {
       labels: categoria.subcategorias.map((s) => s.subcategoria_nombre),
       datasets: [{ data: categoria.subcategorias.map((s) => s.total_clubes), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
-  });
+  }));
 }
 
 // ----- Reporte 2: Recaudado vs Gastos -----
@@ -5785,21 +5797,55 @@ async function cargarReporteFinanzas(anio) {
     document.getElementById('repFinanzasDiferenciaAnual').textContent = formatearMonto(data.anual.diferencia);
     aplicarSignoDiferencia(document.getElementById('repFinanzasDiferenciaTile'), data.anual.diferencia);
 
-    chartRecaudadoVsGastos = destruirChart(chartRecaudadoVsGastos);
-    chartRecaudadoVsGastos = new Chart(document.getElementById('chartRecaudadoVsGastos'), {
-      data: {
-        labels: data.meses.map((m) => NOMBRES_MESES[m.mes - 1]),
-        datasets: [
-          { type: 'bar', label: 'Recaudado', data: data.meses.map((m) => m.recaudado), backgroundColor: '#52d17f' },
-          { type: 'bar', label: 'Gastos', data: data.meses.map((m) => m.gastos), backgroundColor: '#ff8080' },
-          { type: 'line', label: 'Recaudado acumulado', data: data.meses.map((m) => m.acumulado_recaudado), borderColor: '#4f8ef7', backgroundColor: '#4f8ef7', tension: 0.3, yAxisID: 'y' },
-        ],
-      },
-      options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
-    });
+    await renderChartRecaudadoVsGastosUltimosMeses(data, anio);
   } catch (err) {
     console.error('Error al cargar reporte de recaudado vs gastos:', err);
   }
+}
+
+// Grafico de barras con el mes actual y los dos meses anteriores (siempre en
+// base a la fecha real de hoy, sin importar qué año esté eligiendo el
+// usuario con las flechas ◀ ▶, que solo cambian los totales anuales de arriba).
+// Si esos 3 meses cruzan el límite de un año (ej. Nov/Dic/Ene), se piden los
+// datos del otro año que haga falta.
+async function renderChartRecaudadoVsGastosUltimosMeses(dataAnioSolicitado, anioSolicitado) {
+  const hoy = new Date();
+  const ultimosMeses = [];
+  for (let i = 2; i >= 0; i--) {
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    ultimosMeses.push({ anio: d.getFullYear(), mes: d.getMonth() + 1 });
+  }
+
+  const datosPorAnio = { [anioSolicitado]: dataAnioSolicitado };
+  const aniosFaltantes = Array.from(new Set(ultimosMeses.map((m) => m.anio))).filter((a) => !(a in datosPorAnio));
+  await Promise.all(aniosFaltantes.map(async (a) => {
+    try {
+      datosPorAnio[a] = await apiFetch(`/liga/reportes/recaudado-vs-gastos?anio=${a}`);
+    } catch (err) {
+      console.error(`Error al cargar datos del año ${a} para el gráfico de últimos meses:`, err);
+    }
+  }));
+
+  const buscarMes = (anio, mes) => {
+    const d = datosPorAnio[anio];
+    return (d && d.meses.find((x) => x.mes === mes)) || { recaudado: 0, gastos: 0 };
+  };
+
+  const mismoAnio = ultimosMeses.every((m) => m.anio === ultimosMeses[0].anio);
+  const labels = ultimosMeses.map((m) => mismoAnio ? NOMBRES_MESES[m.mes - 1] : `${NOMBRES_MESES[m.mes - 1]} ${m.anio}`);
+
+  chartRecaudadoVsGastos = destruirChart(chartRecaudadoVsGastos);
+  chartRecaudadoVsGastos = crearChartSeguro(() => new Chart(document.getElementById('chartRecaudadoVsGastos'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Recaudado', data: ultimosMeses.map((m) => buscarMes(m.anio, m.mes).recaudado), backgroundColor: '#52d17f' },
+        { label: 'Gastos', data: ultimosMeses.map((m) => buscarMes(m.anio, m.mes).gastos), backgroundColor: '#ff8080' },
+      ],
+    },
+    options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
+  }));
 }
 
 // ----- Reporte 3: Esperado vs Recaudado -----
@@ -5815,7 +5861,7 @@ async function cargarReporteEsperadoVsRecaudado(torneoId) {
     aplicarSignoDiferencia(document.getElementById('repDiferenciaTile'), data.total.diferencia);
 
     chartEsperadoPorTorneo = destruirChart(chartEsperadoPorTorneo);
-    chartEsperadoPorTorneo = new Chart(document.getElementById('chartEsperadoPorTorneo'), {
+    chartEsperadoPorTorneo = crearChartSeguro(() => new Chart(document.getElementById('chartEsperadoPorTorneo'), {
       type: 'bar',
       data: {
         labels: data.torneos.map((t) => t.torneo_nombre),
@@ -5825,7 +5871,7 @@ async function cargarReporteEsperadoVsRecaudado(torneoId) {
         ],
       },
       options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
-    });
+    }));
 
     const select = document.getElementById('repEsperadoTorneoSelect');
     if (!torneoId) {
@@ -5864,14 +5910,14 @@ async function cargarReporteFichados() {
     document.getElementById('repFichadosTotal').textContent = data.total_fichados;
 
     chartFichadosPorTorneo = destruirChart(chartFichadosPorTorneo);
-    chartFichadosPorTorneo = new Chart(document.getElementById('chartFichadosPorTorneo'), {
+    chartFichadosPorTorneo = crearChartSeguro(() => new Chart(document.getElementById('chartFichadosPorTorneo'), {
       type: 'pie',
       data: {
         labels: reportesFichadosArbol.map((t) => t.torneo_nombre),
         datasets: [{ data: reportesFichadosArbol.map((t) => t.total_fichados), backgroundColor: PALETA_REPORTES }],
       },
       options: { plugins: { legend: { position: 'bottom' } } },
-    });
+    }));
 
     const select = document.getElementById('repFichadosTorneoSelect');
     select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
@@ -5904,14 +5950,14 @@ function onCambioRepFichadosTorneo(torneoId) {
 
   wrapCategoria.classList.remove('oculto');
   chartFichadosPorCategoria = destruirChart(chartFichadosPorCategoria);
-  chartFichadosPorCategoria = new Chart(document.getElementById('chartFichadosPorCategoria'), {
+  chartFichadosPorCategoria = crearChartSeguro(() => new Chart(document.getElementById('chartFichadosPorCategoria'), {
     type: 'pie',
     data: {
       labels: torneo.categorias.map((c) => c.categoria_nombre),
       datasets: [{ data: torneo.categorias.map((c) => c.total_fichados), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
-  });
+  }));
 
   const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
   if (tieneSubcategorias) {
@@ -5939,14 +5985,14 @@ function onCambioRepFichadosCategoria(torneo, categoriaId) {
   }
   wrapSubcategoria.classList.remove('oculto');
   chartFichadosPorSubcategoria = destruirChart(chartFichadosPorSubcategoria);
-  chartFichadosPorSubcategoria = new Chart(document.getElementById('chartFichadosPorSubcategoria'), {
+  chartFichadosPorSubcategoria = crearChartSeguro(() => new Chart(document.getElementById('chartFichadosPorSubcategoria'), {
     type: 'pie',
     data: {
       labels: categoria.subcategorias.map((s) => s.subcategoria_nombre),
       datasets: [{ data: categoria.subcategorias.map((s) => s.total_fichados), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
-  });
+  }));
 }
 
 document.addEventListener('DOMContentLoaded', init);
