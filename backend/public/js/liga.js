@@ -161,6 +161,9 @@ function conectarEventos() {
   document.getElementById('tabBtnFinanzas').addEventListener('click', () => cambiarTab('finanzas'));
   document.getElementById('tabBtnCobros').addEventListener('click', () => cambiarTab('cobros'));
   document.getElementById('tabBtnAgenda').addEventListener('click', () => cambiarTab('agenda'));
+  document.getElementById('tabBtnReportes').addEventListener('click', () => cambiarTab('reportes'));
+  document.getElementById('btnRepFinanzasAnioAnterior').addEventListener('click', () => cargarReporteFinanzas(reportesFinanzasAnioActual - 1));
+  document.getElementById('btnRepFinanzasAnioSiguiente').addEventListener('click', () => cargarReporteFinanzas(reportesFinanzasAnioActual + 1));
   document.getElementById('tabBtnConfiguracion').addEventListener('click', () => cambiarTab('configuracion'));
 
   // ---- Clubes ----
@@ -710,12 +713,12 @@ function cambiarTab(nombre) {
   const secciones = {
     clubes: 'seccionClubes', torneos: 'seccionTorneos', postulaciones: 'seccionPostulaciones', fichajes: 'seccionFichajes',
     noticias: 'seccionNoticias', notificaciones: 'seccionNotificaciones',
-    finanzas: 'seccionFinanzas', cobros: 'seccionCobros', agenda: 'seccionAgenda', configuracion: 'seccionConfiguracion'
+    finanzas: 'seccionFinanzas', cobros: 'seccionCobros', agenda: 'seccionAgenda', reportes: 'seccionReportes', configuracion: 'seccionConfiguracion'
   };
   const botones = {
     clubes: 'tabBtnClubes', torneos: 'tabBtnTorneos', postulaciones: 'tabBtnPostulaciones', fichajes: 'tabBtnFichajes',
     noticias: 'tabBtnNoticias', notificaciones: 'tabBtnNotificaciones',
-    finanzas: 'tabBtnFinanzas', cobros: 'tabBtnCobros', agenda: 'tabBtnAgenda', configuracion: 'tabBtnConfiguracion'
+    finanzas: 'tabBtnFinanzas', cobros: 'tabBtnCobros', agenda: 'tabBtnAgenda', reportes: 'tabBtnReportes', configuracion: 'tabBtnConfiguracion'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -734,6 +737,7 @@ function cambiarTab(nombre) {
   if (nombre === 'finanzas') cargarFinanzas();
   if (nombre === 'cobros') cargarCobros();
   if (nombre === 'agenda') cargarAgenda();
+  if (nombre === 'reportes') cargarReportes();
   if (nombre === 'configuracion') cambiarTabConfig('tiposGasto');
 }
 
@@ -5628,6 +5632,321 @@ async function guardarPagoCobroClub(e) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
   }
+}
+
+// ===================== REPORTES =====================
+
+const PALETA_REPORTES = ['#4f8ef7', '#52d17f', '#f7c948', '#ff8080', '#b892f7', '#48c9d9', '#f79c6c', '#a3d977', '#f76ca8', '#7c93f7'];
+const NOMBRES_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+let chartClubesPorTorneo = null;
+let chartClubesPorCategoria = null;
+let chartClubesPorSubcategoria = null;
+let chartRecaudadoVsGastos = null;
+let chartEsperadoPorTorneo = null;
+let chartFichadosPorTorneo = null;
+let chartFichadosPorCategoria = null;
+let chartFichadosPorSubcategoria = null;
+
+let reportesFinanzasAnioActual = new Date().getFullYear();
+let reportesClubesArbol = [];
+let reportesFichadosArbol = [];
+
+let reportesChartDefaultsAplicados = false;
+function aplicarTemaChartsReportes() {
+  if (reportesChartDefaultsAplicados || typeof Chart === 'undefined') return;
+  Chart.defaults.color = '#c7cede';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || Chart.defaults.font.family;
+  reportesChartDefaultsAplicados = true;
+}
+
+function destruirChart(chart) {
+  if (chart) chart.destroy();
+  return null;
+}
+
+function cargarReportes() {
+  aplicarTemaChartsReportes();
+  cargarReporteClubesPorTorneo();
+  cargarReporteFinanzas(reportesFinanzasAnioActual);
+  cargarReporteEsperadoVsRecaudado();
+  cargarReporteFichados();
+}
+
+function aplicarSignoDiferencia(tileEl, diferencia) {
+  tileEl.classList.remove('stat-tile-negativa', 'stat-tile-positiva');
+  tileEl.classList.add(diferencia < 0 ? 'stat-tile-negativa' : 'stat-tile-positiva');
+}
+
+// ----- Reporte 1: Clubes por Torneo / División / Categoría -----
+
+async function cargarReporteClubesPorTorneo() {
+  try {
+    const data = await apiFetch('/liga/reportes/clubes-por-torneo');
+    reportesClubesArbol = data.torneos;
+    document.getElementById('repClubesTotal').textContent = data.total_clubes;
+
+    chartClubesPorTorneo = destruirChart(chartClubesPorTorneo);
+    chartClubesPorTorneo = new Chart(document.getElementById('chartClubesPorTorneo'), {
+      type: 'pie',
+      data: {
+        labels: reportesClubesArbol.map((t) => t.torneo_nombre),
+        datasets: [{ data: reportesClubesArbol.map((t) => t.total_clubes), backgroundColor: PALETA_REPORTES }],
+      },
+      options: { plugins: { legend: { position: 'bottom' } } },
+    });
+
+    const select = document.getElementById('repClubesTorneoSelect');
+    select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
+      reportesClubesArbol.map((t) => `<option value="${t.torneo_id}">${escapeHtml(t.torneo_nombre)}</option>`).join('');
+    select.onchange = () => onCambioRepClubesTorneo(select.value);
+    onCambioRepClubesTorneo('');
+  } catch (err) {
+    console.error('Error al cargar reporte de clubes por torneo:', err);
+  }
+}
+
+function onCambioRepClubesTorneo(torneoId) {
+  const wrapCategoria = document.getElementById('repClubesCategoriaChartWrap');
+  const selectCategoria = document.getElementById('repClubesCategoriaSelect');
+  const wrapSubcategoria = document.getElementById('repClubesSubcategoriaChartWrap');
+
+  if (!torneoId) {
+    wrapCategoria.classList.add('oculto');
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  const torneo = reportesClubesArbol.find((t) => t.torneo_id === torneoId);
+  if (!torneo || !torneo.categorias.length) {
+    wrapCategoria.classList.add('oculto');
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+
+  wrapCategoria.classList.remove('oculto');
+  chartClubesPorCategoria = destruirChart(chartClubesPorCategoria);
+  chartClubesPorCategoria = new Chart(document.getElementById('chartClubesPorCategoria'), {
+    type: 'pie',
+    data: {
+      labels: torneo.categorias.map((c) => c.categoria_nombre),
+      datasets: [{ data: torneo.categorias.map((c) => c.total_clubes), backgroundColor: PALETA_REPORTES }],
+    },
+    options: { plugins: { legend: { position: 'bottom' } } },
+  });
+
+  const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
+  if (tieneSubcategorias) {
+    selectCategoria.classList.remove('oculto');
+    selectCategoria.innerHTML = '<option value="">Elegí una División para ver sus Categorías</option>' +
+      torneo.categorias.map((c) => `<option value="${c.categoria_id}">${escapeHtml(c.categoria_nombre)}</option>`).join('');
+    selectCategoria.onchange = () => onCambioRepClubesCategoria(torneo, selectCategoria.value);
+    onCambioRepClubesCategoria(torneo, '');
+  } else {
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+  }
+}
+
+function onCambioRepClubesCategoria(torneo, categoriaId) {
+  const wrapSubcategoria = document.getElementById('repClubesSubcategoriaChartWrap');
+  if (!categoriaId) {
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  const categoria = torneo.categorias.find((c) => c.categoria_id === categoriaId);
+  if (!categoria || !categoria.subcategorias.length) {
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  wrapSubcategoria.classList.remove('oculto');
+  chartClubesPorSubcategoria = destruirChart(chartClubesPorSubcategoria);
+  chartClubesPorSubcategoria = new Chart(document.getElementById('chartClubesPorSubcategoria'), {
+    type: 'pie',
+    data: {
+      labels: categoria.subcategorias.map((s) => s.subcategoria_nombre),
+      datasets: [{ data: categoria.subcategorias.map((s) => s.total_clubes), backgroundColor: PALETA_REPORTES }],
+    },
+    options: { plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+// ----- Reporte 2: Recaudado vs Gastos -----
+
+async function cargarReporteFinanzas(anio) {
+  reportesFinanzasAnioActual = anio;
+  document.getElementById('repFinanzasAnioLabel').textContent = anio;
+  try {
+    const data = await apiFetch(`/liga/reportes/recaudado-vs-gastos?anio=${anio}`);
+    document.getElementById('repFinanzasRecaudadoAnual').textContent = formatearMonto(data.anual.recaudado);
+    document.getElementById('repFinanzasGastosAnual').textContent = formatearMonto(data.anual.gastos);
+    document.getElementById('repFinanzasDiferenciaAnual').textContent = formatearMonto(data.anual.diferencia);
+    aplicarSignoDiferencia(document.getElementById('repFinanzasDiferenciaTile'), data.anual.diferencia);
+
+    chartRecaudadoVsGastos = destruirChart(chartRecaudadoVsGastos);
+    chartRecaudadoVsGastos = new Chart(document.getElementById('chartRecaudadoVsGastos'), {
+      data: {
+        labels: data.meses.map((m) => NOMBRES_MESES[m.mes - 1]),
+        datasets: [
+          { type: 'bar', label: 'Recaudado', data: data.meses.map((m) => m.recaudado), backgroundColor: '#52d17f' },
+          { type: 'bar', label: 'Gastos', data: data.meses.map((m) => m.gastos), backgroundColor: '#ff8080' },
+          { type: 'line', label: 'Recaudado acumulado', data: data.meses.map((m) => m.acumulado_recaudado), borderColor: '#4f8ef7', backgroundColor: '#4f8ef7', tension: 0.3, yAxisID: 'y' },
+        ],
+      },
+      options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
+    });
+  } catch (err) {
+    console.error('Error al cargar reporte de recaudado vs gastos:', err);
+  }
+}
+
+// ----- Reporte 3: Esperado vs Recaudado -----
+
+async function cargarReporteEsperadoVsRecaudado(torneoId) {
+  try {
+    const url = torneoId ? `/liga/reportes/esperado-vs-recaudado?torneo_id=${torneoId}` : '/liga/reportes/esperado-vs-recaudado';
+    const data = await apiFetch(url);
+
+    document.getElementById('repEsperadoTotal').textContent = formatearMonto(data.total.esperado);
+    document.getElementById('repRecaudadoTotal').textContent = formatearMonto(data.total.recaudado);
+    document.getElementById('repDiferenciaTotal').textContent = formatearMonto(data.total.diferencia);
+    aplicarSignoDiferencia(document.getElementById('repDiferenciaTile'), data.total.diferencia);
+
+    chartEsperadoPorTorneo = destruirChart(chartEsperadoPorTorneo);
+    chartEsperadoPorTorneo = new Chart(document.getElementById('chartEsperadoPorTorneo'), {
+      type: 'bar',
+      data: {
+        labels: data.torneos.map((t) => t.torneo_nombre),
+        datasets: [
+          { label: 'Esperado', data: data.torneos.map((t) => t.esperado), backgroundColor: '#4f8ef7' },
+          { label: 'Recaudado', data: data.torneos.map((t) => t.recaudado), backgroundColor: '#52d17f' },
+        ],
+      },
+      options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    const select = document.getElementById('repEsperadoTorneoSelect');
+    if (!torneoId) {
+      select.innerHTML = '<option value="">Ver desglose por club de un Torneo...</option>' +
+        data.torneos.map((t) => `<option value="${t.torneo_id}">${escapeHtml(t.torneo_nombre)}</option>`).join('');
+      select.onchange = () => cargarReporteEsperadoVsRecaudado(select.value);
+    }
+
+    const tabla = document.getElementById('tablaEsperadoPorClubTabla');
+    const tbody = document.getElementById('tablaEsperadoPorClub');
+    if (data.detalle_por_club) {
+      tabla.classList.remove('oculto');
+      tbody.innerHTML = data.detalle_por_club.length ? data.detalle_por_club.map((c) => `
+        <tr>
+          <td>${escapeHtml(c.club_nombre)}</td>
+          <td>${formatearMonto(c.esperado)}</td>
+          <td>${formatearMonto(c.recaudado)}</td>
+          <td>${formatearMonto(c.diferencia)}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="4">Sin deudas registradas en ese Torneo</td></tr>';
+    } else {
+      tabla.classList.add('oculto');
+      tbody.innerHTML = '';
+    }
+  } catch (err) {
+    console.error('Error al cargar reporte de esperado vs recaudado:', err);
+  }
+}
+
+// ----- Reporte 4: Total de Fichados -----
+
+async function cargarReporteFichados() {
+  try {
+    const data = await apiFetch('/liga/reportes/fichados');
+    reportesFichadosArbol = data.torneos;
+    document.getElementById('repFichadosTotal').textContent = data.total_fichados;
+
+    chartFichadosPorTorneo = destruirChart(chartFichadosPorTorneo);
+    chartFichadosPorTorneo = new Chart(document.getElementById('chartFichadosPorTorneo'), {
+      type: 'pie',
+      data: {
+        labels: reportesFichadosArbol.map((t) => t.torneo_nombre),
+        datasets: [{ data: reportesFichadosArbol.map((t) => t.total_fichados), backgroundColor: PALETA_REPORTES }],
+      },
+      options: { plugins: { legend: { position: 'bottom' } } },
+    });
+
+    const select = document.getElementById('repFichadosTorneoSelect');
+    select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
+      reportesFichadosArbol.map((t) => `<option value="${t.torneo_id}">${escapeHtml(t.torneo_nombre)}</option>`).join('');
+    select.onchange = () => onCambioRepFichadosTorneo(select.value);
+    onCambioRepFichadosTorneo('');
+  } catch (err) {
+    console.error('Error al cargar reporte de fichados:', err);
+  }
+}
+
+function onCambioRepFichadosTorneo(torneoId) {
+  const wrapCategoria = document.getElementById('repFichadosCategoriaChartWrap');
+  const selectCategoria = document.getElementById('repFichadosCategoriaSelect');
+  const wrapSubcategoria = document.getElementById('repFichadosSubcategoriaChartWrap');
+
+  if (!torneoId) {
+    wrapCategoria.classList.add('oculto');
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  const torneo = reportesFichadosArbol.find((t) => t.torneo_id === torneoId);
+  if (!torneo || !torneo.categorias.length) {
+    wrapCategoria.classList.add('oculto');
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+
+  wrapCategoria.classList.remove('oculto');
+  chartFichadosPorCategoria = destruirChart(chartFichadosPorCategoria);
+  chartFichadosPorCategoria = new Chart(document.getElementById('chartFichadosPorCategoria'), {
+    type: 'pie',
+    data: {
+      labels: torneo.categorias.map((c) => c.categoria_nombre),
+      datasets: [{ data: torneo.categorias.map((c) => c.total_fichados), backgroundColor: PALETA_REPORTES }],
+    },
+    options: { plugins: { legend: { position: 'bottom' } } },
+  });
+
+  const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
+  if (tieneSubcategorias) {
+    selectCategoria.classList.remove('oculto');
+    selectCategoria.innerHTML = '<option value="">Elegí una División para ver sus Categorías</option>' +
+      torneo.categorias.map((c) => `<option value="${c.categoria_id || ''}">${escapeHtml(c.categoria_nombre)}</option>`).join('');
+    selectCategoria.onchange = () => onCambioRepFichadosCategoria(torneo, selectCategoria.value);
+    onCambioRepFichadosCategoria(torneo, '');
+  } else {
+    selectCategoria.classList.add('oculto');
+    wrapSubcategoria.classList.add('oculto');
+  }
+}
+
+function onCambioRepFichadosCategoria(torneo, categoriaId) {
+  const wrapSubcategoria = document.getElementById('repFichadosSubcategoriaChartWrap');
+  if (!categoriaId) {
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  const categoria = torneo.categorias.find((c) => (c.categoria_id || '') === categoriaId);
+  if (!categoria || !categoria.subcategorias.length) {
+    wrapSubcategoria.classList.add('oculto');
+    return;
+  }
+  wrapSubcategoria.classList.remove('oculto');
+  chartFichadosPorSubcategoria = destruirChart(chartFichadosPorSubcategoria);
+  chartFichadosPorSubcategoria = new Chart(document.getElementById('chartFichadosPorSubcategoria'), {
+    type: 'pie',
+    data: {
+      labels: categoria.subcategorias.map((s) => s.subcategoria_nombre),
+      datasets: [{ data: categoria.subcategorias.map((s) => s.total_fichados), backgroundColor: PALETA_REPORTES }],
+    },
+    options: { plugins: { legend: { position: 'bottom' } } },
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

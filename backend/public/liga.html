@@ -151,6 +151,14 @@
   .stat-tile-label { font-size: 12px; color: var(--gris-600, #555); }
   .stat-tile-alerta .stat-tile-numero { color: #ff8080; }
   .stat-tile-alerta.sin-pendientes .stat-tile-numero { color: #52d17f; }
+  /* Pestaña Reportes: contenedor de altura fija para que cada gráfico de
+     Chart.js (responsive:true, maintainAspectRatio:false) sepa cuánto
+     espacio tiene, en vez de crecer sin límite. */
+  .contenedor-chart { position: relative; height: 280px; margin-bottom: 6px; }
+  #repFinanzasDiferenciaTile.stat-tile-negativa .stat-tile-numero,
+  #repDiferenciaTile.stat-tile-negativa .stat-tile-numero { color: #ff8080; }
+  #repFinanzasDiferenciaTile.stat-tile-positiva .stat-tile-numero,
+  #repDiferenciaTile.stat-tile-positiva .stat-tile-numero { color: #52d17f; }
   /* Filtro desplegable de selección múltiple (Ciudad / Provincia): un botón
      compacto que al hacer click despliega una lista de checkboxes, en vez
      de un <select multiple> grande que ocupaba mucho lugar en pantalla. */
@@ -208,6 +216,7 @@
       <button class="tab-btn" id="tabBtnFinanzas">Finanzas</button>
       <button class="tab-btn" id="tabBtnCobros">Cobros</button>
       <button class="tab-btn" id="tabBtnAgenda">Agenda</button>
+      <button class="tab-btn" id="tabBtnReportes">Reportes</button>
       <button class="tab-btn" id="tabBtnConfiguracion">Configuración</button>
     </div>
 
@@ -1428,6 +1437,87 @@
       </div>
     </div>
 
+    <!-- ===== SECCIÓN REPORTES ===== -->
+    <div id="seccionReportes" class="oculto">
+      <div class="panel">
+        <div class="panel-header"><h2>Clubes por Torneo / División / Categoría</h2></div>
+        <div class="fila-stats-clubes" style="display:flex; gap:10px; margin-bottom:16px;">
+          <div class="stat-tile"><span class="stat-tile-numero" id="repClubesTotal">-</span><span class="stat-tile-label">Clubes activos en la Liga</span></div>
+        </div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
+          <div style="flex:1; min-width:280px; max-width:380px;">
+            <div class="contenedor-chart"><canvas id="chartClubesPorTorneo"></canvas></div>
+          </div>
+          <div style="flex:1; min-width:280px;">
+            <select id="repClubesTorneoSelect" style="margin-bottom:12px;">
+              <option value="">Elegí un Torneo para ver sus Divisiones</option>
+            </select>
+            <div class="contenedor-chart oculto" id="repClubesCategoriaChartWrap"><canvas id="chartClubesPorCategoria"></canvas></div>
+            <select id="repClubesCategoriaSelect" class="oculto" style="margin:12px 0;">
+              <option value="">Elegí una División para ver sus Categorías</option>
+            </select>
+            <div class="contenedor-chart oculto" id="repClubesSubcategoriaChartWrap"><canvas id="chartClubesPorSubcategoria"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Recaudado vs Gastos</h2>
+          <div class="agenda-calendario-header" style="margin:0;">
+            <button type="button" class="btn btn-secundario btn-pequeno" id="btnRepFinanzasAnioAnterior">◀</button>
+            <h3 id="repFinanzasAnioLabel" style="min-width:60px; text-align:center;">-</h3>
+            <button type="button" class="btn btn-secundario btn-pequeno" id="btnRepFinanzasAnioSiguiente">▶</button>
+          </div>
+        </div>
+        <div class="fila-stats-clubes" style="display:flex; gap:10px; margin-bottom:16px;">
+          <div class="stat-tile"><span class="stat-tile-numero" id="repFinanzasRecaudadoAnual">-</span><span class="stat-tile-label">Recaudado en el año</span></div>
+          <div class="stat-tile"><span class="stat-tile-numero" id="repFinanzasGastosAnual">-</span><span class="stat-tile-label">Gastos en el año</span></div>
+          <div class="stat-tile" id="repFinanzasDiferenciaTile"><span class="stat-tile-numero" id="repFinanzasDiferenciaAnual">-</span><span class="stat-tile-label">Diferencia anual</span></div>
+        </div>
+        <div class="contenedor-chart"><canvas id="chartRecaudadoVsGastos"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h2>Esperado vs Recaudado</h2></div>
+        <div class="fila-stats-clubes" style="display:flex; gap:10px; margin-bottom:16px;">
+          <div class="stat-tile"><span class="stat-tile-numero" id="repEsperadoTotal">-</span><span class="stat-tile-label">Esperado (toda la Liga)</span></div>
+          <div class="stat-tile"><span class="stat-tile-numero" id="repRecaudadoTotal">-</span><span class="stat-tile-label">Recaudado (toda la Liga)</span></div>
+          <div class="stat-tile" id="repDiferenciaTile"><span class="stat-tile-numero" id="repDiferenciaTotal">-</span><span class="stat-tile-label">Diferencia</span></div>
+        </div>
+        <div class="contenedor-chart"><canvas id="chartEsperadoPorTorneo"></canvas></div>
+        <select id="repEsperadoTorneoSelect" style="margin:16px 0 10px;">
+          <option value="">Ver desglose por club de un Torneo...</option>
+        </select>
+        <table class="oculto" id="tablaEsperadoPorClubTabla">
+          <thead><tr><th>Club</th><th>Esperado</th><th>Recaudado</th><th>Diferencia</th></tr></thead>
+          <tbody id="tablaEsperadoPorClub"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h2>Total de Fichados</h2></div>
+        <div class="fila-stats-clubes" style="display:flex; gap:10px; margin-bottom:16px;">
+          <div class="stat-tile"><span class="stat-tile-numero" id="repFichadosTotal">-</span><span class="stat-tile-label">Jugadores fichados (aprobados)</span></div>
+        </div>
+        <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
+          <div style="flex:1; min-width:280px; max-width:380px;">
+            <div class="contenedor-chart"><canvas id="chartFichadosPorTorneo"></canvas></div>
+          </div>
+          <div style="flex:1; min-width:280px;">
+            <select id="repFichadosTorneoSelect" style="margin-bottom:12px;">
+              <option value="">Elegí un Torneo para ver sus Divisiones</option>
+            </select>
+            <div class="contenedor-chart oculto" id="repFichadosCategoriaChartWrap"><canvas id="chartFichadosPorCategoria"></canvas></div>
+            <select id="repFichadosCategoriaSelect" class="oculto" style="margin:12px 0;">
+              <option value="">Elegí una División para ver sus Categorías</option>
+            </select>
+            <div class="contenedor-chart oculto" id="repFichadosSubcategoriaChartWrap"><canvas id="chartFichadosPorSubcategoria"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== SECCIÓN CONFIGURACIÓN ===== -->
     <div id="seccionConfiguracion" class="oculto">
       <div class="tabs">
@@ -1667,6 +1757,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/liga.js"></script>
 </body>

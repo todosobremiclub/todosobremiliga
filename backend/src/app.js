@@ -101,6 +101,9 @@ app.use('/club/notificaciones', requireAuth, requireRole('super_admin', 'club_ad
 app.use('/liga/gastos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaGastosRoutes'));
 app.use('/liga/ingresos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaIngresosRoutes'));
 app.use('/liga/agenda', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaAgendaRoutes'));
+// Pestaña "Reportes": clubes por torneo, recaudado vs gastos, esperado vs
+// recaudado y total de fichados, todo a nivel de toda la Liga.
+app.use('/liga/reportes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaReportesRoutes'));
 
 // Job programado: genera automáticamente la cuota mensual de Cobros el
 // primer día de cada mes (ver src/jobs/cobrosMensual.js).
