@@ -107,7 +107,7 @@
     position: fixed; top: 5%; left: 50%; transform: translateX(-50%);
     width: min(700px, 94vw); max-height: 88vh; overflow-y: auto;
     z-index: 60; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    background: linear-gradient(180deg, #161c2b, #10141f);
+    background: linear-gradient(180deg, #232b40, #1a2333);
     border: 1px solid rgba(255,255,255,0.09);
     border-radius: var(--radio); padding: 20px;
   }
@@ -458,12 +458,11 @@
               <th class="th-orden" onclick="ordenarClubesPor('ciudad')">Ciudad <span id="flechaOrdenCiudad"></span></th>
               <th class="th-orden" onclick="ordenarClubesPor('provincia')">Provincia <span id="flechaOrdenProvincia"></span></th>
               <th>Teléfono</th>
-              <th>Email</th>
               <th>Estado en tu Liga</th>
               <th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tablaClubes"><tr><td colspan="10">Cargando...</td></tr></tbody>
+          <tbody id="tablaClubes"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="texto-ayuda" id="paginacionClubesInfo"></span>

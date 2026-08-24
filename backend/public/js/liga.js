@@ -83,7 +83,30 @@ function ocultarFondoModal() {
   document.getElementById('fondoModalGenerico').classList.add('oculto');
 }
 
+// Todos los popups quedan definidos en el HTML anidados dentro de paneles de
+// la página (ej: dentro de "Clubes" -> .panel -> form#formClub). Al estar tan
+// anidados, en algunos navegadores el z-index del popup deja de ganarle al
+// fondo oscuro compartido (#fondoModalGenerico) aunque su z-index sea más
+// alto en el CSS: el click termina "atravesando" el popup y cerrándolo en
+// vez de dejar interactuar con sus campos. Para evitarlo, movemos cada popup
+// (y el fondo) para que cuelguen directo de <body> apenas arranca la página:
+// así siempre quedan al mismo nivel de anidamiento y el z-index se respeta.
+function moverPopupsABody() {
+  const ids = [
+    'fondoModalGenerico', 'formClub', 'panelCanchasClub', 'panelUsuariosClub',
+    'panelDocumentosClub', 'panelComentariosClub', 'modalParticipacionesClub',
+    'modalFichajesClub', 'modalImpagosMes', 'modalAsignarCategoriaMasivo',
+    'formTorneo', 'panelCategorias', 'modalEditarFichaje', 'panelDeudasClub',
+    'modalCobrosClub', 'modalCanchasPredio'
+  ];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) document.body.appendChild(el);
+  });
+}
+
 function init() {
+  moverPopupsABody();
   const usuario = requerirRol(['liga_admin', 'super_admin']);
   if (!usuario) return;
   inicializarTopbar(usuario);
@@ -1850,7 +1873,7 @@ async function abrirImpagosMes() {
 
 async function cargarClubes() {
   const tbody = document.getElementById('tablaClubes');
-  tbody.innerHTML = '<tr><td colspan="10">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
   const texto = document.getElementById('buscadorClubes').value.trim();
   const ciudades = valoresDropdown('ciudad');
   const provincias = valoresDropdown('provincia');
@@ -1889,14 +1912,14 @@ async function cargarClubes() {
     renderFilasClubes();
     actualizarBarraAccionesMasivas();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="10">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
 function renderFilasClubes() {
   const tbody = document.getElementById('tablaClubes');
   if (!clubesCache.length) {
-    tbody.innerHTML = '<tr><td colspan="10">No se encontraron clubes.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9">No se encontraron clubes.</td></tr>';
     document.getElementById('chkSeleccionarTodosClubes').checked = false;
     return;
   }
@@ -1915,7 +1938,6 @@ function renderFilasClubes() {
           ${club.telefono ? escapeHtml(club.telefono) : '-'}
           ${wa ? `<a class="btn-whatsapp-icono" href="${wa}" target="_blank" rel="noopener" title="Enviar WhatsApp">${ICONO_WHATSAPP}</a>` : ''}
         </td>
-        <td>${club.email_contacto ? `<a href="mailto:${escapeHtml(club.email_contacto)}">${escapeHtml(club.email_contacto)}</a>` : '-'}</td>
         <td><span class="badge ${club.activo_en_liga ? 'badge-activo' : 'badge-inactivo'}">${club.activo_en_liga ? 'Activo' : 'Inactivo'}</span></td>
         <td>
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarClub('${club.id}')">${ICONO_LAPIZ}</button>
