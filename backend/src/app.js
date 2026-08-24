@@ -16,8 +16,10 @@ app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 // Sirve el frontend estático (admin / liga / web / app se irán agregando acá)
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// La raíz del dominio (www.tsml.com.ar) redirige directo al login en vez de
+// mostrar una respuesta técnica de "servicio activo" — eso queda solo en /health.
 app.get('/', (_req, res) => {
-  res.json({ ok: true, servicio: 'todosobremiliga-backend' });
+  res.redirect('/login.html');
 });
 
 // ===== HEALTH =====
