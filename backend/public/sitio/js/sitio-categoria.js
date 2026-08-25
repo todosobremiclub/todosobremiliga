@@ -313,14 +313,13 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
             <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</strong>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}
           </div>
         </div>
-        <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
-          <span>${p.hora ? escapeHtml(String(p.hora).slice(0, 5)) : (p.fecha ? '' : 'Sin horario')}</span>
-          ${(cancha.resumen.length || cancha.direccion) ? `
-            <div style="text-align:right;">
-              ${cancha.resumen.length ? `<div>${cancha.resumen.join(' · ')}</div>` : ''}
-              ${cancha.direccion ? `<div style="margin-top:2px;">${escapeHtml(cancha.direccion)}</div>` : ''}
-            </div>
-          ` : ''}
+        <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:170px; text-align:left;">
+            ${cancha.resumen.length ? `<div>${cancha.resumen.join(' · ')}</div>` : ''}
+            ${cancha.direccion ? `<div style="margin-top:2px;">${escapeHtml(cancha.direccion)}</div>` : ''}
+          </div>
+          <div style="white-space:nowrap; text-align:center;">${p.hora ? escapeHtml(String(p.hora).slice(0, 5)) : (p.fecha ? '' : 'Sin horario')}</div>
+          <div style="flex:1; min-width:170px;"></div>
         </div>
       </div>
     `);
