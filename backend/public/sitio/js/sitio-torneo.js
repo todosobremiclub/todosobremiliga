@@ -17,6 +17,15 @@ function getParamsDeUrl() {
   };
 }
 
+// URL "linda" (/<slug-liga>/<slug-torneo>, sin query string): a diferencia
+// de la URL vieja (?id=...), acá no viaja el id real del Torneo -- hay que
+// resolverlo contra el backend por los dos slugs.
+function getSlugsDeUrlLinda() {
+  const segmentos = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+  if (segmentos.length !== 2) return null;
+  return { ligaSlug: segmentos[0], torneoSlug: segmentos[1] };
+}
+
 let torneoIdActual = null;
 let categoriasCache = [];
 let categoriaSeleccionadaId = null;
@@ -41,14 +50,23 @@ let jornadaFixtureActual = 1;
 
 async function init() {
   const { torneoId, nombre, categoriaId, subcategoriaId, tab } = getParamsDeUrl();
-  torneoIdActual = torneoId;
   categoriaIdDesdeUrl = categoriaId;
   subcategoriaIdDesdeUrl = subcategoriaId;
   tabInicialDesdeUrl = tab;
 
-  if (nombre) document.getElementById('nombreTorneo').textContent = nombre;
+  if (torneoId) {
+    // URL vieja (/sitio/torneo.html?id=...): el id ya viaja en la URL.
+    torneoIdActual = torneoId;
+    if (nombre) document.getElementById('nombreTorneo').textContent = nombre;
+    cargarLigaDelTorneo();
+  } else {
+    // URL "linda" (/<liga>/<torneo>): hay que resolver el id contra el
+    // backend antes de poder pedir tabla/fixture/etc.
+    const slugs = getSlugsDeUrlLinda();
+    if (slugs) await resolverTorneoPorSlugs(slugs.ligaSlug, slugs.torneoSlug);
+  }
 
-  if (!torneoId) {
+  if (!torneoIdActual) {
     document.getElementById('nombreTorneo').textContent = 'Torneo no especificado';
     document.getElementById('tabsCategorias').innerHTML = '<p class="sitio-vacio">Falta indicar el Torneo en la URL.</p>';
     return;
@@ -61,27 +79,47 @@ async function init() {
   document.getElementById('btnJornadaAnteriorPublico').addEventListener('click', () => cambiarJornadaFixturePublico(-1));
   document.getElementById('btnJornadaSiguientePublico').addEventListener('click', () => cambiarJornadaFixturePublico(1));
 
-  cargarLigaDelTorneo();
   await cargarCategorias();
   cargarNoticiasTorneo();
 }
 
-// Trae la Liga dueña de este Torneo para pintar el header/fondo con sus
-// colores (igual que hace el Panel de Liga) y para que el breadcrumb
-// vuelva a la Liga real en vez de siempre al listado general.
+// Trae la Liga dueña de este Torneo (llegando por la URL vieja, ?id=...)
+// para pintar el header/fondo con sus colores (igual que hace el Panel de
+// Liga) y para que el breadcrumb vuelva a la Liga real -- con su URL
+// "linda" -- en vez de siempre al listado general.
 async function cargarLigaDelTorneo() {
   try {
     const res = await fetch(`/web/torneos/${torneoIdActual}`);
     const data = await res.json();
     if (!data.ok) return;
-    aplicarTemaLiga(data.torneo.color_primario, data.torneo.color_secundario);
-    if (data.torneo.liga_slug) {
-      const link = document.getElementById('linkVolverLiga');
-      link.href = `/sitio/liga.html?slug=${encodeURIComponent(data.torneo.liga_slug)}`;
-      link.textContent = `← ${data.torneo.liga_nombre}`;
-    }
+    aplicarBreadcrumbYTemaDeTorneo(data.torneo);
   } catch (err) {
     // si falla, seguimos con el tema/breadcrumb por defecto
+  }
+}
+
+// Resuelve el id real del Torneo a partir de los dos slugs de la URL
+// "linda" (/<liga>/<torneo>) y deja todo listo para seguir como si hubiera
+// llegado el id por query string.
+async function resolverTorneoPorSlugs(ligaSlug, torneoSlug) {
+  try {
+    const res = await fetch(`/web/ligas/${encodeURIComponent(ligaSlug)}/torneos/${encodeURIComponent(torneoSlug)}`);
+    const data = await res.json();
+    if (!data.ok) return;
+    torneoIdActual = data.torneo.id;
+    document.getElementById('nombreTorneo').textContent = data.torneo.nombre;
+    aplicarBreadcrumbYTemaDeTorneo(data.torneo);
+  } catch (err) {
+    // si falla, torneoIdActual queda null y init() muestra el mensaje de error
+  }
+}
+
+function aplicarBreadcrumbYTemaDeTorneo(torneo) {
+  aplicarTemaLiga(torneo.color_primario, torneo.color_secundario);
+  if (torneo.liga_slug) {
+    const link = document.getElementById('linkVolverLiga');
+    link.href = `/${encodeURIComponent(torneo.liga_slug)}`;
+    link.textContent = `← ${torneo.liga_nombre}`;
   }
 }
 

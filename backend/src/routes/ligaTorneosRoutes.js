@@ -2,6 +2,26 @@ const express = require('express');
 const router = express.Router();
 
 const { query } = require('../db');
+const { slugify } = require('../utils/slugify');
+
+// Arma un slug único para un torneo DENTRO de su Liga (dos Ligas distintas sí
+// pueden compartir el mismo slug de torneo) — mismo criterio que ya usa
+// adminLigasRoutes.js para el slug de la Liga, pero acotado por liga_id.
+async function slugUnicoDeTorneo(nombre, ligaId, excluirTorneoId) {
+  const slugBase = slugify(nombre) || 'torneo';
+  let slugFinal = slugBase;
+  let intento = 1;
+  while (true) {
+    const existe = await query(
+      'SELECT 1 FROM torneos WHERE liga_id = $1 AND slug = $2 AND ($3::uuid IS NULL OR id != $3::uuid)',
+      [ligaId, slugFinal, excluirTorneoId || null]
+    );
+    if (!existe.rows[0]) break;
+    intento += 1;
+    slugFinal = `${slugBase}-${intento}`;
+  }
+  return slugFinal;
+}
 
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
@@ -87,11 +107,12 @@ router.post('/', async (req, res) => {
     if (await nombreTorneoYaExisteEnLiga(nombre, req.ligaId)) {
       return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
     }
+    const slug = await slugUnicoDeTorneo(nombre, req.ligaId);
     const { rows } = await query(
-      `INSERT INTO torneos (liga_id, nombre, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego, goles_walkover_ganador, goles_walkover_perdedor, logo_url)
-       VALUES ($1, $2, $3, $4, COALESCE($5, 'todos_contra_todos'), COALESCE($6, '{}'::jsonb), COALESCE($7, '{}'::jsonb), $8, $9, COALESCE($10, 'clubes'), COALESCE($11, 3), COALESCE($12, 0), $13)
+      `INSERT INTO torneos (liga_id, nombre, slug, deporte, temporada, formato_juego, sistema_puntaje, config_extra, fecha_inicio, fecha_fin, cancha_juego, goles_walkover_ganador, goles_walkover_perdedor, logo_url)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'todos_contra_todos'), COALESCE($7, '{}'::jsonb), COALESCE($8, '{}'::jsonb), $9, $10, COALESCE($11, 'clubes'), COALESCE($12, 3), COALESCE($13, 0), $14)
        RETURNING *`,
-      [req.ligaId, nombre.trim(), deporte, temporada || null, formato_juego || null,
+      [req.ligaId, nombre.trim(), slug, deporte, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
        fecha_inicio || null, fecha_fin || null, cancha_juego || null,
@@ -122,23 +143,30 @@ router.put('/:torneoId', async (req, res) => {
       return res.status(409).json({ ok: false, error: 'Ya existe un torneo con ese nombre en tu Liga' });
     }
 
+    // El slug se recalcula solo si cambió el nombre (mismo criterio que
+    // `ligas.slug`) — así una URL ya compartida no se rompe por otros cambios.
+    const slug = (nombre && nombre.trim() !== torneo.nombre)
+      ? await slugUnicoDeTorneo(nombre, req.ligaId, req.params.torneoId)
+      : torneo.slug;
+
     const { rows } = await query(
       `UPDATE torneos SET
          nombre = COALESCE($1, nombre),
-         deporte = COALESCE($2, deporte),
-         temporada = COALESCE($3, temporada),
-         formato_juego = COALESCE($4, formato_juego),
-         sistema_puntaje = COALESCE($5, sistema_puntaje),
-         config_extra = COALESCE($6, config_extra),
-         fecha_inicio = COALESCE($7, fecha_inicio),
-         fecha_fin = COALESCE($8, fecha_fin),
-         cancha_juego = COALESCE($9, cancha_juego),
-         goles_walkover_ganador = COALESCE($10, goles_walkover_ganador),
-         goles_walkover_perdedor = COALESCE($11, goles_walkover_perdedor),
-         logo_url = $12
-       WHERE id = $13
+         slug = $2,
+         deporte = COALESCE($3, deporte),
+         temporada = COALESCE($4, temporada),
+         formato_juego = COALESCE($5, formato_juego),
+         sistema_puntaje = COALESCE($6, sistema_puntaje),
+         config_extra = COALESCE($7, config_extra),
+         fecha_inicio = COALESCE($8, fecha_inicio),
+         fecha_fin = COALESCE($9, fecha_fin),
+         cancha_juego = COALESCE($10, cancha_juego),
+         goles_walkover_ganador = COALESCE($11, goles_walkover_ganador),
+         goles_walkover_perdedor = COALESCE($12, goles_walkover_perdedor),
+         logo_url = $13
+       WHERE id = $14
        RETURNING *`,
-      [nombre || null, deporte || null, temporada || null, formato_juego || null,
+      [nombre || null, slug, deporte || null, temporada || null, formato_juego || null,
        sistema_puntaje ? JSON.stringify(sistema_puntaje) : null,
        config_extra ? JSON.stringify(config_extra) : null,
        fecha_inicio || null, fecha_fin || null, cancha_juego || null,

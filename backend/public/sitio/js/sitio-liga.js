@@ -1,8 +1,14 @@
 // Página pública de una Liga: su info + listado de Torneos.
 
+// El slug de la Liga llega por query string en la URL vieja
+// (/sitio/liga.html?slug=tsmc) o directo en el path en la URL "linda"
+// (/tsmc) -- se soportan las dos.
 function getSlugDeUrl() {
   const params = new URLSearchParams(window.location.search);
-  return params.get('slug');
+  const desdeQuery = params.get('slug');
+  if (desdeQuery) return desdeQuery;
+  const segmento = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  return (segmento && segmento !== 'sitio/liga.html') ? segmento : null;
 }
 
 async function init() {
@@ -44,7 +50,7 @@ async function init() {
       return;
     }
     contenedorTorneos.innerHTML = dataTorneos.torneos.map((t) => `
-      <a class="card-link ${t.logo_url ? 'con-foto-fondo' : ''}" ${t.logo_url ? `style="--foto-fondo: url('${escapeHtml(t.logo_url)}')"` : ''} href="/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}">
+      <a class="card-link ${t.logo_url ? 'con-foto-fondo' : ''}" ${t.logo_url ? `style="--foto-fondo: url('${escapeHtml(t.logo_url)}')"` : ''} href="${t.slug ? `/${encodeURIComponent(slug)}/${encodeURIComponent(t.slug)}` : `/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}`}">
         <h3>${escapeHtml(t.nombre)}</h3>
         <p>${escapeHtml(t.deporte)} · ${escapeHtml(t.temporada || '')} · ${escapeHtml(t.estado || 'planificado')}</p>
       </a>

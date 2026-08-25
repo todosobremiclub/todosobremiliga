@@ -58,7 +58,7 @@ router.get('/ligas/:slug', async (req, res) => {
 router.get('/torneos/:torneoId', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
               l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url
        FROM torneos t
@@ -74,11 +74,34 @@ router.get('/torneos/:torneoId', async (req, res) => {
   }
 });
 
+// GET /web/ligas/:slug/torneos/:torneoSlug — resuelve un Torneo por su slug
+// DENTRO de una Liga (por su slug) a sus datos + id real. Es lo que usa la
+// URL "linda" del sitio público (www.todosobremiliga.com.ar/<liga>/<torneo>)
+// para saber a qué torneo corresponde, ya que esa URL no lleva el id.
+router.get('/ligas/:slug/torneos/:torneoSlug', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
+              l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
+              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url
+       FROM torneos t
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE l.slug = $1 AND t.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.slug, req.params.torneoSlug]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+    res.json({ ok: true, torneo: rows[0] });
+  } catch (err) {
+    console.error('Error en GET torneo publico por slugs:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/torneos — torneos públicos de una Liga
 router.get('/ligas/:slug/torneos', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin, t.logo_url
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin, t.logo_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
        WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva'

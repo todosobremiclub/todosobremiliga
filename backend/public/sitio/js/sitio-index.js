@@ -32,7 +32,7 @@ function renderLigas(ligas) {
     return;
   }
   contenedor.innerHTML = ligas.map((liga) => `
-    <a class="card-link ${liga.logo_url ? 'con-foto-fondo' : ''}" ${liga.logo_url ? `style="--foto-fondo: url('${escapeHtml(liga.logo_url)}')"` : ''} href="/sitio/liga.html?slug=${encodeURIComponent(liga.slug)}">
+    <a class="card-link ${liga.logo_url ? 'con-foto-fondo' : ''}" ${liga.logo_url ? `style="--foto-fondo: url('${escapeHtml(liga.logo_url)}')"` : ''} href="/${encodeURIComponent(liga.slug)}">
       <h3>${escapeHtml(liga.nombre)}</h3>
       <p>${escapeHtml(liga.direccion || 'Ver tabla, fixture y noticias')}</p>
     </a>

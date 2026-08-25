@@ -117,5 +117,40 @@ app.use('/liga/reportes', requireAuth, requireRole('super_admin', 'liga_admin'),
 const { programarGeneracionMensualAutomatica } = require('./jobs/cobrosMensual');
 programarGeneracionMensualAutomatica();
 
+// ===== URLs "lindas" del sitio público =====
+// www.todosobremiliga.com.ar/<slug-liga> y .../<slug-liga>/<slug-torneo>
+// sirven las mismas páginas que ya sirve /sitio/liga.html?slug=... y
+// /sitio/torneo.html?id=..., pero con el nombre en la URL en vez de query
+// string. Van al final de todo a propósito: sólo llegan acá los GET que no
+// matchearon ningún archivo estático ni ninguna ruta de arriba, y cada una
+// chequea contra la base antes de servir nada -- si no hay una Liga/Torneo
+// con ese slug, se sigue de largo (next()) y termina en el 404 de siempre.
+app.get('/:ligaSlug', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT 1 FROM ligas WHERE slug = $1 AND activo = TRUE AND tipo = 'productiva'`,
+      [req.params.ligaSlug]
+    );
+    if (!rows[0]) return next();
+    res.sendFile(path.join(__dirname, '..', 'public', 'sitio', 'liga.html'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/:ligaSlug/:torneoSlug', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT 1 FROM torneos t JOIN ligas l ON l.id = t.liga_id
+       WHERE l.slug = $1 AND t.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.ligaSlug, req.params.torneoSlug]
+    );
+    if (!rows[0]) return next();
+    res.sendFile(path.join(__dirname, '..', 'public', 'sitio', 'torneo.html'));
+  } catch (err) {
+    next(err);
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ API escuchando en ${PORT}`));
