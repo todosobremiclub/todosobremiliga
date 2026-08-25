@@ -457,6 +457,8 @@ function detallesCanchaPartido(p) {
   const detalles = [];
   if (canchaJuegoFixtureActual === 'propias_liga') {
     if (p.predio_nombre) detalles.push(`${escapeHtml(p.predio_nombre)}${p.cancha_predio_nombre ? ' - ' + escapeHtml(p.cancha_predio_nombre) : ''}`);
+    const ubicacionPredio = [p.predio_direccion, p.predio_ciudad, p.predio_provincia].filter(Boolean).join(', ');
+    if (ubicacionPredio) detalles.push(escapeHtml(ubicacionPredio));
     if (p.cancha_predio_techo) detalles.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
   } else {
     if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));

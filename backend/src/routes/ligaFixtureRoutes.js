@@ -203,7 +203,9 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
               COALESCE(ccSel.piso, ccl.piso) AS club_local_cancha_piso,
               COALESCE(tcSel.nombre, tcl.nombre) AS club_local_cancha_tipo_nombre,
               COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
-              pr.nombre AS predio_nombre, cp.nombre AS cancha_predio_nombre,
+              pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
+              cp.nombre AS cancha_predio_nombre,
               cp.tipo_techo AS cancha_predio_techo, cp.tamanio AS cancha_predio_tamanio,
               tcp.nombre AS cancha_predio_tipo_nombre
        FROM partidos p

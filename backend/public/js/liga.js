@@ -1116,7 +1116,7 @@ function renderListaPredios() {
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
           <strong>${escapeHtml(p.nombre)}</strong>
-          ${p.direccion ? `<span class="texto-ayuda"> — ${escapeHtml(p.direccion)}</span>` : ''}
+          ${[p.direccion, p.ciudad, p.provincia].filter(Boolean).length ? `<span class="texto-ayuda"> — ${escapeHtml([p.direccion, p.ciudad, p.provincia].filter(Boolean).join(', '))}</span>` : ''}
           <span class="texto-ayuda"> (${(p.canchas || []).length} cancha${(p.canchas || []).length === 1 ? '' : 's'})</span>
         </div>
         <div>
@@ -1135,6 +1135,8 @@ function editarPredio(id) {
   document.getElementById('predioIdEdicion').value = p.id;
   document.getElementById('predioNombre').value = p.nombre || '';
   document.getElementById('predioDireccion').value = p.direccion || '';
+  document.getElementById('predioCiudad').value = p.ciudad || '';
+  document.getElementById('predioProvincia').value = p.provincia || '';
   document.getElementById('predioFormError').classList.add('oculto');
   document.getElementById('formPredio').classList.remove('oculto');
 }
@@ -1156,7 +1158,9 @@ async function guardarPredio(e) {
   const id = document.getElementById('predioIdEdicion').value;
   const cuerpo = {
     nombre: document.getElementById('predioNombre').value.trim(),
-    direccion: document.getElementById('predioDireccion').value.trim() || undefined
+    direccion: document.getElementById('predioDireccion').value.trim() || undefined,
+    ciudad: document.getElementById('predioCiudad').value.trim() || undefined,
+    provincia: document.getElementById('predioProvincia').value.trim() || undefined
   };
   try {
     if (id) {
@@ -4240,6 +4244,8 @@ function renderJornadaFixture(jornadasDisponibles) {
       if (p.cancha_predio_tipo_nombre) detallesPredio.push(escapeHtml(p.cancha_predio_tipo_nombre));
       if (p.cancha_predio_techo) detallesPredio.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
       if (p.cancha_predio_tamanio) detallesPredio.push(escapeHtml(p.cancha_predio_tamanio));
+      const ubicacionPredio = [p.predio_direccion, p.predio_ciudad, p.predio_provincia].filter(Boolean).join(', ');
+      if (ubicacionPredio) detallesPredio.push(escapeHtml(ubicacionPredio));
       bloqueCancha = `
         <div>
           <label style="font-size:12px;">Predio y cancha</label>

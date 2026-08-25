@@ -338,12 +338,12 @@ router.get('/predios', async (req, res) => {
 });
 
 router.post('/predios', async (req, res) => {
-  const { nombre, direccion } = req.body;
+  const { nombre, direccion, ciudad, provincia } = req.body;
   if (!nombre || !nombre.trim()) return res.status(400).json({ ok: false, error: 'Falta el nombre' });
   try {
     const { rows } = await query(
-      'INSERT INTO predios_liga (liga_id, nombre, direccion) VALUES ($1, $2, $3) RETURNING *',
-      [req.ligaId, nombre.trim(), direccion || null]
+      'INSERT INTO predios_liga (liga_id, nombre, direccion, ciudad, provincia) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [req.ligaId, nombre.trim(), direccion || null, ciudad || null, provincia || null]
     );
     res.status(201).json({ ok: true, predio: { ...rows[0], canchas: [] } });
   } catch (err) {
@@ -354,12 +354,12 @@ router.post('/predios', async (req, res) => {
 });
 
 router.put('/predios/:id', async (req, res) => {
-  const { nombre, direccion, activo } = req.body;
+  const { nombre, direccion, ciudad, provincia, activo } = req.body;
   try {
     const { rows } = await query(
-      `UPDATE predios_liga SET nombre = COALESCE($1, nombre), direccion = $2, activo = COALESCE($3, activo)
-       WHERE id = $4 AND liga_id = $5 RETURNING *`,
-      [nombre ? nombre.trim() : null, direccion || null, activo, req.params.id, req.ligaId]
+      `UPDATE predios_liga SET nombre = COALESCE($1, nombre), direccion = $2, ciudad = $3, provincia = $4, activo = COALESCE($5, activo)
+       WHERE id = $6 AND liga_id = $7 RETURNING *`,
+      [nombre ? nombre.trim() : null, direccion || null, ciudad || null, provincia || null, activo, req.params.id, req.ligaId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'No encontrado en tu Liga' });
     res.json({ ok: true, predio: rows[0] });

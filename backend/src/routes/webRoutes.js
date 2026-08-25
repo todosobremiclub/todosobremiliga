@@ -282,6 +282,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
               COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
               COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
               pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
               cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
@@ -329,6 +330,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId', asy
               COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
               COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
               pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
               cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
