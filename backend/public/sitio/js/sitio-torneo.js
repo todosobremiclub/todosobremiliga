@@ -455,7 +455,7 @@ function formatearFechaPartido(fecha) {
 }
 
 // Igual que formatearFechaPartido pero anteponiendo el día de la semana
-// (ej. "Sábado 29/8/2026"), para la fila del fixture.
+// (ej. "Sábado 29/8/2026"), usado en el popup de detalle de un partido.
 function formatearFechaConDiaPartido(fecha) {
   if (!fecha) return null;
   const d = new Date(fecha);
@@ -463,6 +463,19 @@ function formatearFechaConDiaPartido(fecha) {
   const dia = d.toLocaleDateString('es-AR', { timeZone: 'UTC', weekday: 'long' });
   const diaCapitalizado = dia.charAt(0).toUpperCase() + dia.slice(1);
   return `${diaCapitalizado} ${d.toLocaleDateString('es-AR', { timeZone: 'UTC' })}`;
+}
+
+// Versión corta para el separador entre días dentro de una misma jornada
+// (ej. "Vie 21/08"), cuando la fecha juega en más de un día.
+function formatearIndicadorDia(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return null;
+  const diaCorto = d.toLocaleDateString('es-AR', { timeZone: 'UTC', weekday: 'short' }).replace('.', '');
+  const diaCapitalizado = diaCorto.charAt(0).toUpperCase() + diaCorto.slice(1);
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${diaCapitalizado} ${dd}/${mm}`;
 }
 
 // Datos de cancha del partido (dirección del club local, o predio+cancha
@@ -486,15 +499,27 @@ function detallesCanchaPartido(p) {
 
 function renderJornadaFixturePublico(jornadasDisponibles) {
   const contenedor = document.getElementById('contenedorPartidosJornadaPublico');
+  // El backend ya ordena por fecha y hora (ORDER BY p.fecha, p.hora), así
+  // que dentro de la jornada los partidos ya vienen del más próximo al
+  // último -- acá sólo hay que agrupar visualmente por día cuando la misma
+  // jornada se juega en más de una fecha (ej. viernes/sábado/domingo).
   const partidosJornada = partidosFixtureCache.filter((p) => (p.jornada != null ? p.jornada : 0) === jornadaFixtureActual);
   const descripcion = jornadasDescripcionFixtureCache[jornadaFixtureActual];
   document.getElementById('tituloJornadaActualPublico').textContent = `Fecha ${jornadaFixtureActual}${descripcion ? ' — ' + escapeHtml(descripcion) : ''}`;
   document.getElementById('btnJornadaAnteriorPublico').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === 0;
   document.getElementById('btnJornadaSiguientePublico').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === jornadasDisponibles.length - 1;
 
-  contenedor.innerHTML = partidosJornada.map((p) => {
+  let diaAnterior;
+  const filas = [];
+  partidosJornada.forEach((p) => {
+    const indicadorDia = p.fecha ? formatearIndicadorDia(p.fecha) : 'Sin fecha';
+    if (indicadorDia !== diaAnterior) {
+      filas.push(`<div class="separador-dia-fixture">${escapeHtml(indicadorDia)}</div>`);
+      diaAnterior = indicadorDia;
+    }
+
     const cancha = detallesCanchaPartido(p);
-    return `
+    filas.push(`
       <div class="panel fila-partido-clickable" style="margin-bottom:10px;" onclick="abrirDetallePartido('${p.id}')">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:170px;">
@@ -508,7 +533,7 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
           </div>
         </div>
         <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
-          <span>${p.fecha ? `${escapeHtml(formatearFechaConDiaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}` : 'Sin fecha'}</span>
+          <span>${p.hora ? escapeHtml(String(p.hora).slice(0, 5)) : (p.fecha ? '' : 'Sin horario')}</span>
           ${(cancha.resumen.length || cancha.direccion) ? `
             <div style="text-align:right;">
               ${cancha.resumen.length ? `<div>${cancha.resumen.join(' · ')}</div>` : ''}
@@ -517,8 +542,9 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
           ` : ''}
         </div>
       </div>
-    `;
-  }).join('');
+    `);
+  });
+  contenedor.innerHTML = filas.join('');
 }
 
 // ----- Popup de detalle de un partido -----

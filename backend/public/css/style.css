@@ -700,6 +700,25 @@ button.btn-peligro:hover { background: #fee2e2; }
   padding: 20px 0;
 }
 
+/* Separador de día dentro de una misma jornada del fixture (ej. "Vie
+   21/08"), cuando esa jornada se juega en más de una fecha -- mismo
+   criterio visual que usan los sitios de resultados deportivos. Colores
+   claros por defecto; se pisan más abajo para el sitio público, que
+   siempre corre sobre el fondo oscuro "cancha de noche". */
+.separador-dia-fixture {
+  background: var(--gris-100);
+  border: 1px solid var(--gris-300);
+  border-radius: var(--radio);
+  padding: 8px 14px;
+  margin: 16px 0 10px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--gris-900);
+}
+
+.separador-dia-fixture:first-child { margin-top: 0; }
+
 /* Buscador de clubes de la página pública de una Liga: input + lista de
    resultados desplegable debajo, que se cierra sola al elegir un club o
    hacer click afuera. */
@@ -905,6 +924,14 @@ body.liga-fondo-cancha .tab-btn.activo, body.club-fondo-cancha .tab-btn.activo {
 body.liga-fondo-cancha .tarjeta-participacion-club, body.club-fondo-cancha .tarjeta-participacion-club {
   background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.09);
+}
+
+/* Separador de día del fixture (ver arriba): versión oscura para el sitio
+   público, que siempre corre sobre el fondo "cancha de noche". */
+body.liga-fondo-cancha .separador-dia-fixture, body.club-fondo-cancha .separador-dia-fixture {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--gris-100);
 }
 
 /* ============================================================================

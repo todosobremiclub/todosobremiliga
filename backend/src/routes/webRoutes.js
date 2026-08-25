@@ -297,7 +297,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
        LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
          AND l.activo = TRUE AND l.tipo = 'productiva'
-       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
+       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST, p.hora ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
@@ -421,7 +421,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId/f
        WHERE p.torneo_id = $1 AND p.categoria_id = $2
          AND (p.equipo_local_id = $3 OR p.equipo_visitante_id = $3)
          AND l.activo = TRUE AND l.tipo = 'productiva'
-       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
+       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST, p.hora ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId, req.params.equipoTorneoId]
     );
     res.json({ ok: true, partidos: rows });

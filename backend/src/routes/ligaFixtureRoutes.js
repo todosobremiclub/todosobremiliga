@@ -221,7 +221,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
        LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
        LEFT JOIN tipos_cancha tcp ON tcp.id = cp.tipo_cancha_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
-       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
+       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST, p.hora ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
