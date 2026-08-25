@@ -92,6 +92,10 @@ async function cargarLigaDelTorneo() {
     const res = await fetch(`/web/torneos/${torneoIdActual}`);
     const data = await res.json();
     if (!data.ok) return;
+    // El nombre del Torneo se pisa acá siempre (venga o no por query string
+    // en la URL vieja) para que el título nunca se quede en "Cargando..."
+    // -- ej. cuando se llega desde un link que no incluye &nombre=... .
+    document.getElementById('nombreTorneo').textContent = data.torneo.nombre;
     aplicarBreadcrumbYTemaDeTorneo(data.torneo);
   } catch (err) {
     // si falla, seguimos con el tema/breadcrumb por defecto
@@ -450,21 +454,34 @@ function formatearFechaPartido(fecha) {
   return d.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
+// Igual que formatearFechaPartido pero anteponiendo el día de la semana
+// (ej. "Sábado 29/8/2026"), para la fila del fixture.
+function formatearFechaConDiaPartido(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return String(fecha);
+  const dia = d.toLocaleDateString('es-AR', { timeZone: 'UTC', weekday: 'long' });
+  const diaCapitalizado = dia.charAt(0).toUpperCase() + dia.slice(1);
+  return `${diaCapitalizado} ${d.toLocaleDateString('es-AR', { timeZone: 'UTC' })}`;
+}
+
 // Datos de cancha del partido (dirección del club local, o predio+cancha
 // propia de la Liga con si es techada o al aire libre), según cómo juega
-// este torneo -- mismo criterio que ya usa el Panel de Liga.
+// este torneo -- mismo criterio que ya usa el Panel de Liga. Se separa la
+// dirección del resto (predio/cancha + techada) porque cada una va en un
+// lugar distinto de la fila del fixture y del popup de detalle.
 function detallesCanchaPartido(p) {
-  const detalles = [];
+  const resumen = [];
+  let direccion = '';
   if (canchaJuegoFixtureActual === 'propias_liga') {
-    if (p.predio_nombre) detalles.push(`${escapeHtml(p.predio_nombre)}${p.cancha_predio_nombre ? ' - ' + escapeHtml(p.cancha_predio_nombre) : ''}`);
-    const ubicacionPredio = [p.predio_direccion, p.predio_ciudad, p.predio_provincia].filter(Boolean).join(', ');
-    if (ubicacionPredio) detalles.push(escapeHtml(ubicacionPredio));
-    if (p.cancha_predio_techo) detalles.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
+    if (p.predio_nombre) resumen.push(`${escapeHtml(p.predio_nombre)}${p.cancha_predio_nombre ? ' - ' + escapeHtml(p.cancha_predio_nombre) : ''}`);
+    direccion = [p.predio_direccion, p.predio_ciudad, p.predio_provincia].filter(Boolean).join(', ');
+    if (p.cancha_predio_techo) resumen.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
   } else {
-    if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
-    if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
+    direccion = p.club_local_direccion || '';
+    if (p.club_local_cancha_techo) resumen.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
   }
-  return detalles;
+  return { resumen, direccion };
 }
 
 function renderJornadaFixturePublico(jornadasDisponibles) {
@@ -476,7 +493,7 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
   document.getElementById('btnJornadaSiguientePublico').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === jornadasDisponibles.length - 1;
 
   contenedor.innerHTML = partidosJornada.map((p) => {
-    const detalles = detallesCanchaPartido(p);
+    const cancha = detallesCanchaPartido(p);
     return `
       <div class="panel fila-partido-clickable" style="margin-bottom:10px;" onclick="abrirDetallePartido('${p.id}')">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
@@ -490,9 +507,12 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
             <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</strong>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}
           </div>
         </div>
-        <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; gap:10px; flex-wrap:wrap;">
-          ${p.fecha ? `<span>${escapeHtml(formatearFechaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}</span>` : '<span>Sin fecha</span>'}
-          ${detalles.length ? `<span>${detalles.join(' · ')}</span>` : ''}
+        <div style="margin-top:6px; font-size:12px; color:var(--gris-600);">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <span>${p.fecha ? `${escapeHtml(formatearFechaConDiaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}` : 'Sin fecha'}</span>
+            ${cancha.direccion ? `<span>${escapeHtml(cancha.direccion)}</span>` : ''}
+          </div>
+          ${cancha.resumen.length ? `<div style="margin-top:2px;">${cancha.resumen.join(' · ')}</div>` : ''}
         </div>
       </div>
     `;
@@ -525,7 +545,7 @@ function cerrarDetallePartido() {
 }
 
 function renderDetallePartidoHtml(p, estadisticas) {
-  const detalles = detallesCanchaPartido(p);
+  const cancha = detallesCanchaPartido(p);
   const goleadores = estadisticas.filter((e) => e.goles > 0);
   const tarjetas = estadisticas.filter((e) => e.tarjetas_amarillas > 0 || e.tarjetas_rojas > 0);
 
@@ -549,7 +569,12 @@ function renderDetallePartidoHtml(p, estadisticas) {
     <p style="text-align:center; color:var(--gris-600); margin:6px 0;">
       ${p.jornada != null ? `Fecha ${p.jornada} · ` : ''}${p.fecha ? escapeHtml(formatearFechaPartido(p.fecha)) : 'Sin fecha'}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}
     </p>
-    ${detalles.length ? `<p style="text-align:center; color:var(--gris-600); font-size:13px; margin:0 0 14px;">${detalles.join(' · ')}</p>` : '<div style="margin-bottom:14px;"></div>'}
+    ${cancha.resumen.length || cancha.direccion ? `
+      <div style="text-align:center; color:var(--gris-600); font-size:13px; margin:0 0 14px;">
+        ${cancha.resumen.length ? `<p style="margin:0;">${cancha.resumen.join(' · ')}</p>` : ''}
+        ${cancha.direccion ? `<p style="margin:2px 0 0;">${escapeHtml(cancha.direccion)}</p>` : ''}
+      </div>
+    ` : '<div style="margin-bottom:14px;"></div>'}
 
     ${goleadores.length ? `
       <h3 style="margin-bottom:6px;">Goleadores</h3>
