@@ -837,5 +837,38 @@ body.liga-fondo-cancha .badge-alerta, body.club-fondo-cancha .badge-alerta { bac
 /* Filas de tabla / tarjetas clickeables: el hover oscurecía un poco (pensado
    para fondo blanco); sobre vidrio oscuro tiene que aclarar en vez. */
 body.liga-fondo-cancha .fila-equipo-clickable:hover, body.club-fondo-cancha .fila-equipo-clickable:hover { background: rgba(255,255,255,0.05); }
+
+/* Buscador de clubes/ligas del sitio público (dropdown de resultados): de
+   caja blanca a vidrio oscuro, igual que el resto de las tarjetas. */
+body.liga-fondo-cancha .buscador-clubes-resultados, body.club-fondo-cancha .buscador-clubes-resultados {
+  background: #171d2c;
+  border: 1px solid rgba(255,255,255,0.09);
+}
+body.liga-fondo-cancha .buscador-clubes-resultado, body.club-fondo-cancha .buscador-clubes-resultado {
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+body.liga-fondo-cancha .buscador-clubes-resultado:hover, body.club-fondo-cancha .buscador-clubes-resultado:hover {
+  background: rgba(255,255,255,0.06);
+}
 body.liga-fondo-cancha .club-swatch, body.club-fondo-cancha .club-swatch { border-color: rgba(255,255,255,0.25); }
+
+/* Pestañas de división/equipo/torneo en el sitio público (.tab-btn, inline en
+   cada página): mismo tratamiento que .card-link/.noticia-card. La pestaña
+   activa ya usa var(--azul) sólido, así que no necesita cambios. */
+body.liga-fondo-cancha .tab-btn, body.club-fondo-cancha .tab-btn {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--gris-100);
+}
+body.liga-fondo-cancha .tab-btn.activo, body.club-fondo-cancha .tab-btn.activo {
+  background: var(--azul);
+  color: var(--blanco);
+  border-color: var(--azul);
+}
+
+/* Tarjeta de participación de un club en un torneo (sitio/club.html, inline). */
+body.liga-fondo-cancha .tarjeta-participacion-club, body.club-fondo-cancha .tarjeta-participacion-club {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.09);
+}
 
