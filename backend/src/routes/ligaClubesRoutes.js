@@ -171,7 +171,19 @@ router.get('/filtros-disponibles', async (req, res) => {
     );
     const ciudades = [...new Set(rows.map((r) => r.ciudad).filter(Boolean))].sort();
     const provincias = [...new Set(rows.map((r) => r.provincia).filter(Boolean))].sort();
-    res.json({ ok: true, ciudades, provincias });
+    // Pares ciudad/provincia (sin repetir) para que el frontend pueda armar
+    // el filtro en cascada: al elegir una Provincia, mostrar solo las
+    // Ciudades que pertenecen a esa Provincia.
+    const paresVistos = new Set();
+    const pares = [];
+    rows.forEach((r) => {
+      if (!r.ciudad || !r.provincia) return;
+      const clave = `${r.ciudad}|${r.provincia}`;
+      if (paresVistos.has(clave)) return;
+      paresVistos.add(clave);
+      pares.push({ ciudad: r.ciudad, provincia: r.provincia });
+    });
+    res.json({ ok: true, ciudades, provincias, pares });
   } catch (err) {
     console.error('Error en GET /liga/clubes/filtros-disponibles:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });

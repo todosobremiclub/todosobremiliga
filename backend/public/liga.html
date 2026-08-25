@@ -56,6 +56,8 @@
   .tab-btn-general { border-style: dashed; }
   .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; white-space: nowrap; }
   .tabla-scroll { overflow-x: auto; }
+  .link-telefono-wa { color: #25D366; text-decoration: none; white-space: nowrap; }
+  .link-telefono-wa:hover { text-decoration: underline; }
   .link-club-fichajes:hover { color: var(--azul); text-decoration: underline; }
   .bloque-torneo-fichajes-club { margin-bottom: 18px; padding: 12px 14px; border-radius: 10px; background: var(--gris-100); }
   .bloque-torneo-fichajes-club:last-child { margin-bottom: 0; }
@@ -251,17 +253,17 @@
 
         <div class="barra-filtros">
           <input type="text" id="buscadorClubes" placeholder="Buscar por Nombre...">
-          <div class="dropdown-multi" id="dropdownCiudad">
-            <button type="button" class="dropdown-multi-boton" id="btnDropdownCiudad">
-              Ciudad <span class="dropdown-multi-contador oculto" id="contadorCiudad">0</span> ▾
-            </button>
-            <div class="dropdown-multi-panel oculto" id="panelDropdownCiudad"></div>
-          </div>
           <div class="dropdown-multi" id="dropdownProvincia">
             <button type="button" class="dropdown-multi-boton" id="btnDropdownProvincia">
               Provincia <span class="dropdown-multi-contador oculto" id="contadorProvincia">0</span> ▾
             </button>
             <div class="dropdown-multi-panel oculto" id="panelDropdownProvincia"></div>
+          </div>
+          <div class="dropdown-multi" id="dropdownCiudad">
+            <button type="button" class="dropdown-multi-boton" id="btnDropdownCiudad">
+              Ciudad <span class="dropdown-multi-contador oculto" id="contadorCiudad">0</span> ▾
+            </button>
+            <div class="dropdown-multi-panel oculto" id="panelDropdownCiudad"></div>
           </div>
           <select id="filtroClubesCancha">
             <option value="">Todas las canchas</option>

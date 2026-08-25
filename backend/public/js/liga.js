@@ -1723,6 +1723,8 @@ function actualizarFlechasOrdenClubes() {
 // Reemplaza al <select multiple size="3"> (que ocupaba mucho lugar en
 // pantalla) por un botón compacto que despliega una lista de checkboxes.
 const dropdownsMultipleFiltro = {}; // { ciudad: {opciones:[], seleccion:Set}, provincia: {...} }
+let paresClubesCiudadProvincia = []; // [{ciudad, provincia}, ...] para el filtro en cascada
+let todasCiudadesClubesDisponibles = []; // todas las ciudades cargadas en la Liga (sin filtrar por provincia)
 
 // `opciones` acepta un array de strings (ej: ciudades) o de objetos
 // {value, label} (ej: modalidades, donde el value es el id y el label el
@@ -1748,10 +1750,40 @@ function armarDropdownMultiple(clave, opciones) {
       if (chk.checked) dropdownsMultipleFiltro[clave].seleccion.add(chk.value);
       else dropdownsMultipleFiltro[clave].seleccion.delete(chk.value);
       actualizarContadorDropdown(clave);
+      // Si cambió la Provincia, el desplegable de Ciudad se recalcula para
+      // mostrar solo las ciudades de las provincias elegidas.
+      if (clave === 'provincia') actualizarOpcionesCiudadPorProvincia();
       paginaClubesActual = 1;
       cargarClubes();
     });
   });
+}
+
+// Recalcula las opciones del desplegable de Ciudad según la(s) Provincia(s)
+// elegida(s) en ese momento (filtro en cascada). Si no hay ninguna Provincia
+// tildada, se muestran todas las ciudades cargadas en la Liga. Si alguna
+// ciudad que ya estaba tildada deja de pertenecer a las provincias elegidas,
+// se destilda sola.
+function ciudadesDisponiblesSegunProvincia() {
+  const provinciasSeleccionadas = valoresDropdown('provincia');
+  if (!provinciasSeleccionadas.length) return todasCiudadesClubesDisponibles;
+  return [...new Set(
+    paresClubesCiudadProvincia
+      .filter((p) => provinciasSeleccionadas.includes(p.provincia))
+      .map((p) => p.ciudad)
+  )].sort();
+}
+
+function actualizarOpcionesCiudadPorProvincia() {
+  const nuevasCiudades = ciudadesDisponiblesSegunProvincia();
+  const nuevasSet = new Set(nuevasCiudades);
+  if (dropdownsMultipleFiltro.ciudad) {
+    [...dropdownsMultipleFiltro.ciudad.seleccion].forEach((c) => {
+      if (!nuevasSet.has(c)) dropdownsMultipleFiltro.ciudad.seleccion.delete(c);
+    });
+  }
+  armarDropdownMultiple('ciudad', nuevasCiudades);
+  actualizarContadorDropdown('ciudad');
 }
 
 function capitalizar(texto) {
@@ -1783,8 +1815,10 @@ function toggleDropdownPanel(clave) {
 async function cargarFiltrosDisponiblesClubes() {
   try {
     const data = await apiFetch('/liga/clubes/filtros-disponibles');
-    armarDropdownMultiple('ciudad', data.ciudades);
+    todasCiudadesClubesDisponibles = data.ciudades || [];
+    paresClubesCiudadProvincia = data.pares || [];
     armarDropdownMultiple('provincia', data.provincias);
+    armarDropdownMultiple('ciudad', ciudadesDisponiblesSegunProvincia());
   } catch (err) {
     // si falla, los filtros quedan vacíos (no bloquea el resto de la pantalla)
   }
@@ -1934,12 +1968,11 @@ function renderFilasClubes() {
         <td>${escapeHtml(club.direccion || '-')}</td>
         <td>${escapeHtml(club.ciudad || '-')}</td>
         <td>${escapeHtml(club.provincia || '-')}</td>
-        <td>
-          ${club.telefono ? escapeHtml(club.telefono) : '-'}
-          ${wa ? `<a class="btn-whatsapp-icono" href="${wa}" target="_blank" rel="noopener" title="Enviar WhatsApp">${ICONO_WHATSAPP}</a>` : ''}
+        <td style="white-space:nowrap;">
+          ${club.telefono ? (wa ? `<a href="${wa}" target="_blank" rel="noopener" class="link-telefono-wa" title="Enviar WhatsApp">${escapeHtml(club.telefono)}</a>` : escapeHtml(club.telefono)) : '-'}
         </td>
         <td><span class="badge ${club.activo_en_liga ? 'badge-activo' : 'badge-inactivo'}">${club.activo_en_liga ? 'Activo' : 'Inactivo'}</span></td>
-        <td>
+        <td style="white-space:nowrap;">
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarClub('${club.id}')">${ICONO_LAPIZ}</button>
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Participaciones" onclick="verParticipacionesClub('${club.id}', '${escapeHtml(club.nombre)}')">${ICONO_COPA}</button>
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Usuarios" onclick="verUsuariosClub('${club.id}', '${escapeHtml(club.nombre)}')">${ICONO_PERSONA}</button>
