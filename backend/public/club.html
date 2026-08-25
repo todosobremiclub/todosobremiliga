@@ -66,6 +66,7 @@
       <button class="tab-btn" id="tabBtnMisTorneos">Mis Torneos</button>
       <button class="tab-btn" id="tabBtnNotificaciones">Notificaciones</button>
       <button class="tab-btn" id="tabBtnDocumentos">Documentos</button>
+      <button class="tab-btn" id="tabBtnConfiguracion">Configuración</button>
     </div>
 
     <!-- ===== SECCIÓN JUGADORES ===== -->
@@ -74,6 +75,7 @@
         <div class="panel-header">
           <h2>Jugadores / Socios</h2>
           <div>
+            <button class="btn btn-secundario" id="btnVerSolicitudesSocios">Solicitudes pendientes <span id="badgeSolicitudesPendientes" class="badge badge-pendiente oculto">0</span></button>
             <button class="btn btn-secundario" id="btnMostrarFichajeMasivo">Fichaje masivo</button>
             <button class="btn" id="btnMostrarFormJugador">+ Nuevo Jugador</button>
           </div>
@@ -113,6 +115,22 @@
               <input type="number" id="jugadorNumero">
             </div>
             <div>
+              <label for="jugadorTelefono">Teléfono</label>
+              <input type="tel" id="jugadorTelefono">
+            </div>
+            <div>
+              <label for="jugadorEmail">Email</label>
+              <input type="email" id="jugadorEmail">
+            </div>
+            <div>
+              <label for="jugadorActividad">Actividad</label>
+              <select id="jugadorActividad"><option value="">Sin especificar</option></select>
+            </div>
+            <div>
+              <label for="jugadorCategoriaSocio">Categoría</label>
+              <select id="jugadorCategoriaSocio"><option value="">Sin especificar</option></select>
+            </div>
+            <div>
               <label for="jugadorFotoArchivo">Foto (elegir desde la computadora)</label>
               <div class="logo-preview-wrap">
                 <img id="jugadorFotoPreview" class="oculto" alt="Foto">
@@ -133,6 +151,21 @@
           <tbody id="tablaJugadores"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
       </div>
+
+      <!-- Solicitudes de autorregistro de socios (llegan desde el formulario
+           público QR/link) pendientes de aprobar o rechazar. -->
+      <div class="panel oculto" id="panelSolicitudesSocios" style="position:fixed; top:8%; left:15%; right:15%; max-height:84vh; overflow:auto; z-index:70; box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+        <div class="panel-header">
+          <h2>Solicitudes de socios pendientes</h2>
+          <button class="btn btn-secundario" id="btnCerrarSolicitudesSocios">Cerrar</button>
+        </div>
+        <p class="texto-ayuda">Estas solicitudes las cargó alguien desde el link/QR de autorregistro. Revisá los datos y aprobá (se crea el jugador) o rechazá cada una.</p>
+        <table>
+          <thead><tr><th>Nombre</th><th>DNI</th><th>Fecha nac.</th><th>Actividad</th><th>Categoría</th><th>Contacto</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaSolicitudesSocios"><tr><td colspan="7">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="oculto" id="fondoModalSolicitudesSocios" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:65;"></div>
 
       <!-- Solicitar fichaje para uno o varios jugadores (fichaje masivo:
            mismo torneo + división para todos los tildados) -->
@@ -254,6 +287,52 @@
           <button type="submit" class="btn">Subir documento</button>
           <p class="mensaje-error oculto" id="documentoFormError"></p>
         </form>
+      </div>
+    </div>
+
+    <!-- ===== SECCIÓN CONFIGURACIÓN ===== -->
+    <div id="seccionConfiguracion" class="oculto">
+      <div class="panel">
+        <h2>Registro de socios por QR</h2>
+        <p class="texto-ayuda">Compartí este link (o el código QR) con tus socios para que se registren solos. Cada solicitud queda pendiente de tu aprobación en "Jugadores → Solicitudes pendientes".</p>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+          <input type="text" id="linkRegistroSocios" readonly style="flex:1; min-width:260px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <button class="btn btn-secundario btn-pequeno" id="btnCompartirRegistroSocios">Compartir</button>
+          <button class="btn btn-secundario btn-pequeno" id="btnDescargarQrSocios">Descargar QR</button>
+        </div>
+        <div id="qrRegistroSociosContenedor" style="display:none;"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Actividades</h2>
+        </div>
+        <p class="texto-ayuda">Las actividades que ofrece tu club (ej: Fútbol, Vóley, Handball) — aparecen como desplegable al cargar un jugador y en el formulario público de socios.</p>
+        <form id="formActividad" style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="nombreNuevaActividad" placeholder="Nombre de la actividad" required style="flex:1; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <button type="submit" class="btn btn-pequeno">Agregar</button>
+        </form>
+        <p class="mensaje-error oculto" id="actividadFormError"></p>
+        <table>
+          <thead><tr><th>Nombre</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaActividades"><tr><td colspan="3">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Categorías de socio</h2>
+        </div>
+        <p class="texto-ayuda">Las categorías de socio de tu club (ej: Infantil, Cadete, Mayor) — aparecen como desplegable al cargar un jugador y en el formulario público de socios.</p>
+        <form id="formCategoriaSocio" style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="nombreNuevaCategoriaSocio" placeholder="Nombre de la categoría" required style="flex:1; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+          <button type="submit" class="btn btn-pequeno">Agregar</button>
+        </form>
+        <p class="mensaje-error oculto" id="categoriaSocioFormError"></p>
+        <table>
+          <thead><tr><th>Nombre</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaCategoriasSocio"><tr><td colspan="3">Cargando...</td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>

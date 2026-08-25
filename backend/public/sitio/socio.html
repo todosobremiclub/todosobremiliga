@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registrate como Socio - Todo Sobre mi Liga</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .club-header-logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.6); }
+  .form-socio-card { background: var(--blanco); border-radius: var(--radio); padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); max-width: 560px; margin: 0 auto; }
+  .form-socio-card .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-socio-card .campo-ancho { grid-column: 1 / -1; }
+  .form-socio-card label { display: block; font-size: 13px; font-weight: 600; color: var(--gris-700); margin-bottom: 4px; }
+  .form-socio-card input, .form-socio-card select {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--gris-300); border-radius: 8px; font-size: 14px; box-sizing: border-box;
+  }
+  .foto-preview-socio { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--gris-100); border: 1px solid var(--gris-300); }
+  .pantalla-exito-socio { text-align: center; padding: 30px 10px; }
+  .pantalla-exito-socio .icono-ok { font-size: 42px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="sitio-header">
+    <div class="sitio-header-inner">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <img id="clubLogo" class="club-header-logo oculto" alt="">
+        <div>
+          <h1 id="nombreClub">Cargando...</h1>
+          <div class="sitio-breadcrumb">Registro de socios</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sitio-contenido">
+    <div class="form-socio-card">
+      <div id="bloqueError" class="mensaje-error oculto" style="margin-bottom:14px;"></div>
+
+      <form id="formSocio" class="oculto">
+        <p class="texto-ayuda">Completá tus datos para registrarte como socio del club. Tu solicitud queda pendiente hasta que el club la revise y la apruebe.</p>
+        <div class="form-grid">
+          <div>
+            <label for="socioNombre">Nombre *</label>
+            <input type="text" id="socioNombre" required>
+          </div>
+          <div>
+            <label for="socioApellido">Apellido *</label>
+            <input type="text" id="socioApellido" required>
+          </div>
+          <div>
+            <label for="socioDni">DNI *</label>
+            <input type="text" id="socioDni" required>
+          </div>
+          <div>
+            <label for="socioFechaNacimiento">Fecha de nacimiento</label>
+            <input type="date" id="socioFechaNacimiento">
+          </div>
+          <div>
+            <label for="socioTelefono">Teléfono</label>
+            <input type="tel" id="socioTelefono" placeholder="Ej: 11-2233-4455">
+          </div>
+          <div>
+            <label for="socioEmail">Email</label>
+            <input type="email" id="socioEmail">
+          </div>
+          <div id="campoActividad" class="oculto">
+            <label for="socioActividad">Actividad</label>
+            <select id="socioActividad"><option value="">Elegí una actividad</option></select>
+          </div>
+          <div id="campoCategoria" class="oculto">
+            <label for="socioCategoria">Categoría</label>
+            <select id="socioCategoria"><option value="">Elegí una categoría</option></select>
+          </div>
+          <div class="campo-ancho">
+            <label for="socioFotoArchivo">Foto (opcional)</label>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <img id="socioFotoPreview" class="foto-preview-socio oculto" alt="">
+              <input type="file" id="socioFotoArchivo" accept="image/*">
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn" style="margin-top:16px; width:100%;">Enviar solicitud</button>
+        <p class="mensaje-error oculto" id="socioFormError" style="margin-top:10px;"></p>
+      </form>
+
+      <div id="pantallaExito" class="pantalla-exito-socio oculto">
+        <div class="icono-ok">✅</div>
+        <h2>¡Listo!</h2>
+        <p class="texto-ayuda">Tu solicitud fue enviada correctamente. El club la va a revisar y te va a contactar para confirmar tu alta.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/sitio/js/socio.js"></script>
+</body>
+</html>

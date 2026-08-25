@@ -86,6 +86,10 @@ app.use('/club/ligas', requireAuth, requireRole('super_admin', 'club_admin'), re
 app.use('/club/torneos', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubTorneosRoutes'));
 // Documentos del club (los puede subir tanto el club_admin como la Liga).
 app.use('/club/documentos', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubDocumentosRoutes'));
+// Configuración propia del Club: Actividades y Categorías de socio, que
+// después aparecen como desplegable al cargar un jugador y en el
+// formulario público de autorregistro de socios (QR/link).
+app.use('/club/configuracion', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubConfiguracionRoutes'));
 
 // Lado Liga (liga_admin): aprobar/rechazar fichajes y verificar carnets el
 // día de partido, filtrado automáticamente a SU liga.

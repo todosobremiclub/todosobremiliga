@@ -513,6 +513,77 @@ router.post('/ligas/:slug/postulaciones', async (req, res) => {
   }
 });
 
+// ===== AUTORREGISTRO DE SOCIOS (público, QR/link que comparte el Club) =====
+
+// GET /web/clubes/:clubId/socio-registro — datos del Club (para pintar el
+// formulario: nombre, logo, colores) más las Actividades y Categorías de
+// socio ACTIVAS que configuró, para armar los desplegables.
+router.get('/clubes/:clubId/socio-registro', async (req, res) => {
+  try {
+    const clubResult = await query(
+      `SELECT id, nombre, logo_url, color_primario, color_secundario
+       FROM clubes WHERE id = $1 AND activo = TRUE`,
+      [req.params.clubId]
+    );
+    if (!clubResult.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado' });
+
+    const actividadesResult = await query(
+      'SELECT id, nombre FROM club_actividades WHERE club_id = $1 AND activo = TRUE ORDER BY nombre ASC',
+      [req.params.clubId]
+    );
+    const categoriasResult = await query(
+      'SELECT id, nombre FROM club_categorias_socio WHERE club_id = $1 AND activo = TRUE ORDER BY nombre ASC',
+      [req.params.clubId]
+    );
+
+    res.json({ ok: true, club: clubResult.rows[0], actividades: actividadesResult.rows, categorias: categoriasResult.rows });
+  } catch (err) {
+    console.error('Error en GET socio-registro (info club):', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /web/clubes/:clubId/socios — un socio se autorregistra desde el
+// formulario público. Queda "pendiente" en solicitudes_socio hasta que el
+// club_admin lo apruebe (recién ahí se crea el jugador) o lo rechace.
+router.post('/clubes/:clubId/socios', async (req, res) => {
+  const { nombre, apellido, dni, fecha_nacimiento, telefono, email, foto_url, actividad_id, categoria_socio_id } = req.body;
+
+  if (!nombre || !nombre.trim() || !apellido || !apellido.trim() || !dni || !dni.trim()) {
+    return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios (nombre, apellido, DNI)' });
+  }
+
+  try {
+    const clubResult = await query('SELECT id FROM clubes WHERE id = $1 AND activo = TRUE', [req.params.clubId]);
+    if (!clubResult.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado' });
+
+    // Si se eligió Actividad/Categoría, tienen que ser de ESTE club (y estar
+    // activas) — evita que alguien arme un request a mano con un id de otro
+    // club.
+    if (actividad_id) {
+      const ok = await query('SELECT 1 FROM club_actividades WHERE id = $1 AND club_id = $2 AND activo = TRUE', [actividad_id, req.params.clubId]);
+      if (!ok.rows[0]) return res.status(400).json({ ok: false, error: 'La actividad elegida no es válida' });
+    }
+    if (categoria_socio_id) {
+      const ok = await query('SELECT 1 FROM club_categorias_socio WHERE id = $1 AND club_id = $2 AND activo = TRUE', [categoria_socio_id, req.params.clubId]);
+      if (!ok.rows[0]) return res.status(400).json({ ok: false, error: 'La categoría elegida no es válida' });
+    }
+
+    const { rows } = await query(
+      `INSERT INTO solicitudes_socio
+         (club_id, nombre, apellido, dni, fecha_nacimiento, telefono, email, foto_url, actividad_id, categoria_socio_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, nombre, apellido, creado_at`,
+      [req.params.clubId, nombre.trim(), apellido.trim(), dni.trim(), fecha_nacimiento || null,
+       telefono || null, email || null, foto_url || null, actividad_id || null, categoria_socio_id || null]
+    );
+    res.status(201).json({ ok: true, solicitud: rows[0] });
+  } catch (err) {
+    console.error('Error en POST socios (autorregistro):', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/noticias — noticias públicas (publicadas) de una Liga
 // que son para "todos": las segmentadas (por club/ciudad/provincia/torneo)
 // no se muestran en la home general, sólo en la página pública de ese club

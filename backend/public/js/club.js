@@ -18,6 +18,9 @@ let jugadoresSeleccionados = new Set();
 let fichajeJugadorIdsActual = [];
 let categoriasFichajeCache = [];
 let jugadorIdEdicion = null;
+let actividadesCache = [];
+let categoriasSocioCache = [];
+let miClubId = null;
 
 function init() {
   const usuario = requerirRol(['club_admin', 'super_admin']);
@@ -25,6 +28,8 @@ function init() {
   inicializarTopbar(usuario);
   conectarEventos();
   cargarJugadores();
+  cargarOpcionesActividadCategoria();
+  actualizarBadgeSolicitudesPendientes();
 }
 
 function conectarEventos() {
@@ -33,7 +38,15 @@ function conectarEventos() {
   document.getElementById('tabBtnMisTorneos').addEventListener('click', () => cambiarTab('misTorneos'));
   document.getElementById('tabBtnNotificaciones').addEventListener('click', () => cambiarTab('notificaciones'));
   document.getElementById('tabBtnDocumentos').addEventListener('click', () => cambiarTab('documentos'));
+  document.getElementById('tabBtnConfiguracion').addEventListener('click', () => cambiarTab('configuracion'));
   document.getElementById('formDocumentoClub').addEventListener('submit', subirDocumentoClub);
+
+  document.getElementById('btnVerSolicitudesSocios').addEventListener('click', abrirSolicitudesSocios);
+  document.getElementById('btnCerrarSolicitudesSocios').addEventListener('click', cerrarSolicitudesSocios);
+  document.getElementById('formActividad').addEventListener('submit', agregarActividad);
+  document.getElementById('formCategoriaSocio').addEventListener('submit', agregarCategoriaSocio);
+  document.getElementById('btnCompartirRegistroSocios').addEventListener('click', compartirLinkRegistroSocios);
+  document.getElementById('btnDescargarQrSocios').addEventListener('click', descargarQrRegistroSocios);
 
   document.getElementById('btnMostrarFormJugador').addEventListener('click', () => {
     jugadorIdEdicion = null;
@@ -93,11 +106,11 @@ function conectarEventos() {
 function cambiarTab(nombre) {
   const secciones = {
     jugadores: 'seccionJugadores', fichajes: 'seccionFichajes', misTorneos: 'seccionMisTorneos',
-    notificaciones: 'seccionNotificaciones', documentos: 'seccionDocumentos'
+    notificaciones: 'seccionNotificaciones', documentos: 'seccionDocumentos', configuracion: 'seccionConfiguracion'
   };
   const botones = {
     jugadores: 'tabBtnJugadores', fichajes: 'tabBtnFichajes', misTorneos: 'tabBtnMisTorneos',
-    notificaciones: 'tabBtnNotificaciones', documentos: 'tabBtnDocumentos'
+    notificaciones: 'tabBtnNotificaciones', documentos: 'tabBtnDocumentos', configuracion: 'tabBtnConfiguracion'
   };
   Object.keys(secciones).forEach((key) => {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
@@ -107,6 +120,7 @@ function cambiarTab(nombre) {
   if (nombre === 'misTorneos') cargarMisTorneos();
   if (nombre === 'notificaciones') cargarNotificacionesClub();
   if (nombre === 'documentos') cargarDocumentosClub();
+  if (nombre === 'configuracion') cargarConfiguracion();
 }
 
 // ===================== MIS TORNEOS =====================
@@ -235,6 +249,284 @@ async function eliminarDocumentoClub(documentoId) {
   }
 }
 
+// ===================== CONFIGURACIÓN (Actividades / Categorías / QR socios) =====================
+
+async function cargarOpcionesActividadCategoria() {
+  try {
+    const [actividades, categorias] = await Promise.all([
+      apiFetch('/club/configuracion/actividades'),
+      apiFetch('/club/configuracion/categorias')
+    ]);
+    actividadesCache = actividades.actividades.filter((a) => a.activo);
+    categoriasSocioCache = categorias.categorias.filter((c) => c.activo);
+    const selectActividad = document.getElementById('jugadorActividad');
+    selectActividad.innerHTML = '<option value="">Sin especificar</option>' +
+      actividadesCache.map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+    const selectCategoria = document.getElementById('jugadorCategoriaSocio');
+    selectCategoria.innerHTML = '<option value="">Sin especificar</option>' +
+      categoriasSocioCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  } catch (err) {
+    // si falla, el jugador se puede seguir cargando igual sin estos campos
+  }
+}
+
+async function cargarConfiguracion() {
+  await Promise.all([cargarActividades(), cargarCategoriasSocio(), pintarLinkYQrRegistroSocios()]);
+}
+
+async function cargarActividades() {
+  const tbody = document.getElementById('tablaActividades');
+  tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/club/configuracion/actividades');
+    actividadesCache = data.actividades;
+    if (!actividadesCache.length) {
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no cargaste ninguna actividad.</td></tr>';
+    } else {
+      tbody.innerHTML = actividadesCache.map((a) => `
+        <tr>
+          <td>${escapeHtml(a.nombre)}</td>
+          <td><span class="badge ${a.activo ? 'badge-activo' : 'badge-inactivo'}">${a.activo ? 'Activa' : 'Inactiva'}</span></td>
+          <td>
+            <button class="btn ${a.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoActividad('${a.id}', ${!a.activo})">${a.activo ? 'Desactivar' : 'Activar'}</button>
+            <button class="btn btn-peligro btn-pequeno" onclick="eliminarActividad('${a.id}')">Eliminar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    // refresca también los <select> del form de jugador con la lista activa
+    const selectActividad = document.getElementById('jugadorActividad');
+    selectActividad.innerHTML = '<option value="">Sin especificar</option>' +
+      actividadesCache.filter((a) => a.activo).map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function agregarActividad(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('actividadFormError');
+  errorEl.classList.add('oculto');
+  const input = document.getElementById('nombreNuevaActividad');
+  try {
+    await apiFetch('/club/configuracion/actividades', { method: 'POST', body: JSON.stringify({ nombre: input.value.trim() }) });
+    input.value = '';
+    cargarActividades();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function toggleActivoActividad(id, nuevoValor) {
+  try {
+    await apiFetch(`/club/configuracion/actividades/${id}/activo`, { method: 'PATCH', body: JSON.stringify({ activo: nuevoValor }) });
+    cargarActividades();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function eliminarActividad(id) {
+  if (!confirm('¿Eliminar esta actividad?')) return;
+  try {
+    await apiFetch(`/club/configuracion/actividades/${id}`, { method: 'DELETE' });
+    cargarActividades();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function cargarCategoriasSocio() {
+  const tbody = document.getElementById('tablaCategoriasSocio');
+  tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/club/configuracion/categorias');
+    categoriasSocioCache = data.categorias;
+    if (!categoriasSocioCache.length) {
+      tbody.innerHTML = '<tr><td colspan="3">Todavía no cargaste ninguna categoría.</td></tr>';
+    } else {
+      tbody.innerHTML = categoriasSocioCache.map((c) => `
+        <tr>
+          <td>${escapeHtml(c.nombre)}</td>
+          <td><span class="badge ${c.activo ? 'badge-activo' : 'badge-inactivo'}">${c.activo ? 'Activa' : 'Inactiva'}</span></td>
+          <td>
+            <button class="btn ${c.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoCategoriaSocio('${c.id}', ${!c.activo})">${c.activo ? 'Desactivar' : 'Activar'}</button>
+            <button class="btn btn-peligro btn-pequeno" onclick="eliminarCategoriaSocio('${c.id}')">Eliminar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    const selectCategoria = document.getElementById('jugadorCategoriaSocio');
+    selectCategoria.innerHTML = '<option value="">Sin especificar</option>' +
+      categoriasSocioCache.filter((c) => c.activo).map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function agregarCategoriaSocio(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('categoriaSocioFormError');
+  errorEl.classList.add('oculto');
+  const input = document.getElementById('nombreNuevaCategoriaSocio');
+  try {
+    await apiFetch('/club/configuracion/categorias', { method: 'POST', body: JSON.stringify({ nombre: input.value.trim() }) });
+    input.value = '';
+    cargarCategoriasSocio();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function toggleActivoCategoriaSocio(id, nuevoValor) {
+  try {
+    await apiFetch(`/club/configuracion/categorias/${id}/activo`, { method: 'PATCH', body: JSON.stringify({ activo: nuevoValor }) });
+    cargarCategoriasSocio();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function eliminarCategoriaSocio(id) {
+  if (!confirm('¿Eliminar esta categoría?')) return;
+  try {
+    await apiFetch(`/club/configuracion/categorias/${id}`, { method: 'DELETE' });
+    cargarCategoriasSocio();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// El QR se genera en tamaño grande (640x640) directamente, aunque nunca se
+// muestre en pantalla (el contenedor queda oculto con display:none) — así la
+// descarga sale nítida y no hace falta agrandar un canvas chico. Mismo
+// patrón que usa el Panel Liga para el QR de postulación de clubes.
+async function pintarLinkYQrRegistroSocios() {
+  if (!miClubId) {
+    try {
+      const data = await apiFetch('/club/configuracion/mi-club');
+      miClubId = data.club_id;
+    } catch (err) {
+      return;
+    }
+  }
+  const url = `${window.location.origin}/sitio/socio.html?club_id=${miClubId}`;
+  document.getElementById('linkRegistroSocios').value = url;
+  const contenedor = document.getElementById('qrRegistroSociosContenedor');
+  contenedor.innerHTML = '';
+  if (window.QRCode) {
+    // eslint-disable-next-line no-new
+    new QRCode(contenedor, { text: url, width: 640, height: 640 });
+  }
+}
+
+async function compartirLinkRegistroSocios() {
+  const url = document.getElementById('linkRegistroSocios').value;
+  if (!url) return;
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Registrate como socio', url });
+    } catch (err) {
+      // el usuario canceló el share nativo, no hacemos nada
+    }
+  } else if (navigator.clipboard) {
+    await navigator.clipboard.writeText(url);
+    alert('Link copiado al portapapeles.');
+  }
+}
+
+function descargarQrRegistroSocios() {
+  const contenedor = document.getElementById('qrRegistroSociosContenedor');
+  const canvas = contenedor.querySelector('canvas');
+  const img = contenedor.querySelector('img');
+  const dataUrl = canvas ? canvas.toDataURL('image/png') : (img ? img.src : null);
+  if (!dataUrl) return;
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = 'qr-registro-socios.png';
+  link.click();
+}
+
+// ===================== SOLICITUDES DE SOCIOS (autorregistro) =====================
+
+async function actualizarBadgeSolicitudesPendientes() {
+  try {
+    const data = await apiFetch('/club/jugadores/solicitudes');
+    const badge = document.getElementById('badgeSolicitudesPendientes');
+    if (data.solicitudes.length) {
+      badge.textContent = data.solicitudes.length;
+      badge.classList.remove('oculto');
+    } else {
+      badge.classList.add('oculto');
+    }
+  } catch (err) {
+    // sin bloquear la pantalla si esto falla
+  }
+}
+
+function abrirSolicitudesSocios() {
+  document.getElementById('panelSolicitudesSocios').classList.remove('oculto');
+  document.getElementById('fondoModalSolicitudesSocios').classList.remove('oculto');
+  cargarSolicitudesSocios();
+}
+
+function cerrarSolicitudesSocios() {
+  document.getElementById('panelSolicitudesSocios').classList.add('oculto');
+  document.getElementById('fondoModalSolicitudesSocios').classList.add('oculto');
+}
+
+async function cargarSolicitudesSocios() {
+  const tbody = document.getElementById('tablaSolicitudesSocios');
+  tbody.innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/club/jugadores/solicitudes');
+    if (!data.solicitudes.length) {
+      tbody.innerHTML = '<tr><td colspan="7">No hay solicitudes pendientes.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.solicitudes.map((s) => `
+      <tr>
+        <td>${escapeHtml(s.apellido)}, ${escapeHtml(s.nombre)}</td>
+        <td>${escapeHtml(s.dni)}</td>
+        <td>${formatearFecha(s.fecha_nacimiento)}</td>
+        <td>${escapeHtml(s.actividad_nombre || '-')}</td>
+        <td>${escapeHtml(s.categoria_socio_nombre || '-')}</td>
+        <td>${escapeHtml(s.telefono || s.email || '-')}</td>
+        <td>
+          <button class="btn btn-pequeno" onclick="aprobarSolicitudSocio('${s.id}')">Aprobar</button>
+          <button class="btn btn-peligro btn-pequeno" onclick="rechazarSolicitudSocio('${s.id}')">Rechazar</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function aprobarSolicitudSocio(id) {
+  try {
+    await apiFetch(`/club/jugadores/solicitudes/${id}/aprobar`, { method: 'POST' });
+    cargarSolicitudesSocios();
+    actualizarBadgeSolicitudesPendientes();
+    cargarJugadores();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function rechazarSolicitudSocio(id) {
+  const motivo = prompt('Motivo del rechazo (opcional):') || undefined;
+  try {
+    await apiFetch(`/club/jugadores/solicitudes/${id}/rechazar`, { method: 'POST', body: JSON.stringify({ motivo }) });
+    cargarSolicitudesSocios();
+    actualizarBadgeSolicitudesPendientes();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
 // ===================== JUGADORES =====================
 
 async function cargarJugadores() {
@@ -341,6 +633,10 @@ function abrirEditarJugador(jugadorId) {
   document.getElementById('jugadorFechaNacimiento').value = j.fecha_nacimiento ? String(j.fecha_nacimiento).slice(0, 10) : '';
   document.getElementById('jugadorPosicion').value = j.posicion || '';
   document.getElementById('jugadorNumero').value = j.numero_camiseta != null ? j.numero_camiseta : '';
+  document.getElementById('jugadorTelefono').value = j.telefono || '';
+  document.getElementById('jugadorEmail').value = j.email || '';
+  document.getElementById('jugadorActividad').value = j.actividad_id || '';
+  document.getElementById('jugadorCategoriaSocio').value = j.categoria_socio_id || '';
   document.getElementById('jugadorFotoUrl').value = j.foto_url || '';
   const preview = document.getElementById('jugadorFotoPreview');
   if (j.foto_url) {
@@ -365,6 +661,10 @@ async function guardarJugador(e) {
     fecha_nacimiento: document.getElementById('jugadorFechaNacimiento').value || undefined,
     posicion: document.getElementById('jugadorPosicion').value.trim() || undefined,
     numero_camiseta: document.getElementById('jugadorNumero').value || undefined,
+    telefono: document.getElementById('jugadorTelefono').value.trim() || undefined,
+    email: document.getElementById('jugadorEmail').value.trim() || undefined,
+    actividad_id: document.getElementById('jugadorActividad').value || undefined,
+    categoria_socio_id: document.getElementById('jugadorCategoriaSocio').value || undefined,
     foto_url: document.getElementById('jugadorFotoUrl').value || undefined
   };
 
