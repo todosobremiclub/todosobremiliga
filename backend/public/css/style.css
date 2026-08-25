@@ -912,7 +912,10 @@ body.liga-fondo-cancha .club-swatch, body.club-fondo-cancha .club-swatch { borde
 body.liga-fondo-cancha .tab-btn, body.club-fondo-cancha .tab-btn {
   background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.09);
-  color: var(--gris-100);
+  /* --gris-100 en este scope es blanco casi transparente pensado para
+     FONDOS tipo "vidrio esmerilado", no para texto -- por eso el texto
+     quedaba casi invisible. --gris-600 es el gris claro legible. */
+  color: var(--gris-600);
 }
 body.liga-fondo-cancha .tab-btn.activo, body.club-fondo-cancha .tab-btn.activo {
   background: var(--azul);
@@ -929,9 +932,9 @@ body.liga-fondo-cancha .tarjeta-participacion-club, body.club-fondo-cancha .tarj
 /* Separador de día del fixture (ver arriba): versión oscura para el sitio
    público, que siempre corre sobre el fondo "cancha de noche". */
 body.liga-fondo-cancha .separador-dia-fixture, body.club-fondo-cancha .separador-dia-fixture {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.09);
-  color: var(--gris-100);
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: var(--gris-900);
 }
 
 /* ============================================================================
@@ -974,8 +977,12 @@ body.liga-fondo-cancha .separador-dia-fixture, body.club-fondo-cancha .separador
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-  color: var(--gris-100);
+  background: rgba(255,255,255,0.1);
+  /* Color fijo (no var(--gris-100)): el footer es siempre una franja oscura
+     fija, y esa variable se redefine a un blanco casi transparente dentro
+     de body.liga-fondo-cancha -- se hereda igual acá y dejaba los íconos
+     casi invisibles. */
+  color: rgba(255,255,255,0.85);
   transition: background 0.15s, color 0.15s;
 }
 

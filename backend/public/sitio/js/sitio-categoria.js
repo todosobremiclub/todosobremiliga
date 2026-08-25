@@ -255,11 +255,11 @@ function formatearIndicadorDia(fecha) {
   if (!fecha) return null;
   const d = new Date(fecha);
   if (Number.isNaN(d.getTime())) return null;
-  const diaCorto = d.toLocaleDateString('es-AR', { timeZone: 'UTC', weekday: 'short' }).replace('.', '');
-  const diaCapitalizado = diaCorto.charAt(0).toUpperCase() + diaCorto.slice(1);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${diaCapitalizado} ${dd}/${mm}`;
+  const dia = d.toLocaleDateString('es-AR', { timeZone: 'UTC', weekday: 'long' });
+  const diaCapitalizado = dia.charAt(0).toUpperCase() + dia.slice(1);
+  const mes = d.toLocaleDateString('es-AR', { timeZone: 'UTC', month: 'long' });
+  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
+  return `${diaCapitalizado} ${d.getUTCDate()} de ${mesCapitalizado}`;
 }
 
 // Se separa la dirección del resto (predio/cancha + techada) porque cada
