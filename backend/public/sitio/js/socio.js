@@ -119,6 +119,9 @@ async function enviarFormulario(e) {
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
-  document.getElementById('socioFotoArchivo').addEventListener('change', onElegirFoto);
+  document.getElementById('socioFotoCamara').addEventListener('change', onElegirFoto);
+  document.getElementById('socioFotoGaleria').addEventListener('change', onElegirFoto);
+  document.getElementById('btnTomarFoto').addEventListener('click', () => document.getElementById('socioFotoCamara').click());
+  document.getElementById('btnElegirFotoGaleria').addEventListener('click', () => document.getElementById('socioFotoGaleria').click());
   document.getElementById('formSocio').addEventListener('submit', enviarFormulario);
 });

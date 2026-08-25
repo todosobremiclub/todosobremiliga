@@ -72,10 +72,13 @@
             <select id="socioCategoria"><option value="">Elegí una categoría</option></select>
           </div>
           <div class="campo-ancho">
-            <label for="socioFotoArchivo">Foto (opcional)</label>
-            <div style="display:flex; align-items:center; gap:12px;">
+            <label>Foto (opcional)</label>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
               <img id="socioFotoPreview" class="foto-preview-socio oculto" alt="">
-              <input type="file" id="socioFotoArchivo" accept="image/*">
+              <button type="button" class="btn btn-secundario btn-pequeno" id="btnTomarFoto">Tomar foto</button>
+              <button type="button" class="btn btn-secundario btn-pequeno" id="btnElegirFotoGaleria">Elegir de galería</button>
+              <input type="file" id="socioFotoCamara" accept="image/*" capture="environment" class="oculto">
+              <input type="file" id="socioFotoGaleria" accept="image/*" class="oculto">
             </div>
           </div>
         </div>
