@@ -451,4 +451,82 @@ router.delete('/:torneoId/categorias/:categoriaId/subcategorias/:subcategoriaId'
   }
 });
 
+// ===== REGLAMENTO / DOCUMENTOS DEL TORNEO (PDF o Word, los sube la Liga) =====
+
+// Tipos de archivo permitidos para el reglamento: PDF y Word (.doc/.docx).
+const MIME_PERMITIDOS_REGLAMENTO = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
+
+// El frontend manda el archivo como data-URI ("data:<mimetype>;base64,...").
+// Acá validamos que el mimetype declarado sea PDF o Word antes de guardarlo.
+function mimeDeDataUri(dataUri) {
+  const match = /^data:([^;]+);base64,/.exec(dataUri || '');
+  return match ? match[1] : null;
+}
+
+// GET /liga/torneos/:torneoId/documentos
+router.get('/:torneoId/documentos', async (req, res) => {
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+
+    const { rows } = await query(
+      'SELECT * FROM torneo_documentos WHERE torneo_id = $1 ORDER BY creado_at DESC',
+      [req.params.torneoId]
+    );
+    res.json({ ok: true, documentos: rows });
+  } catch (err) {
+    console.error('Error en GET documentos de torneo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/torneos/:torneoId/documentos — subir el reglamento (PDF o Word)
+router.post('/:torneoId/documentos', async (req, res) => {
+  const { nombre, archivo_url } = req.body;
+  if (!nombre || !nombre.trim() || !archivo_url) {
+    return res.status(400).json({ ok: false, error: 'Faltan nombre y/o archivo' });
+  }
+  const mime = mimeDeDataUri(archivo_url);
+  if (!mime || !MIME_PERMITIDOS_REGLAMENTO.includes(mime)) {
+    return res.status(400).json({ ok: false, error: 'Solo se aceptan archivos PDF o Word (.doc/.docx)' });
+  }
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+
+    const { rows } = await query(
+      `INSERT INTO torneo_documentos (torneo_id, nombre, archivo_url, subido_por_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [req.params.torneoId, nombre.trim(), archivo_url, req.usuario.id]
+    );
+    res.status(201).json({ ok: true, documento: rows[0] });
+  } catch (err) {
+    console.error('Error en POST documento de torneo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/torneos/:torneoId/documentos/:documentoId
+router.delete('/:torneoId/documentos/:documentoId', async (req, res) => {
+  try {
+    const torneo = await buscarTorneoDeMiLiga(req.params.torneoId, req.ligaId);
+    if (!torneo) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+
+    const { rowCount } = await query(
+      'DELETE FROM torneo_documentos WHERE id = $1 AND torneo_id = $2',
+      [req.params.documentoId, req.params.torneoId]
+    );
+    if (!rowCount) return res.status(404).json({ ok: false, error: 'Documento no encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE documento de torneo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 module.exports = router;

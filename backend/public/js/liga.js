@@ -31,7 +31,8 @@ const ICONO_PERSONA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const ICONO_BASURA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
 const ICONO_WEB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>';
 const ICONO_COPA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a1 1 0 0 0-1 1 5 5 0 0 0 4 5"/><path d="M17 5h3a1 1 0 0 1 1 1 5 5 0 0 1-4 5"/></svg>';
-const ICONO_WHATSAPP = '<svg viewBox="0 0 32 32"><path fill="#fff" d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.23.6 4.36 1.75 6.24L4 29l7.94-1.7a12.9 12.9 0 0 0 4.08.65h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3Zm0 21.98h-.01a10 10 0 0 1-3.5-.62l-.5-.18-4.71 1.01 1.03-4.58-.2-.53a9.9 9.9 0 0 1-1.6-5.06c0-5.5 4.48-9.98 9.99-9.98 5.5 0 9.98 4.48 9.98 9.98s-4.48 9.96-9.98 9.96Zm5.47-7.47c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg>';
+const ICONO_DOCUMENTO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>';
+const ICONO_WHATSAPP ='<svg viewBox="0 0 32 32"><path fill="#fff" d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.23.6 4.36 1.75 6.24L4 29l7.94-1.7a12.9 12.9 0 0 0 4.08.65h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.4 22.65 3 16.02 3Zm0 21.98h-.01a10 10 0 0 1-3.5-.62l-.5-.18-4.71 1.01 1.03-4.58-.2-.53a9.9 9.9 0 0 1-1.6-5.06c0-5.5 4.48-9.98 9.99-9.98 5.5 0 9.98 4.48 9.98 9.98s-4.48 9.96-9.98 9.96Zm5.47-7.47c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35Z"/></svg>';
 
 // Foto de un jugador/socio en listados y en el carnet digital: si no tiene
 // foto cargada, en vez de dejar el círculo vacío se simula una foto de
@@ -97,7 +98,7 @@ function moverPopupsABody() {
     'panelDocumentosClub', 'panelComentariosClub', 'modalParticipacionesClub',
     'modalFichajesClub', 'modalImpagosMes', 'modalAsignarCategoriaMasivo',
     'formTorneo', 'panelCategorias', 'modalEditarFichaje', 'panelDeudasClub',
-    'modalCobrosClub', 'modalCanchasPredio'
+    'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo'
   ];
   ids.forEach((id) => {
     const el = document.getElementById(id);
@@ -219,6 +220,12 @@ function conectarEventos() {
   });
   document.getElementById('formDocumentoClub').addEventListener('submit', subirDocumentoClub);
 
+  document.getElementById('btnCerrarDocumentosTorneo').addEventListener('click', () => {
+    document.getElementById('panelDocumentosTorneo').classList.add('oculto');
+    ocultarFondoModal();
+  });
+  document.getElementById('formDocumentoTorneo').addEventListener('submit', subirDocumentoTorneo);
+
   document.getElementById('btnCerrarComentariosClub').addEventListener('click', () => {
     document.getElementById('panelComentariosClub').classList.add('oculto');
     ocultarFondoModal();
@@ -248,7 +255,7 @@ function conectarEventos() {
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
      'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'panelCategorias', 'modalEditarFichaje',
-     'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes'
+     'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes', 'panelDocumentosTorneo'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
     torneoActualId = null;
@@ -2661,6 +2668,88 @@ async function eliminarDocumentoClub(documentoId) {
   }
 }
 
+// ----- Reglamento / documentos del Torneo (PDF o Word) -----
+
+let torneoIdDocumentosActual = null;
+
+function abrirDocumentosTorneo(torneoId, nombreTorneo) {
+  torneoIdDocumentosActual = torneoId;
+  document.getElementById('panelDocumentosTorneo').classList.remove('oculto');
+  mostrarFondoModal();
+  document.getElementById('tituloDocumentosTorneo').textContent = `Reglamento de "${nombreTorneo}"`;
+  document.getElementById('formDocumentoTorneo').reset();
+  document.getElementById('documentoTorneoFormError').classList.add('oculto');
+  cargarDocumentosTorneo();
+}
+
+async function cargarDocumentosTorneo() {
+  const tbody = document.getElementById('tablaDocumentosTorneo');
+  tbody.innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoIdDocumentosActual}/documentos`);
+    const documentos = data.documentos;
+    if (!documentos.length) {
+      tbody.innerHTML = '<tr><td colspan="3">Este torneo todavía no tiene reglamento cargado.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = documentos.map((d) => `
+      <tr>
+        <td><a href="${d.archivo_url}" download="${escapeHtml(d.nombre)}" target="_blank">${escapeHtml(d.nombre)}</a></td>
+        <td>${new Date(d.creado_at).toLocaleDateString('es-AR')}</td>
+        <td><button class="btn btn-peligro btn-pequeno" onclick="eliminarDocumentoTorneo('${d.id}')">Eliminar</button></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function subirDocumentoTorneo(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('documentoTorneoFormError');
+  errorEl.classList.add('oculto');
+
+  const nombre = document.getElementById('documentoTorneoNombre').value.trim();
+  const archivo = document.getElementById('documentoTorneoArchivo').files[0];
+  if (!archivo) {
+    errorEl.textContent = 'Elegí un archivo.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+  const tiposPermitidos = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  if (!tiposPermitidos.includes(archivo.type)) {
+    errorEl.textContent = 'Solo se aceptan archivos PDF o Word (.doc/.docx).';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+
+  const lector = new FileReader();
+  lector.onload = async () => {
+    try {
+      await apiFetch(`/liga/torneos/${torneoIdDocumentosActual}/documentos`, {
+        method: 'POST',
+        body: JSON.stringify({ nombre, archivo_url: lector.result })
+      });
+      document.getElementById('formDocumentoTorneo').reset();
+      cargarDocumentosTorneo();
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('oculto');
+    }
+  };
+  lector.readAsDataURL(archivo);
+}
+
+async function eliminarDocumentoTorneo(documentoId) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  try {
+    await apiFetch(`/liga/torneos/${torneoIdDocumentosActual}/documentos/${documentoId}`, { method: 'DELETE' });
+    cargarDocumentosTorneo();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
 // ----- Notas internas de la Liga sobre el club (el Club nunca las ve) -----
 
 let clubIdComentariosActual = null;
@@ -3265,6 +3354,7 @@ function renderTorneos() {
     <div class="boton-grande boton-grande-torneo" onclick="verCategorias('${t.id}', '${escapeHtml(t.nombre)}')">
       <div class="acciones-boton-grande">
         <button class="btn btn-secundario btn-pequeno btn-icono" title="Ver en el sitio público" onclick="event.stopPropagation(); window.open('/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}', '_blank')">${ICONO_WEB}</button>
+        <button class="btn btn-secundario btn-pequeno btn-icono" title="Reglamento" onclick="event.stopPropagation(); abrirDocumentosTorneo('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_DOCUMENTO}</button>
         <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarTorneo('${t.id}')">${ICONO_LAPIZ}</button>
         <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarTorneo('${t.id}', '${escapeHtml(t.nombre)}')">${ICONO_BASURA}</button>
       </div>

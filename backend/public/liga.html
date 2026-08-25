@@ -720,6 +720,32 @@
         <div id="gridTorneos" class="grid-botones-grandes grid-torneos">
           <p class="texto-ayuda">Cargando...</p>
         </div>
+
+        <!-- Reglamento / documentos del Torneo (PDF o Word) -->
+        <div class="panel oculto popup-modal" id="panelDocumentosTorneo">
+          <div class="panel-header">
+            <h2 id="tituloDocumentosTorneo">Reglamento del Torneo</h2>
+            <button class="btn btn-secundario" id="btnCerrarDocumentosTorneo">Cerrar</button>
+          </div>
+          <table>
+            <thead><tr><th>Nombre</th><th>Fecha</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaDocumentosTorneo"><tr><td colspan="3">Cargando...</td></tr></tbody>
+          </table>
+          <form id="formDocumentoTorneo" style="margin-top:12px;">
+            <div class="form-grid">
+              <div>
+                <label for="documentoTorneoNombre">Nombre del documento *</label>
+                <input type="text" id="documentoTorneoNombre" required placeholder="Ej: Reglamento 2026">
+              </div>
+              <div>
+                <label for="documentoTorneoArchivo">Archivo (PDF o Word) *</label>
+                <input type="file" id="documentoTorneoArchivo" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-pequeno">Subir documento</button>
+            <p class="mensaje-error oculto" id="documentoTorneoFormError"></p>
+          </form>
+        </div>
       </div>
 
       <!-- Detalle de un torneo: sus divisiones arriba como botones, y debajo
