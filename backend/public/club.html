@@ -152,7 +152,17 @@
 
         <table>
           <thead>
-            <tr><th><input type="checkbox" id="checkTodosJugadores"></th><th>Foto</th><th>Nombre</th><th>DNI</th><th>Fecha de nacimiento</th><th>Año Nac.</th><th>Número</th><th>Estado</th><th>Acciones</th></tr>
+            <tr>
+              <th><input type="checkbox" id="checkTodosJugadores"></th>
+              <th>Foto</th>
+              <th class="th-orden" onclick="ordenarJugadoresPor('nombre')">Nombre <span id="flechaOrdenJugadoresNombre"></span></th>
+              <th class="th-orden" onclick="ordenarJugadoresPor('dni')">DNI <span id="flechaOrdenJugadoresDni"></span></th>
+              <th class="th-orden" onclick="ordenarJugadoresPor('fecha_nacimiento')">Fecha de nacimiento <span id="flechaOrdenJugadoresFecha"></span></th>
+              <th class="th-orden" onclick="ordenarJugadoresPor('anio_nacimiento')">Año Nac. <span id="flechaOrdenJugadoresAnio"></span></th>
+              <th>Número</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
           </thead>
           <tbody id="tablaJugadores"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>

@@ -12,6 +12,8 @@ function fotoJugadorHtml(fotoUrl, clase) {
 }
 
 let jugadoresCache = [];
+let ordenJugadoresCampo = 'nombre';
+let ordenJugadoresDireccion = 'asc';
 let ligasClubCache = [];
 let fichajesCache = [];
 let jugadoresSeleccionados = new Set();
@@ -567,6 +569,7 @@ async function cargarJugadores() {
     jugadoresCache = data.jugadores;
     jugadoresSeleccionados.clear();
     poblarFiltroAnioNacimiento();
+    actualizarFlechasOrdenJugadores();
     renderJugadores();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
@@ -592,6 +595,57 @@ function formatearFecha(fecha) {
   return fechaObj.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
+function ordenarJugadoresPor(campo) {
+  if (ordenJugadoresCampo === campo) {
+    ordenJugadoresDireccion = ordenJugadoresDireccion === 'asc' ? 'desc' : 'asc';
+  } else {
+    ordenJugadoresCampo = campo;
+    ordenJugadoresDireccion = 'asc';
+  }
+  actualizarFlechasOrdenJugadores();
+  renderJugadores();
+}
+
+function actualizarFlechasOrdenJugadores() {
+  const flechas = {
+    nombre: 'flechaOrdenJugadoresNombre', dni: 'flechaOrdenJugadoresDni',
+    fecha_nacimiento: 'flechaOrdenJugadoresFecha', anio_nacimiento: 'flechaOrdenJugadoresAnio'
+  };
+  Object.entries(flechas).forEach(([campo, idEl]) => {
+    const el = document.getElementById(idEl);
+    if (!el) return;
+    el.textContent = campo === ordenJugadoresCampo ? (ordenJugadoresDireccion === 'asc' ? '▲' : '▼') : '';
+  });
+}
+
+// Ordena la lista IN PLACE. "nombre" ordena por Apellido + Nombre, que es
+// como se muestra en la tabla ("Apellido, Nombre"). DNI se compara como
+// número cuando se puede (si no, como texto) para que 9 quede antes que 10.
+function ordenarListaJugadores(lista) {
+  const signo = ordenJugadoresDireccion === 'asc' ? 1 : -1;
+  lista.sort((a, b) => {
+    let va; let vb;
+    if (ordenJugadoresCampo === 'nombre') {
+      va = `${a.apellido} ${a.nombre}`.toLowerCase();
+      vb = `${b.apellido} ${b.nombre}`.toLowerCase();
+    } else if (ordenJugadoresCampo === 'dni') {
+      const na = Number(a.dni); const nb = Number(b.dni);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) { va = na; vb = nb; } else { va = String(a.dni || ''); vb = String(b.dni || ''); }
+    } else if (ordenJugadoresCampo === 'fecha_nacimiento') {
+      va = a.fecha_nacimiento ? new Date(a.fecha_nacimiento).getTime() : -Infinity;
+      vb = b.fecha_nacimiento ? new Date(b.fecha_nacimiento).getTime() : -Infinity;
+    } else if (ordenJugadoresCampo === 'anio_nacimiento') {
+      va = a.anio_nacimiento != null ? a.anio_nacimiento : -Infinity;
+      vb = b.anio_nacimiento != null ? b.anio_nacimiento : -Infinity;
+    } else {
+      return 0;
+    }
+    if (va < vb) return -1 * signo;
+    if (va > vb) return 1 * signo;
+    return 0;
+  });
+}
+
 function renderJugadores() {
   const tbody = document.getElementById('tablaJugadores');
   const texto = (document.getElementById('buscadorJugadores').value || '').trim().toLowerCase();
@@ -613,6 +667,8 @@ function renderJugadores() {
     } else if (categoriaId && j.categoria_socio_id !== categoriaId) return false;
     return true;
   });
+
+  ordenarListaJugadores(lista);
 
   if (!jugadoresCache.length) {
     tbody.innerHTML = '<tr><td colspan="9">Todavía no cargaste ningún jugador.</td></tr>';
