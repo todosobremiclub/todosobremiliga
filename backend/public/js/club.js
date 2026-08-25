@@ -481,11 +481,15 @@ async function actualizarBadgeSolicitudesPendientes() {
   try {
     const data = await apiFetch('/club/jugadores/solicitudes');
     const badge = document.getElementById('badgeSolicitudesPendientes');
+    const badgeTab = document.getElementById('badgeTabJugadores');
     if (data.solicitudes.length) {
       badge.textContent = data.solicitudes.length;
       badge.classList.remove('oculto');
+      badgeTab.textContent = data.solicitudes.length;
+      badgeTab.classList.remove('oculto');
     } else {
       badge.classList.add('oculto');
+      badgeTab.classList.add('oculto');
     }
   } catch (err) {
     // sin bloquear la pantalla si esto falla
