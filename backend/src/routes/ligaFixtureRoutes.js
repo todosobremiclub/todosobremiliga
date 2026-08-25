@@ -518,6 +518,16 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
       return res.status(201).json({ ok: true, partidos_creados: cantidadCreados, jornadas: jornadasMax, grupos: porGrupo.size, ida_vuelta: !!ida_vuelta });
     }
 
+    // "Eliminación directa": no existe fixture de temporada regular — el
+    // torneo ES la llave. Se arma directo con el botón "Generar llave" (más
+    // abajo en este archivo), no con este botón.
+    if (contexto.formato_juego === 'eliminacion_directa') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Este torneo es de "Eliminación directa": no tiene fixture de temporada regular. Usá el botón "Generar llave" con los equipos ya inscriptos.'
+      });
+    }
+
     // "Apertura y Clausura" SIEMPRE genera las dos ruedas (apertura + clausura
     // invirtiendo localía), etiquetando cada partido con su ronda para poder
     // armar las 3 tablas (apertura / clausura / general) por separado.
@@ -762,8 +772,8 @@ router.post('/:torneoId/categorias/:categoriaId/llave/generar', async (req, res)
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
-    if (contexto.formato_juego !== 'grupos_playoffs') {
-      return res.status(400).json({ ok: false, error: 'Este torneo no usa el formato "Grupos + Playoffs"' });
+    if (!['grupos_playoffs', 'eliminacion_directa'].includes(contexto.formato_juego)) {
+      return res.status(400).json({ ok: false, error: 'Este torneo no usa el formato "Grupos + Playoffs" ni "Eliminación directa"' });
     }
 
     const yaExiste = await query(
@@ -775,6 +785,39 @@ router.post('/:torneoId/categorias/:categoriaId/llave/generar', async (req, res)
     );
     if (yaExiste.rows[0].cantidad > 0) {
       return res.status(409).json({ ok: false, error: 'Ya hay una llave generada para esta división/categoría. Usá "Vaciar llave" si querés rehacerla.' });
+    }
+
+    // "Eliminación directa": no hay fase de grupos previa — se arma la
+    // primera ronda directo con TODOS los equipos inscriptos y activos,
+    // sorteados al azar (sin evitar nada, porque no hay grupos de los que
+    // cuidarse). Tienen que ser una cantidad que arme una llave pareja (2,
+    // 4, 8, 16, 32 o 64).
+    if (contexto.formato_juego === 'eliminacion_directa') {
+      const equiposResult = await query(
+        `SELECT id AS equipo_torneo_id, grupo FROM equipos_torneo
+         WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+        [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+      );
+      const total = equiposResult.rows.length;
+      if (!CANTIDADES_VALIDAS_LLAVE.includes(total)) {
+        return res.status(400).json({
+          ok: false,
+          error: `La cantidad de equipos inscriptos (${total}) no arma una llave pareja. Tiene que dar 2, 4, 8, 16, 32 o 64. Ajustá cuántos equipos están inscriptos y activos en esta división.`
+        });
+      }
+      const pares = armarCrucesEvitandoMismoGrupo(equiposResult.rows);
+      const fase = FASES_LLAVE_POR_CANTIDAD[total];
+      let creados = 0;
+      for (let i = 0; i < pares.length; i++) {
+        const [a, b] = pares[i];
+        await query(
+          `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase, orden_llave)
+           VALUES ($1, $2, $3, $4, 1, $5, $6)`,
+          [req.params.torneoId, req.params.categoriaId, a.equipo_torneo_id, b.equipo_torneo_id, fase, i]
+        );
+        creados += 1;
+      }
+      return res.status(201).json({ ok: true, fase, partidos_creados: creados, clasificados: total });
     }
 
     const grupales = await query(
