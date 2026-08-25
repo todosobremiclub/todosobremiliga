@@ -79,6 +79,13 @@ async function cargarEquipo() {
       logoEl.src = equipo.club_logo_url;
       logoEl.classList.remove('oculto');
     }
+    renderFooterLiga({
+      logoUrl: equipo.liga_logo_url,
+      nombre: equipo.liga_nombre,
+      facebookUrl: equipo.facebook_url,
+      instagramUrl: equipo.instagram_url,
+      youtubeUrl: equipo.youtube_url
+    });
   } catch (err) {
     document.getElementById('nombreEquipo').textContent = 'Error cargando el equipo';
   }

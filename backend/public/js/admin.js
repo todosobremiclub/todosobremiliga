@@ -244,6 +244,9 @@ function limpiarFormLiga() {
   document.getElementById('ligaColorSecundarioHex').textContent = '#1e3a8a';
   document.getElementById('ligaColorAcento').value = '#f59e0b';
   document.getElementById('ligaColorAcentoHex').textContent = '#f59e0b';
+  document.getElementById('ligaFacebookUrl').value = '';
+  document.getElementById('ligaInstagramUrl').value = '';
+  document.getElementById('ligaYoutubeUrl').value = '';
   document.getElementById('ligaFormError').classList.add('oculto');
 }
 
@@ -346,6 +349,9 @@ function editarLiga(ligaId) {
   document.getElementById('ligaColorSecundarioHex').textContent = liga.color_secundario || '#1e3a8a';
   document.getElementById('ligaColorAcento').value = liga.color_acento || '#f59e0b';
   document.getElementById('ligaColorAcentoHex').textContent = liga.color_acento || '#f59e0b';
+  document.getElementById('ligaFacebookUrl').value = liga.facebook_url || '';
+  document.getElementById('ligaInstagramUrl').value = liga.instagram_url || '';
+  document.getElementById('ligaYoutubeUrl').value = liga.youtube_url || '';
   document.getElementById('ligaFormError').classList.add('oculto');
   document.getElementById('formLiga').classList.remove('oculto');
   mostrarFondoModal();
@@ -370,7 +376,10 @@ async function guardarLiga(e) {
     logo_url: document.getElementById('ligaLogoUrl').value || undefined,
     color_primario: document.getElementById('ligaColorPrimario').value,
     color_secundario: document.getElementById('ligaColorSecundario').value,
-    color_acento: document.getElementById('ligaColorAcento').value
+    color_acento: document.getElementById('ligaColorAcento').value,
+    facebook_url: document.getElementById('ligaFacebookUrl').value.trim() || undefined,
+    instagram_url: document.getElementById('ligaInstagramUrl').value.trim() || undefined,
+    youtube_url: document.getElementById('ligaYoutubeUrl').value.trim() || undefined
   };
 
   try {
@@ -442,6 +451,11 @@ async function verLiga(ligaId) {
         <div><strong>Color primario:</strong> <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${liga.color_primario || '#ccc'};vertical-align:middle;"></span> ${escapeHtml(liga.color_primario || '-')}</div>
         <div><strong>Color secundario:</strong> <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${liga.color_secundario || '#ccc'};vertical-align:middle;"></span> ${escapeHtml(liga.color_secundario || '-')}</div>
         <div><strong>Color de acento:</strong> <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${liga.color_acento || '#ccc'};vertical-align:middle;"></span> ${escapeHtml(liga.color_acento || '-')}</div>
+      </div>
+      <div class="form-grid">
+        <div><strong>Facebook:</strong> ${liga.facebook_url ? `<a href="${escapeHtml(liga.facebook_url)}" target="_blank" rel="noopener">${escapeHtml(liga.facebook_url)}</a>` : '-'}</div>
+        <div><strong>Instagram:</strong> ${liga.instagram_url ? `<a href="${escapeHtml(liga.instagram_url)}" target="_blank" rel="noopener">${escapeHtml(liga.instagram_url)}</a>` : '-'}</div>
+        <div><strong>YouTube:</strong> ${liga.youtube_url ? `<a href="${escapeHtml(liga.youtube_url)}" target="_blank" rel="noopener">${escapeHtml(liga.youtube_url)}</a>` : '-'}</div>
       </div>
       <p class="texto-ayuda">Creada el ${new Date(liga.creado_at).toLocaleDateString('es-AR')}</p>
     `;

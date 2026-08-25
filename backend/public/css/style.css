@@ -587,6 +587,41 @@ button.btn-peligro:hover { background: #fee2e2; }
   color: var(--gris-600);
 }
 
+/* Grilla de Torneos de la página pública de una Liga (sitio/liga.html):
+   tarjetas bastante más grandes que las de .grid-cards genérica, siempre 3
+   por fila en pantallas grandes (achica a 2 y después a 1 en mobile). No se
+   toca .grid-cards porque esa clase también la usa el listado de Ligas de
+   la home pública, que debe seguir con su tamaño chico de siempre. */
+.grid-cards-torneos {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+}
+
+.grid-cards-torneos .card-link {
+  padding: 32px 28px;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.grid-cards-torneos .card-link h3 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.grid-cards-torneos .card-link p {
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .grid-cards-torneos { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .grid-cards-torneos { grid-template-columns: 1fr; }
+}
+
 /* Botones grandes del Panel de Liga (Torneos, Categorías) */
 .grid-botones-grandes {
   display: grid;
@@ -871,4 +906,56 @@ body.liga-fondo-cancha .tarjeta-participacion-club, body.club-fondo-cancha .tarj
   background: rgba(255,255,255,0.045);
   border: 1px solid rgba(255,255,255,0.09);
 }
+
+/* ============================================================================
+   Footer del sitio público: logo de la Liga + botones de redes sociales
+   (Facebook/Instagram/YouTube), cargados desde el Panel Super Admin al crear
+   o editar la Liga. Se inyecta con JS (ver renderFooterLiga en sitio-tema.js)
+   dentro de <div id="footerLiga"></div> al final de cada página pública.
+   Franja fija oscura, independiente del color de marca de cada Liga -- va
+   siempre al pie, igual en todas las Ligas, como el footer de referencia. */
+#footerLiga:empty { display: none; }
+
+.footer-liga-inner {
+  margin-top: 40px;
+  padding: 28px 40px;
+  background: #0a0e17;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-liga-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--blanco);
+}
+
+.footer-liga-redes {
+  display: flex;
+  gap: 14px;
+}
+
+.footer-liga-red-boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  color: var(--gris-100);
+  transition: background 0.15s, color 0.15s;
+}
+
+.footer-liga-red-boton svg {
+  width: 20px;
+  height: 20px;
+}
+
+.footer-liga-red-boton:hover { background: var(--azul); color: var(--blanco); }
 

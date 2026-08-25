@@ -60,6 +60,13 @@ async function cargarLigaDelTorneo() {
       link.href = `/sitio/liga.html?slug=${encodeURIComponent(data.torneo.liga_slug)}`;
       link.textContent = `← ${data.torneo.liga_nombre}`;
     }
+    renderFooterLiga({
+      logoUrl: data.torneo.liga_logo_url,
+      nombre: data.torneo.liga_nombre,
+      facebookUrl: data.torneo.facebook_url,
+      instagramUrl: data.torneo.instagram_url,
+      youtubeUrl: data.torneo.youtube_url
+    });
   } catch (err) {
     // si falla, seguimos con el tema/breadcrumb por defecto
   }

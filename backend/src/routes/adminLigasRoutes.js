@@ -33,6 +33,7 @@ router.get('/', async (req, res) => {
     const { rows } = await query(
       `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.ciudad, l.provincia, l.telefono, l.email_contacto,
               l.color_primario, l.color_secundario, l.color_acento, l.activo, l.tipo, l.estado_demo,
+              l.facebook_url, l.instagram_url, l.youtube_url,
               l.creado_at,
               COUNT(cl.club_id) AS cantidad_clubes
        FROM ligas l
@@ -76,7 +77,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
-    color_primario, color_secundario, color_acento, tipo, estado_demo
+    color_primario, color_secundario, color_acento, tipo, estado_demo,
+    facebook_url, instagram_url, youtube_url
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -104,12 +106,14 @@ router.post('/', async (req, res) => {
 
     const { rows } = await query(
       `INSERT INTO ligas (nombre, slug, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
-                           color_primario, color_secundario, color_acento, tipo, estado_demo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'productiva'), $13)
+                           color_primario, color_secundario, color_acento, tipo, estado_demo,
+                           facebook_url, instagram_url, youtube_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'productiva'), $13, $14, $15, $16)
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
        telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
-       color_acento || null, tipo || null, estado_demo || null]
+       color_acento || null, tipo || null, estado_demo || null,
+       facebook_url || null, instagram_url || null, youtube_url || null]
     );
     res.status(201).json({ ok: true, liga: rows[0] });
   } catch (err) {
@@ -123,7 +127,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const {
     nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
-    color_primario, color_secundario, color_acento, tipo, estado_demo
+    color_primario, color_secundario, color_acento, tipo, estado_demo,
+    facebook_url, instagram_url, youtube_url
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -158,12 +163,14 @@ router.put('/:id', async (req, res) => {
          nombre = $1, slug = $2, logo_url = $3, direccion = $4, ciudad = $5, provincia = $6, telefono = $7,
          email_contacto = $8, color_primario = $9, color_secundario = $10, color_acento = $11,
          tipo = COALESCE($12, tipo), estado_demo = $13,
+         facebook_url = $14, instagram_url = $15, youtube_url = $16,
          actualizado_at = NOW()
-       WHERE id = $14
+       WHERE id = $17
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
        telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
-       color_acento || null, tipo || null, estado_demo || null, req.params.id]
+       color_acento || null, tipo || null, estado_demo || null,
+       facebook_url || null, instagram_url || null, youtube_url || null, req.params.id]
     );
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {
