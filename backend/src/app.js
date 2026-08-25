@@ -45,6 +45,7 @@ const requireRole = require('./middleware/requireRole');
 // requiere estar logueado y tener rol super_admin.
 app.use('/admin/ligas', requireAuth, requireRole('super_admin'), require('./routes/adminLigasRoutes'));
 app.use('/admin/usuarios', requireAuth, requireRole('super_admin'), require('./routes/adminUsuariosRoutes'));
+app.use('/admin/noticias', requireAuth, requireRole('super_admin'), require('./routes/adminNoticiasRoutes'));
 
 // ===== MÓDULO LIGA =====
 // Todo lo que cuelgue de /liga requiere estar logueado como liga_admin (o

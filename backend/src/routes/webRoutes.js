@@ -21,6 +21,21 @@ router.get('/ligas', async (_req, res) => {
   }
 });
 
+// GET /web/noticias-globales — noticias de la plataforma (Super Admin),
+// publicadas, para la home pública (/sitio/index.html).
+router.get('/noticias-globales', async (_req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM noticias_globales WHERE estado = 'publicada'
+       ORDER BY destacada DESC, publicado_at DESC`
+    );
+    res.json({ ok: true, noticias: rows });
+  } catch (err) {
+    console.error('Error en GET /web/noticias-globales:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug — detalle público de una Liga
 router.get('/ligas/:slug', async (req, res) => {
   try {

@@ -7,6 +7,8 @@ let logoBase64Actual = '';
 let paginaLigasActual = 1;
 const LIGAS_POR_PAGINA = 25;
 let totalLigasActual = 0;
+let noticiasGlobalesCache = [];
+let noticiaGlobalImagenBase64Actual = '';
 
 function mostrarFondoModal() {
   document.getElementById('fondoModalGenerico').classList.remove('oculto');
@@ -84,6 +86,119 @@ function conectarEventos() {
     const span = document.getElementById(`ligaColor${sufijo}Hex`);
     input.addEventListener('input', () => { span.textContent = input.value; });
   });
+
+  document.getElementById('tabBtnSeccionLigas').addEventListener('click', () => cambiarSeccion('ligas'));
+  document.getElementById('tabBtnSeccionNoticias').addEventListener('click', () => cambiarSeccion('noticias'));
+
+  document.getElementById('btnMostrarFormNoticiaGlobal').addEventListener('click', () => {
+    limpiarFormNoticiaGlobal();
+    document.getElementById('formNoticiaGlobal').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormNoticiaGlobal').addEventListener('click', () => {
+    document.getElementById('formNoticiaGlobal').classList.add('oculto');
+  });
+  document.getElementById('formNoticiaGlobal').addEventListener('submit', guardarNoticiaGlobal);
+  document.getElementById('noticiaGlobalImagenArchivo').addEventListener('change', onElegirImagenNoticiaGlobal);
+}
+
+// ===================== SECCIONES (Ligas / Noticias) =====================
+
+function cambiarSeccion(nombre) {
+  document.getElementById('tabBtnSeccionLigas').classList.toggle('activo', nombre === 'ligas');
+  document.getElementById('tabBtnSeccionNoticias').classList.toggle('activo', nombre === 'noticias');
+  document.getElementById('seccionLigas').classList.toggle('oculto', nombre !== 'ligas');
+  document.getElementById('seccionNoticias').classList.toggle('oculto', nombre !== 'noticias');
+  if (nombre === 'noticias') cargarNoticiasGlobales();
+}
+
+// ===================== NOTICIAS GLOBALES =====================
+
+function limpiarFormNoticiaGlobal() {
+  document.getElementById('noticiaGlobalIdEdicion').value = '';
+  document.getElementById('noticiaGlobalTitulo').value = '';
+  document.getElementById('noticiaGlobalContenido').value = '';
+  document.getElementById('noticiaGlobalImagenUrl').value = '';
+  document.getElementById('noticiaGlobalImagenArchivo').value = '';
+  document.getElementById('noticiaGlobalImagenPreview').classList.add('oculto');
+  noticiaGlobalImagenBase64Actual = '';
+  document.getElementById('noticiaGlobalDestacada').checked = false;
+  document.getElementById('noticiaGlobalFormError').classList.add('oculto');
+}
+
+function onElegirImagenNoticiaGlobal(e) {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    noticiaGlobalImagenBase64Actual = lector.result;
+    const preview = document.getElementById('noticiaGlobalImagenPreview');
+    preview.src = noticiaGlobalImagenBase64Actual;
+    preview.classList.remove('oculto');
+    document.getElementById('noticiaGlobalImagenUrl').value = noticiaGlobalImagenBase64Actual;
+  };
+  lector.readAsDataURL(archivo);
+}
+
+async function cargarNoticiasGlobales() {
+  const tbody = document.getElementById('tablaNoticiasGlobales');
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/admin/noticias');
+    noticiasGlobalesCache = data.noticias;
+    if (!noticiasGlobalesCache.length) {
+      tbody.innerHTML = '<tr><td colspan="5">Todavía no publicaste ninguna noticia.</td></tr>';
+      return;
+    }
+    const badgesEstado = { publicada: 'badge-activo', borrador: 'badge-pendiente', archivada: 'badge-inactivo' };
+    tbody.innerHTML = noticiasGlobalesCache.map((n) => `
+      <tr>
+        <td>${escapeHtml(n.titulo)}</td>
+        <td><span class="badge ${badgesEstado[n.estado] || ''}">${escapeHtml(n.estado)}</span></td>
+        <td>${n.destacada ? 'Sí' : '-'}</td>
+        <td>${new Date(n.publicado_at).toLocaleDateString('es-AR')}</td>
+        <td>
+          ${n.estado !== 'publicada' ? `<button class="btn btn-secundario btn-pequeno" onclick="cambiarEstadoNoticiaGlobal('${n.id}', 'publicada')">Publicar</button>` : ''}
+          ${n.estado !== 'archivada' ? `<button class="btn btn-secundario btn-pequeno" onclick="cambiarEstadoNoticiaGlobal('${n.id}', 'archivada')">Archivar</button>` : ''}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function guardarNoticiaGlobal(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('noticiaGlobalFormError');
+  errorEl.classList.add('oculto');
+
+  const cuerpo = {
+    titulo: document.getElementById('noticiaGlobalTitulo').value.trim(),
+    contenido: document.getElementById('noticiaGlobalContenido').value.trim(),
+    imagen_url: document.getElementById('noticiaGlobalImagenUrl').value.trim() || undefined,
+    destacada: document.getElementById('noticiaGlobalDestacada').checked
+  };
+
+  try {
+    await apiFetch('/admin/noticias', { method: 'POST', body: JSON.stringify(cuerpo) });
+    document.getElementById('formNoticiaGlobal').classList.add('oculto');
+    cargarNoticiasGlobales();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function cambiarEstadoNoticiaGlobal(noticiaId, nuevoEstado) {
+  try {
+    await apiFetch(`/admin/noticias/${noticiaId}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado: nuevoEstado })
+    });
+    cargarNoticiasGlobales();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
 }
 
 function cambiarTabLigas(tipo) {
