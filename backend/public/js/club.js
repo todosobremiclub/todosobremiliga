@@ -66,6 +66,8 @@ function conectarEventos() {
 
   document.getElementById('buscadorJugadores').addEventListener('input', renderJugadores);
   document.getElementById('filtroAnioNacimientoJugadores').addEventListener('change', renderJugadores);
+  document.getElementById('filtroActividadJugadores').addEventListener('change', renderJugadores);
+  document.getElementById('filtroCategoriaSocioJugadores').addEventListener('change', renderJugadores);
   document.getElementById('checkTodosJugadores').addEventListener('change', (e) => {
     const marcar = e.target.checked;
     document.querySelectorAll('.check-jugador').forEach((chk) => {
@@ -265,9 +267,29 @@ async function cargarOpcionesActividadCategoria() {
     const selectCategoria = document.getElementById('jugadorCategoriaSocio');
     selectCategoria.innerHTML = '<option value="">Sin especificar</option>' +
       categoriasSocioCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    poblarFiltroActividad();
+    poblarFiltroCategoriaSocio();
   } catch (err) {
     // si falla, el jugador se puede seguir cargando igual sin estos campos
   }
+}
+
+function poblarFiltroActividad() {
+  const select = document.getElementById('filtroActividadJugadores');
+  const valorActual = select.value;
+  const activas = actividadesCache.filter((a) => a.activo);
+  select.innerHTML = '<option value="">Todas las actividades</option>' +
+    activas.map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+  if (activas.some((a) => a.id === valorActual)) select.value = valorActual;
+}
+
+function poblarFiltroCategoriaSocio() {
+  const select = document.getElementById('filtroCategoriaSocioJugadores');
+  const valorActual = select.value;
+  const activas = categoriasSocioCache.filter((c) => c.activo);
+  select.innerHTML = '<option value="">Todas las categorías</option>' +
+    activas.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  if (activas.some((c) => c.id === valorActual)) select.value = valorActual;
 }
 
 async function cargarConfiguracion() {
@@ -294,10 +316,11 @@ async function cargarActividades() {
         </tr>
       `).join('');
     }
-    // refresca también los <select> del form de jugador con la lista activa
+    // refresca también los <select> del form de jugador y del filtro con la lista activa
     const selectActividad = document.getElementById('jugadorActividad');
     selectActividad.innerHTML = '<option value="">Sin especificar</option>' +
       actividadesCache.filter((a) => a.activo).map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+    poblarFiltroActividad();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
@@ -360,6 +383,7 @@ async function cargarCategoriasSocio() {
     const selectCategoria = document.getElementById('jugadorCategoriaSocio');
     selectCategoria.innerHTML = '<option value="">Sin especificar</option>' +
       categoriasSocioCache.filter((c) => c.activo).map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    poblarFiltroCategoriaSocio();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
@@ -566,6 +590,8 @@ function renderJugadores() {
   const tbody = document.getElementById('tablaJugadores');
   const texto = (document.getElementById('buscadorJugadores').value || '').trim().toLowerCase();
   const anio = document.getElementById('filtroAnioNacimientoJugadores').value;
+  const actividadId = document.getElementById('filtroActividadJugadores').value;
+  const categoriaId = document.getElementById('filtroCategoriaSocioJugadores').value;
 
   const lista = jugadoresCache.filter((j) => {
     if (texto) {
@@ -573,6 +599,8 @@ function renderJugadores() {
       if (!nombreCompleto.includes(texto)) return false;
     }
     if (anio && String(j.anio_nacimiento || '') !== anio) return false;
+    if (actividadId && j.actividad_id !== actividadId) return false;
+    if (categoriaId && j.categoria_socio_id !== categoriaId) return false;
     return true;
   });
 
