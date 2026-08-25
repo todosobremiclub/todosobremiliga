@@ -100,7 +100,8 @@ function moverPopupsABody() {
     'formTorneo', 'panelCategorias', 'modalEditarFichaje', 'panelDeudasClub',
     'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo',
     'panelGestionarEquipos', 'fondoModalGestionarEquipos',
-    'panelCargarResultado', 'fondoModalResultado'
+    'panelCargarResultado', 'fondoModalResultado',
+    'panelBuscarClubExistente'
   ];
   ids.forEach((id) => {
     const el = document.getElementById(id);
@@ -194,9 +195,26 @@ function conectarEventos() {
 
   // ---- Clubes ----
   document.getElementById('btnMostrarFormClub').addEventListener('click', () => {
+    document.getElementById('buscarClubExistenteInput').value = '';
+    document.getElementById('resultadosBuscarClubExistente').innerHTML = '';
+    document.getElementById('buscarClubExistenteError').classList.add('oculto');
+    document.getElementById('panelBuscarClubExistente').classList.remove('oculto');
+    mostrarFondoModal();
+  });
+  document.getElementById('btnCerrarBuscarClubExistente').addEventListener('click', () => {
+    document.getElementById('panelBuscarClubExistente').classList.add('oculto');
+    ocultarFondoModal();
+  });
+  document.getElementById('btnCrearClubNuevo').addEventListener('click', () => {
+    document.getElementById('panelBuscarClubExistente').classList.add('oculto');
     limpiarFormClub();
     document.getElementById('formClub').classList.remove('oculto');
-    mostrarFondoModal();
+  });
+  let timeoutBuscarClubExistente = null;
+  document.getElementById('buscarClubExistenteInput').addEventListener('input', (e) => {
+    clearTimeout(timeoutBuscarClubExistente);
+    const q = e.target.value;
+    timeoutBuscarClubExistente = setTimeout(() => buscarClubExistente(q), 350);
   });
   document.getElementById('btnCancelarFormClub').addEventListener('click', () => {
     document.getElementById('formClub').classList.add('oculto');
@@ -2287,6 +2305,56 @@ async function subirCargaMasivaClubes(e) {
     paginaClubesActual = 1;
     cargarClubes();
     cargarFiltrosDisponiblesClubes();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+// ===================== VINCULAR CLUB EXISTENTE (evita duplicados) =====================
+
+async function buscarClubExistente(q) {
+  const cont = document.getElementById('resultadosBuscarClubExistente');
+  const texto = (q || '').trim();
+  if (texto.length < 2) {
+    cont.innerHTML = '';
+    return;
+  }
+  cont.innerHTML = '<p class="texto-ayuda">Buscando...</p>';
+  try {
+    const data = await apiFetch(`/liga/clubes/buscar-global?q=${encodeURIComponent(texto)}`);
+    if (!data.clubes.length) {
+      cont.innerHTML = '<p class="texto-ayuda">No se encontró ningún club existente con ese dato. Podés crear uno nuevo abajo.</p>';
+      return;
+    }
+    cont.innerHTML = data.clubes.map((c) => `
+      <div class="fila-club-existente" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--gris-300); border-radius:8px; margin-bottom:8px;">
+        <div>
+          <strong>${escapeHtml(c.nombre)}</strong><br>
+          <span class="texto-ayuda">${[c.ciudad, c.provincia].filter(Boolean).map(escapeHtml).join(', ') || 'Sin ciudad/provincia cargada'}${c.ligas_actuales && c.ligas_actuales.length ? ` — ya juega en: ${c.ligas_actuales.map(escapeHtml).join(', ')}` : ''}</span>
+        </div>
+        <button type="button" class="btn btn-secundario btn-pequeno" onclick="vincularClubExistente('${c.id}')">Vincular a mi Liga</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    cont.innerHTML = `<p class="mensaje-error">Error al buscar: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function vincularClubExistente(clubId) {
+  const errorEl = document.getElementById('buscarClubExistenteError');
+  errorEl.classList.add('oculto');
+  try {
+    const data = await apiFetch(`/liga/clubes/${clubId}/vincular`, { method: 'POST' });
+    document.getElementById('panelBuscarClubExistente').classList.add('oculto');
+    // Filtramos la lista por el nombre exacto del club recién vinculado para
+    // asegurarnos de que aparezca en la página 1 de resultados sin importar
+    // en qué posición alfabética (o página) caiga entre todos los clubes de
+    // la Liga — clubesCache sólo trae una página a la vez.
+    document.getElementById('buscadorClubes').value = data.club.nombre;
+    paginaClubesActual = 1;
+    await cargarClubes();
+    editarClub(clubId);
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');

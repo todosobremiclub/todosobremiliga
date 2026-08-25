@@ -342,9 +342,71 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
   }
 });
 
+// GET /liga/clubes/buscar-global?q=... — busca clubes YA EXISTENTES en toda
+// la plataforma (de cualquier Liga) por nombre, email de contacto o CUIT,
+// para poder vincularlos a mi Liga en vez de crear un club duplicado (ej:
+// un club que ya juega en otra Liga se quiere sumar también a la mía). Sólo
+// devuelve clubes que todavía NO están en mi Liga.
+router.get('/buscar-global', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) {
+    return res.json({ ok: true, clubes: [] });
+  }
+  try {
+    const { rows } = await query(
+      `SELECT c.id, c.nombre, c.logo_url, c.email_contacto, c.cuit, c.ciudad, c.provincia,
+        (
+          SELECT json_agg(l2.nombre ORDER BY l2.nombre)
+          FROM club_liga cl2 JOIN ligas l2 ON l2.id = cl2.liga_id
+          WHERE cl2.club_id = c.id AND cl2.activo = TRUE
+        ) AS ligas_actuales
+       FROM clubes c
+       WHERE c.activo = TRUE
+         AND (c.nombre ILIKE $2 OR c.email_contacto ILIKE $2 OR c.cuit ILIKE $2)
+         AND NOT EXISTS (SELECT 1 FROM club_liga cl WHERE cl.club_id = c.id AND cl.liga_id = $1)
+       ORDER BY c.nombre ASC
+       LIMIT 10`,
+      [req.ligaId, `%${q}%`]
+    );
+    res.json({ ok: true, clubes: rows });
+  } catch (err) {
+    console.error('Error en GET /liga/clubes/buscar-global:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/clubes/:clubId/vincular — vincula un club YA EXISTENTE
+// (encontrado con /buscar-global) a mi Liga, sin duplicarlo: sólo agrega la
+// fila en club_liga. El club conserva sus jugadores, usuario, canchas, etc.
+// — todo eso es compartido entre las Ligas en las que participa. Las
+// categorías/modalidades y la cancha principal para MI Liga se configuran
+// después, editando el club como a cualquier otro.
+router.post('/:clubId/vincular', async (req, res) => {
+  try {
+    const clubResult = await query('SELECT * FROM clubes WHERE id = $1 AND activo = TRUE', [req.params.clubId]);
+    const club = clubResult.rows[0];
+    if (!club) return res.status(404).json({ ok: false, error: 'Club no encontrado' });
+
+    if (await nombreYaExisteEnLiga(club.nombre, req.ligaId, null)) {
+      return res.status(409).json({ ok: false, error: `Ya existe un club llamado "${club.nombre}" en tu Liga` });
+    }
+
+    await query(
+      `INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2)
+       ON CONFLICT (liga_id, club_id) DO UPDATE SET activo = TRUE`,
+      [req.ligaId, req.params.clubId]
+    );
+
+    res.status(201).json({ ok: true, club });
+  } catch (err) {
+    console.error('Error en POST /liga/clubes/:clubId/vincular:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/clubes — alta de un club NUEVO, que queda automáticamente
-// inscripto en mi liga. (Vincular un club ya existente de otra liga es un
-// caso que se suma más adelante si hace falta.)
+// inscripto en mi liga. Para sumar un club que ya existe en otra Liga, usar
+// /buscar-global + /:clubId/vincular en vez de esto (evita duplicar el club).
 router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, telefono,

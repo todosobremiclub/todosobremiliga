@@ -298,6 +298,25 @@
           <div id="cargaMasivaResultado"></div>
         </form>
 
+        <!-- Antes de crear un club nuevo, buscamos si ya existe en la plataforma
+             (puede jugar en otra Liga) para vincularlo en vez de duplicarlo. -->
+        <div class="panel oculto popup-modal" id="panelBuscarClubExistente">
+          <div class="panel-header">
+            <h2>Nuevo Club</h2>
+            <button type="button" class="btn btn-secundario" id="btnCerrarBuscarClubExistente">Cerrar</button>
+          </div>
+          <p class="texto-ayuda">Si el club ya juega en otra Liga de la plataforma, buscalo acá para vincularlo a la tuya sin duplicarlo — conserva sus jugadores, usuario y datos.</p>
+          <div class="form-grid una-columna">
+            <div>
+              <label for="buscarClubExistenteInput">Buscar por nombre, email o CUIT</label>
+              <input type="text" id="buscarClubExistenteInput" placeholder="Ej: Atlético Ferroviario">
+            </div>
+          </div>
+          <div id="resultadosBuscarClubExistente"></div>
+          <button type="button" class="btn" id="btnCrearClubNuevo" style="margin-top:14px;">+ Crear club nuevo</button>
+          <p class="mensaje-error oculto" id="buscarClubExistenteError"></p>
+        </div>
+
         <form id="formClub" class="oculto popup-modal">
           <input type="hidden" id="clubIdEdicion">
           <div class="form-grid">
