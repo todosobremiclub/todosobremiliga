@@ -98,7 +98,9 @@ function moverPopupsABody() {
     'panelDocumentosClub', 'panelComentariosClub', 'modalParticipacionesClub',
     'modalFichajesClub', 'modalImpagosMes', 'modalAsignarCategoriaMasivo',
     'formTorneo', 'panelCategorias', 'modalEditarFichaje', 'panelDeudasClub',
-    'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo'
+    'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo',
+    'panelGestionarEquipos', 'fondoModalGestionarEquipos',
+    'panelCargarResultado', 'fondoModalResultado'
   ];
   ids.forEach((id) => {
     const el = document.getElementById(id);
