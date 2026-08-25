@@ -121,6 +121,13 @@ function aplicarBreadcrumbYTemaDeTorneo(torneo) {
     link.href = `/${encodeURIComponent(torneo.liga_slug)}`;
     link.textContent = `← ${torneo.liga_nombre}`;
   }
+  renderFooterLiga({
+    logoUrl: torneo.liga_logo_url,
+    nombre: torneo.liga_nombre,
+    facebookUrl: torneo.facebook_url,
+    instagramUrl: torneo.instagram_url,
+    youtubeUrl: torneo.youtube_url
+  });
 }
 
 // Noticias que la Liga segmentó específicamente para este torneo (todas las

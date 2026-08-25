@@ -40,7 +40,8 @@ router.get('/noticias-globales', async (_req, res) => {
 router.get('/ligas/:slug', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT id, nombre, slug, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario
+      `SELECT id, nombre, slug, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario,
+              facebook_url, instagram_url, youtube_url
        FROM ligas WHERE slug = $1 AND activo = TRUE AND tipo = 'productiva'`,
       [req.params.slug]
     );
@@ -60,7 +61,8 @@ router.get('/torneos/:torneoId', async (req, res) => {
     const { rows } = await query(
       `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
-              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url
+              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
+              l.facebook_url, l.instagram_url, l.youtube_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
        WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
@@ -83,7 +85,8 @@ router.get('/ligas/:slug/torneos/:torneoSlug', async (req, res) => {
     const { rows } = await query(
       `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
-              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url
+              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
+              l.facebook_url, l.instagram_url, l.youtube_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
        WHERE l.slug = $1 AND t.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'`,
@@ -374,8 +377,9 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId',
               c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
               t.id AS torneo_id, t.nombre AS torneo_nombre,
               cat.id AS categoria_id, cat.nombre AS categoria_nombre,
-              l.nombre AS liga_nombre, l.slug AS liga_slug,
-              l.color_primario, l.color_secundario
+              l.nombre AS liga_nombre, l.slug AS liga_slug, l.logo_url AS liga_logo_url,
+              l.color_primario, l.color_secundario,
+              l.facebook_url, l.instagram_url, l.youtube_url
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
        JOIN torneos t ON t.id = et.torneo_id

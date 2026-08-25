@@ -38,6 +38,13 @@ async function init() {
       logo.src = dataLiga.liga.logo_url;
       logo.classList.remove('oculto');
     }
+    renderFooterLiga({
+      logoUrl: dataLiga.liga.logo_url,
+      nombre: dataLiga.liga.nombre,
+      facebookUrl: dataLiga.liga.facebook_url,
+      instagramUrl: dataLiga.liga.instagram_url,
+      youtubeUrl: dataLiga.liga.youtube_url
+    });
   } catch (err) {
     document.getElementById('nombreLiga').textContent = 'Error cargando la Liga';
   }
