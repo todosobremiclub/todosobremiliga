@@ -123,12 +123,17 @@ async function recalcularTablaPosiciones(torneoId, categoriaId) {
   );
   const equipoIds = equiposResult.rows.map((e) => e.id);
 
+  // Importante: se excluyen los partidos de la llave de eliminación (fase
+  // 'octavos', 'cuartos', etc. — todo lo que no sea NULL o 'grupos'). La
+  // tabla de posiciones representa la fase de grupos/temporada regular; los
+  // resultados de playoffs no tienen que mezclarse ahí ni afectarla.
   const partidosResult = await query(
     `SELECT equipo_local_id, equipo_visitante_id, resultado_local, resultado_visitante, ronda,
             no_presento_local, no_presento_visitante
      FROM partidos
      WHERE torneo_id = $1 AND categoria_id = $2 AND estado = 'jugado'
-       AND resultado_local IS NOT NULL AND resultado_visitante IS NOT NULL`,
+       AND resultado_local IS NOT NULL AND resultado_visitante IS NOT NULL
+       AND (fase IS NULL OR fase = 'grupos')`,
     [torneoId, categoriaId]
   );
 

@@ -128,6 +128,30 @@ router.post('/:torneoId/categorias/:categoriaId/equipos', async (req, res) => {
   }
 });
 
+// PATCH /liga/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoId/grupo
+// Asigna o cambia el Grupo/Zona de un equipo (ej: "A", "B", "Zona 1"). Se usa
+// sobre todo para el formato "Grupos + Playoffs", donde el fixture se genera
+// por separado dentro de cada grupo.
+router.patch('/:torneoId/categorias/:categoriaId/equipos/:equipoId/grupo', async (req, res) => {
+  const { grupo } = req.body;
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const { rows } = await query(
+      `UPDATE equipos_torneo SET grupo = $1
+       WHERE id = $2 AND torneo_id = $3 AND categoria_id = $4
+       RETURNING *`,
+      [grupo && grupo.trim() ? grupo.trim() : null, req.params.equipoId, req.params.torneoId, req.params.categoriaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Equipo no encontrado en esa división' });
+    res.json({ ok: true, equipo: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH grupo de equipo:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // DELETE /liga/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoId —
 // da de baja a un club de la división. Se borran en cascada sus partidos y
 // su fila de tabla de posiciones (el resto del fixture no se re-numera).
@@ -442,7 +466,7 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
     }
 
     const equiposResult = await query(
-      'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      'SELECT id, club_id, grupo FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
     const equipoIds = equiposResult.rows.map((e) => e.id);
@@ -450,6 +474,49 @@ router.post('/:torneoId/categorias/:categoriaId/fixture/generar', async (req, re
       return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 equipos inscriptos para generar un fixture' });
     }
     const clubIdPorEquipo = new Map(equiposResult.rows.map((e) => [e.id, e.club_id]));
+
+    // "Grupos + Playoffs": el fixture NO es un todos-contra-todos mezclado —
+    // se genera un todos-contra-todos POR SEPARADO dentro de cada grupo (el
+    // que se haya cargado en equipos_torneo.grupo), y se etiqueta con
+    // fase='grupos'. La llave de eliminación se arma después, aparte, con
+    // el botón "Generar llave" una vez terminada la fase de grupos.
+    if (contexto.formato_juego === 'grupos_playoffs') {
+      const sinGrupo = equiposResult.rows.filter((e) => !e.grupo);
+      if (sinGrupo.length) {
+        return res.status(400).json({
+          ok: false,
+          error: `Hay ${sinGrupo.length} equipo(s) sin Grupo asignado. Asignales un grupo (A, B, C...) en "Gestionar equipos" antes de generar el fixture.`
+        });
+      }
+      const porGrupo = new Map();
+      equiposResult.rows.forEach((e) => {
+        if (!porGrupo.has(e.grupo)) porGrupo.set(e.grupo, []);
+        porGrupo.get(e.grupo).push(e.id);
+      });
+      for (const [grupo, ids] of porGrupo) {
+        if (ids.length < 2) {
+          return res.status(400).json({ ok: false, error: `El grupo "${grupo}" tiene menos de 2 equipos — no se puede generar fixture para ese grupo.` });
+        }
+      }
+
+      let cantidadCreados = 0;
+      let jornadasMax = 0;
+      for (const [, ids] of porGrupo) {
+        const rondas = generarRoundRobin(ids, !!ida_vuelta);
+        jornadasMax = Math.max(jornadasMax, rondas.length);
+        for (let i = 0; i < rondas.length; i++) {
+          for (const [localId, visitanteId] of rondas[i]) {
+            await query(
+              `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase)
+               VALUES ($1, $2, $3, $4, $5, 'grupos')`,
+              [req.params.torneoId, req.params.categoriaId, localId, visitanteId, i + 1]
+            );
+            cantidadCreados += 1;
+          }
+        }
+      }
+      return res.status(201).json({ ok: true, partidos_creados: cantidadCreados, jornadas: jornadasMax, grupos: porGrupo.size, ida_vuelta: !!ida_vuelta });
+    }
 
     // "Apertura y Clausura" SIEMPRE genera las dos ruedas (apertura + clausura
     // invirtiendo localía), etiquetando cada partido con su ronda para poder
@@ -635,9 +702,13 @@ router.delete('/:torneoId/categorias/:categoriaId/fixture', async (req, res) => 
     if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
 
     const subcategoriaId = req.query.subcategoria_id || null;
+    // Ojo: en torneos "Grupos + Playoffs" esto SOLO vacía la fase de grupos
+    // (fase='grupos' o NULL) — la llave de eliminación generada aparte no se
+    // toca acá, para eso está el botón "Vaciar llave".
     const { rows } = await query(
       `DELETE FROM partidos p USING equipos_torneo el
        WHERE p.equipo_local_id = el.id AND p.torneo_id = $1 AND p.categoria_id = $2 AND p.estado != 'jugado'
+         AND (p.fase IS NULL OR p.fase = 'grupos')
          AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
        RETURNING p.id`,
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
@@ -645,6 +716,311 @@ router.delete('/:torneoId/categorias/:categoriaId/fixture', async (req, res) => 
     res.json({ ok: true, borrados: rows.length });
   } catch (err) {
     console.error('Error en DELETE fixture:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// ===== LLAVE DE ELIMINACIÓN (formato "Grupos + Playoffs") =====
+
+// Nombre de fase según cuántos equipos entran a esa ronda de la llave.
+const FASES_LLAVE_POR_CANTIDAD = { 2: 'final', 4: 'semifinal', 8: 'cuartos', 16: 'octavos', 32: 'dieciseisavos', 64: 'treintaidosavos' };
+const CANTIDADES_VALIDAS_LLAVE = Object.keys(FASES_LLAVE_POR_CANTIDAD).map(Number);
+
+// Arma los cruces de la primera ronda intentando que dos equipos del MISMO
+// grupo no se enfrenten todavía (como en un Mundial real). Si no encuentra
+// un sorteo que lo evite del todo después de varios intentos (grupos muy
+// desparejos o pocos grupos), devuelve el mejor sorteo al azar que haya
+// probado, aunque algún cruce repita grupo.
+function armarCrucesEvitandoMismoGrupo(clasificados) {
+  let mejorIntento = null;
+  let mejorCantidadRepetidos = Infinity;
+  for (let intento = 0; intento < 500; intento++) {
+    const barajado = [...clasificados].sort(() => Math.random() - 0.5);
+    const pares = [];
+    let repetidos = 0;
+    for (let i = 0; i < barajado.length; i += 2) {
+      const a = barajado[i];
+      const b = barajado[i + 1];
+      if (a.grupo && b.grupo && a.grupo === b.grupo) repetidos += 1;
+      pares.push([a, b]);
+    }
+    if (repetidos === 0) return pares;
+    if (repetidos < mejorCantidadRepetidos) {
+      mejorCantidadRepetidos = repetidos;
+      mejorIntento = pares;
+    }
+  }
+  return mejorIntento;
+}
+
+// POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/generar
+// Toma los mejores equipos de cada grupo (según la config del torneo:
+// config_extra.clasificados_por_grupo y config_extra.mejor_tercero) y arma
+// la primera ronda de la llave de eliminación directa.
+router.post('/:torneoId/categorias/:categoriaId/llave/generar', async (req, res) => {
+  const subcategoriaId = req.body.subcategoria_id || null;
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+    if (contexto.formato_juego !== 'grupos_playoffs') {
+      return res.status(400).json({ ok: false, error: 'Este torneo no usa el formato "Grupos + Playoffs"' });
+    }
+
+    const yaExiste = await query(
+      `SELECT COUNT(*)::int AS cantidad FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase IS NOT NULL AND p.fase != 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    if (yaExiste.rows[0].cantidad > 0) {
+      return res.status(409).json({ ok: false, error: 'Ya hay una llave generada para esta división/categoría. Usá "Vaciar llave" si querés rehacerla.' });
+    }
+
+    const grupales = await query(
+      `SELECT p.estado FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase = 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    if (!grupales.rows.length) {
+      return res.status(400).json({ ok: false, error: 'Todavía no generaste el fixture de la fase de grupos.' });
+    }
+    if (grupales.rows.some((p) => p.estado !== 'jugado')) {
+      return res.status(400).json({ ok: false, error: 'Todavía faltan partidos de la fase de grupos por jugar.' });
+    }
+
+    const config = contexto.config_extra || {};
+    const clasificadosPorGrupo = Number(config.clasificados_por_grupo) || 2;
+    const mejorTercero = !!config.mejor_tercero;
+
+    const tabla = await query(
+      `SELECT et.id AS equipo_torneo_id, et.grupo,
+              COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.diferencia, 0) AS diferencia, COALESCE(tp.a_favor, 0) AS a_favor
+       FROM equipos_torneo et
+       LEFT JOIN tabla_posiciones tp
+         ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = 'general'
+       WHERE et.torneo_id = $1 AND et.categoria_id = $2 AND et.activo = TRUE
+         AND et.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       ORDER BY et.grupo ASC, puntos DESC, diferencia DESC, a_favor DESC`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+
+    const porGrupo = new Map();
+    tabla.rows.forEach((r) => {
+      if (!porGrupo.has(r.grupo)) porGrupo.set(r.grupo, []);
+      porGrupo.get(r.grupo).push(r);
+    });
+
+    const clasificados = [];
+    const tercerosCandidatos = [];
+    for (const [grupo, equipos] of porGrupo) {
+      if (equipos.length < clasificadosPorGrupo) {
+        return res.status(400).json({
+          ok: false,
+          error: `El grupo "${grupo}" tiene ${equipos.length} equipo(s), menos que la cantidad configurada para clasificar (${clasificadosPorGrupo}).`
+        });
+      }
+      equipos.slice(0, clasificadosPorGrupo).forEach((e) => clasificados.push(e));
+      if (mejorTercero && equipos.length >= 3) tercerosCandidatos.push(equipos[2]);
+    }
+
+    if (mejorTercero) {
+      if (!tercerosCandidatos.length) {
+        return res.status(400).json({ ok: false, error: 'No hay terceros puestos disponibles para aplicar "mejor tercero" (algún grupo tiene menos de 3 equipos).' });
+      }
+      tercerosCandidatos.sort((a, b) => b.puntos - a.puntos || b.diferencia - a.diferencia || b.a_favor - a.a_favor);
+      clasificados.push(tercerosCandidatos[0]);
+    }
+
+    const total = clasificados.length;
+    if (!CANTIDADES_VALIDAS_LLAVE.includes(total)) {
+      return res.status(400).json({
+        ok: false,
+        error: `La cantidad de clasificados (${total}) no arma una llave pareja. Tiene que dar 2, 4, 8, 16, 32 o 64 (grupos × clasificados por grupo${mejorTercero ? ' + 1 por el mejor tercero' : ''}). Ajustá la cantidad de grupos, cuántos clasifican por grupo, o la opción de mejor tercero, en la configuración del torneo.`
+      });
+    }
+
+    const pares = armarCrucesEvitandoMismoGrupo(clasificados);
+    const fase = FASES_LLAVE_POR_CANTIDAD[total];
+    let creados = 0;
+    for (let i = 0; i < pares.length; i++) {
+      const [a, b] = pares[i];
+      await query(
+        `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase, orden_llave)
+         VALUES ($1, $2, $3, $4, 1, $5, $6)`,
+        [req.params.torneoId, req.params.categoriaId, a.equipo_torneo_id, b.equipo_torneo_id, fase, i]
+      );
+      creados += 1;
+    }
+
+    res.status(201).json({ ok: true, fase, partidos_creados: creados, clasificados: total });
+  } catch (err) {
+    console.error('Error en POST llave/generar:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// Determina quién ganó un partido de la llave (para saber quién avanza a la
+// próxima ronda): por resultado, o por penales si terminó empatado. Se usa
+// tanto para armar la próxima ronda como para informar el campeón cuando la
+// final ya se jugó. Devuelve {ok:true, equipoId} o {ok:false, error}.
+function determinarGanador(partido) {
+  if (partido.resultado_local > partido.resultado_visitante) return { ok: true, equipoId: partido.equipo_local_id };
+  if (partido.resultado_visitante > partido.resultado_local) return { ok: true, equipoId: partido.equipo_visitante_id };
+  const detalle = partido.detalle_resultado || {};
+  const penLocal = detalle.penales_local;
+  const penVisitante = detalle.penales_visitante;
+  if (penLocal != null && penVisitante != null && penLocal !== penVisitante) {
+    return { ok: true, equipoId: penLocal > penVisitante ? partido.equipo_local_id : partido.equipo_visitante_id };
+  }
+  return {
+    ok: false,
+    error: `El partido de la jornada ${partido.jornada} terminó empatado y no tiene penales cargados para definir quién avanza. Cargá el resultado con detalle_resultado: {"penales_local":X,"penales_visitante":Y}.`
+  };
+}
+
+// POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/siguiente-ronda
+// Una vez jugados todos los partidos de la ronda actual de la llave, arma la
+// próxima ronda (cuartos -> semifinal -> final) con los ganadores. Si el
+// partido terminó empatado, busca penales en detalle_resultado
+// ({"penales_local":X,"penales_visitante":Y}) para definir quién avanza.
+router.post('/:torneoId/categorias/:categoriaId/llave/siguiente-ronda', async (req, res) => {
+  const subcategoriaId = req.body.subcategoria_id || null;
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const faseActualResult = await query(
+      `SELECT p.fase, MAX(p.jornada) AS jornada
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase IS NOT NULL AND p.fase != 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       GROUP BY p.fase
+       ORDER BY MAX(p.jornada) DESC
+       LIMIT 1`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    if (!faseActualResult.rows[0]) {
+      return res.status(400).json({ ok: false, error: 'Todavía no generaste la llave de este torneo (botón "Generar llave").' });
+    }
+    const faseActual = faseActualResult.rows[0].fase;
+    const jornadaActual = faseActualResult.rows[0].jornada;
+
+    const partidosRonda = await query(
+      `SELECT p.*, cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase = $3 AND p.jornada = $4
+         AND el.subcategoria_id IS NOT DISTINCT FROM $5::uuid
+       ORDER BY p.orden_llave ASC NULLS LAST`,
+      [req.params.torneoId, req.params.categoriaId, faseActual, jornadaActual, subcategoriaId]
+    );
+    if (!partidosRonda.rows.length) {
+      return res.status(400).json({ ok: false, error: 'No se encontraron partidos de la ronda actual de la llave.' });
+    }
+
+    // Si la ronda actual ya es la final, no se arma ninguna ronda nueva —
+    // pero en vez de un error genérico, si la final ya se jugó devolvemos el
+    // campeón (para que el botón "Generar siguiente ronda" pueda mostrarlo
+    // en vez de fallar sin explicación).
+    if (faseActual === 'final') {
+      const final = partidosRonda.rows[0];
+      if (final.estado !== 'jugado') {
+        return res.status(400).json({ ok: false, error: 'Todavía falta jugar la final.' });
+      }
+      const ganadorFinal = determinarGanador(final);
+      if (!ganadorFinal.ok) return res.status(400).json({ ok: false, error: ganadorFinal.error });
+      const nombreCampeon = ganadorFinal.equipoId === final.equipo_local_id ? final.club_local_nombre : final.club_visitante_nombre;
+      return res.json({ ok: true, finalizado: true, campeon_equipo_torneo_id: ganadorFinal.equipoId, campeon_nombre: nombreCampeon, mensaje: `La llave ya tiene campeón: ${nombreCampeon}.` });
+    }
+
+    const sinJugar = partidosRonda.rows.filter((p) => p.estado !== 'jugado');
+    if (sinJugar.length) {
+      return res.status(400).json({ ok: false, error: `Todavía faltan ${sinJugar.length} partido(s) de esta ronda de la llave por jugar.` });
+    }
+
+    const ganadores = [];
+    for (const p of partidosRonda.rows) {
+      const resultado = determinarGanador(p);
+      if (!resultado.ok) return res.status(400).json({ ok: false, error: resultado.error });
+      ganadores.push(resultado.equipoId);
+    }
+
+    const proximaFase = FASES_LLAVE_POR_CANTIDAD[ganadores.length];
+    const proximaJornada = jornadaActual + 1;
+    let creados = 0;
+    for (let i = 0; i < ganadores.length; i += 2) {
+      await query(
+        `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase, orden_llave)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [req.params.torneoId, req.params.categoriaId, ganadores[i], ganadores[i + 1], proximaJornada, proximaFase, i / 2]
+      );
+      creados += 1;
+    }
+
+    res.status(201).json({ ok: true, fase: proximaFase, partidos_creados: creados });
+  } catch (err) {
+    console.error('Error en POST llave/siguiente-ronda:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/torneos/:torneoId/categorias/:categoriaId/llave — vacía toda
+// la llave de eliminación (no toca la fase de grupos). Solo borra partidos
+// que todavía no se jugaron.
+router.delete('/:torneoId/categorias/:categoriaId/llave', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const subcategoriaId = req.query.subcategoria_id || null;
+    const { rows } = await query(
+      `DELETE FROM partidos p USING equipos_torneo el
+       WHERE p.equipo_local_id = el.id AND p.torneo_id = $1 AND p.categoria_id = $2 AND p.estado != 'jugado'
+         AND p.fase IS NOT NULL AND p.fase != 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       RETURNING p.id`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    res.json({ ok: true, borrados: rows.length });
+  } catch (err) {
+    console.error('Error en DELETE llave:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/llave — trae todos los
+// partidos de la llave de eliminación, agrupados por fase, para dibujar el
+// cuadro en pantalla.
+router.get('/:torneoId/categorias/:categoriaId/llave', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const subcategoriaId = req.query.subcategoria_id || null;
+    const { rows } = await query(
+      `SELECT p.*,
+              cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
+              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase IS NOT NULL AND p.fase != 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       ORDER BY p.jornada ASC, p.orden_llave ASC NULLS LAST`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    res.json({ ok: true, llave: rows });
+  } catch (err) {
+    console.error('Error en GET llave:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
@@ -884,7 +1260,7 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
     // mostraba tabla). El orden A-Z de club queda como desempate final, que
     // es justamente lo que se ve cuando todos los equipos están en 0.
     const { rows } = await query(
-      `SELECT et.id AS equipo_torneo_id, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
+      `SELECT et.id AS equipo_torneo_id, et.grupo, c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
               COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
               COALESCE(tp.ganados, 0) AS ganados,
               COALESCE(tp.empatados, 0) AS empatados,
@@ -919,7 +1295,7 @@ router.get('/:torneoId/categorias/:categoriaId/tabla', async (req, res) => {
          ) ultimos
        ) u5 ON true
        WHERE et.torneo_id = $1 AND et.categoria_id = $2 AND et.subcategoria_id IS NOT DISTINCT FROM $4::uuid
-       ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC, c.nombre ASC`,
+       ORDER BY et.grupo ASC NULLS FIRST, COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC, c.nombre ASC`,
       [req.params.torneoId, req.params.categoriaId, ronda, subcategoriaId]
     );
     res.json({ ok: true, tabla: rows, formato_juego: contexto.formato_juego });
