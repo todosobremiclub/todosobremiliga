@@ -507,12 +507,14 @@ function renderJornadaFixturePublico(jornadasDisponibles) {
             <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</strong>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}
           </div>
         </div>
-        <div style="margin-top:6px; font-size:12px; color:var(--gris-600);">
-          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-            <span>${p.fecha ? `${escapeHtml(formatearFechaConDiaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}` : 'Sin fecha'}</span>
-            ${cancha.direccion ? `<span>${escapeHtml(cancha.direccion)}</span>` : ''}
-          </div>
-          ${cancha.resumen.length ? `<div style="margin-top:2px;">${cancha.resumen.join(' · ')}</div>` : ''}
+        <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+          <span>${p.fecha ? `${escapeHtml(formatearFechaConDiaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}` : 'Sin fecha'}</span>
+          ${(cancha.resumen.length || cancha.direccion) ? `
+            <div style="text-align:right;">
+              ${cancha.resumen.length ? `<div>${cancha.resumen.join(' · ')}</div>` : ''}
+              ${cancha.direccion ? `<div style="margin-top:2px;">${escapeHtml(cancha.direccion)}</div>` : ''}
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
