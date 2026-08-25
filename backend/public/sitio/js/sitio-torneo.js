@@ -33,6 +33,11 @@ let subcategoriaIdDesdeUrl = null;
 // desde "Mis Torneos" del Panel Club) — si viene, se abre esa en vez de la
 // pestaña "Tabla" por defecto. Sólo se usa una vez, al cargar la página.
 let tabInicialDesdeUrl = null;
+// Fixture agrupado por fecha (jornada), igual que el Panel de Liga.
+let partidosFixtureCache = [];
+let canchaJuegoFixtureActual = 'clubes';
+let jornadasDescripcionFixtureCache = {};
+let jornadaFixtureActual = 1;
 
 async function init() {
   const { torneoId, nombre, categoriaId, subcategoriaId, tab } = getParamsDeUrl();
@@ -53,9 +58,31 @@ async function init() {
   document.getElementById('tabBtnFixture').addEventListener('click', () => cambiarTab('fixture'));
   document.getElementById('tabBtnGoleadores').addEventListener('click', () => cambiarTab('goleadores'));
   document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTab('tarjetas'));
+  document.getElementById('btnJornadaAnteriorPublico').addEventListener('click', () => cambiarJornadaFixturePublico(-1));
+  document.getElementById('btnJornadaSiguientePublico').addEventListener('click', () => cambiarJornadaFixturePublico(1));
 
+  cargarLigaDelTorneo();
   await cargarCategorias();
   cargarNoticiasTorneo();
+}
+
+// Trae la Liga dueña de este Torneo para pintar el header/fondo con sus
+// colores (igual que hace el Panel de Liga) y para que el breadcrumb
+// vuelva a la Liga real en vez de siempre al listado general.
+async function cargarLigaDelTorneo() {
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}`);
+    const data = await res.json();
+    if (!data.ok) return;
+    aplicarTemaLiga(data.torneo.color_primario, data.torneo.color_secundario);
+    if (data.torneo.liga_slug) {
+      const link = document.getElementById('linkVolverLiga');
+      link.href = `/sitio/liga.html?slug=${encodeURIComponent(data.torneo.liga_slug)}`;
+      link.textContent = `← ${data.torneo.liga_nombre}`;
+    }
+  } catch (err) {
+    // si falla, seguimos con el tema/breadcrumb por defecto
+  }
 }
 
 // Noticias que la Liga segmentó específicamente para este torneo (todas las
@@ -327,29 +354,170 @@ async function cargarTabla() {
   }
 }
 
+function jornadasDisponiblesFixturePublico() {
+  return Array.from(new Set(partidosFixtureCache.map((p) => (p.jornada != null ? p.jornada : 0)))).sort((a, b) => a - b);
+}
+
 async function cargarFixture() {
-  const tbody = document.getElementById('tablaFixture');
-  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+  const navegador = document.getElementById('navegadorJornadasPublico');
+  const contenedor = document.getElementById('contenedorPartidosJornadaPublico');
+  navegador.classList.add('oculto');
+  contenedor.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
   try {
     if (!tablaCache.length) await cargarTabla();
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/fixture${qsSubcategoria()}`);
     const data = await res.json();
     if (!data.ok || !data.partidos.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no hay partidos programados.</td></tr>';
+      contenedor.innerHTML = '<p class="sitio-vacio">Todavía no hay partidos programados.</p>';
       return;
     }
-    tbody.innerHTML = data.partidos.map((p) => `
-      <tr>
-        <td>${p.jornada != null ? p.jornada : '-'}</td>
-        <td>${escudoClub(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</td>
-        <td>${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}${(p.no_presento_local || p.no_presento_visitante) ? ' <span class="badge badge-pendiente" title="Resultado por incomparecencia">W.O.</span>' : ''}</td>
-        <td>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</td>
-        <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
-      </tr>
-    `).join('');
+    partidosFixtureCache = data.partidos;
+    canchaJuegoFixtureActual = data.cancha_juego;
+    jornadasDescripcionFixtureCache = {};
+    (data.jornadas || []).forEach((j) => { jornadasDescripcionFixtureCache[j.jornada] = j.descripcion; });
+
+    const jornadasDisponibles = jornadasDisponiblesFixturePublico();
+    jornadaFixtureActual = 1;
+    if (!jornadasDisponibles.includes(jornadaFixtureActual)) jornadaFixtureActual = jornadasDisponibles[0];
+    navegador.classList.remove('oculto');
+    renderJornadaFixturePublico(jornadasDisponibles);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+    contenedor.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+function cambiarJornadaFixturePublico(delta) {
+  const jornadasDisponibles = jornadasDisponiblesFixturePublico();
+  const idx = jornadasDisponibles.indexOf(jornadaFixtureActual);
+  const nuevoIdx = idx + delta;
+  if (nuevoIdx < 0 || nuevoIdx >= jornadasDisponibles.length) return;
+  jornadaFixtureActual = jornadasDisponibles[nuevoIdx];
+  renderJornadaFixturePublico(jornadasDisponibles);
+}
+
+// El backend devuelve la fecha como fecha/hora ISO completa (ej.
+// "2026-08-01T00:00:00.000Z"); hay que parsearla en UTC para no perder un
+// día y mostrarla en formato local legible (ej. "1/8/2026").
+function formatearFechaPartido(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return String(fecha);
+  return d.toLocaleDateString('es-AR', { timeZone: 'UTC' });
+}
+
+// Datos de cancha del partido (dirección del club local, o predio+cancha
+// propia de la Liga con si es techada o al aire libre), según cómo juega
+// este torneo -- mismo criterio que ya usa el Panel de Liga.
+function detallesCanchaPartido(p) {
+  const detalles = [];
+  if (canchaJuegoFixtureActual === 'propias_liga') {
+    if (p.predio_nombre) detalles.push(`${escapeHtml(p.predio_nombre)}${p.cancha_predio_nombre ? ' - ' + escapeHtml(p.cancha_predio_nombre) : ''}`);
+    if (p.cancha_predio_techo) detalles.push(p.cancha_predio_techo === 'techada' ? 'Techada' : 'Aire libre');
+  } else {
+    if (p.club_local_direccion) detalles.push(escapeHtml(p.club_local_direccion));
+    if (p.club_local_cancha_techo) detalles.push(p.club_local_cancha_techo === 'techada' ? 'Techada' : 'Aire libre');
+  }
+  return detalles;
+}
+
+function renderJornadaFixturePublico(jornadasDisponibles) {
+  const contenedor = document.getElementById('contenedorPartidosJornadaPublico');
+  const partidosJornada = partidosFixtureCache.filter((p) => (p.jornada != null ? p.jornada : 0) === jornadaFixtureActual);
+  const descripcion = jornadasDescripcionFixtureCache[jornadaFixtureActual];
+  document.getElementById('tituloJornadaActualPublico').textContent = `Fecha ${jornadaFixtureActual}${descripcion ? ' — ' + escapeHtml(descripcion) : ''}`;
+  document.getElementById('btnJornadaAnteriorPublico').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === 0;
+  document.getElementById('btnJornadaSiguientePublico').disabled = jornadasDisponibles.indexOf(jornadaFixtureActual) === jornadasDisponibles.length - 1;
+
+  contenedor.innerHTML = partidosJornada.map((p) => {
+    const detalles = detallesCanchaPartido(p);
+    return `
+      <div class="panel fila-partido-clickable" style="margin-bottom:10px;" onclick="abrirDetallePartido('${p.id}')">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:170px;">
+            ${escudoClub(p.club_local_logo_url, p.club_local_color)}<strong>${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_torneo_id)}</strong>
+          </div>
+          <div style="font-weight:700; white-space:nowrap;">
+            ${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}${(p.no_presento_local || p.no_presento_visitante) ? ' <span class="badge badge-pendiente" title="Resultado por incomparecencia">W.O.</span>' : ''}
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:170px; justify-content:flex-end; text-align:right;">
+            <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_torneo_id)}</strong>${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}
+          </div>
+        </div>
+        <div style="margin-top:6px; font-size:12px; color:var(--gris-600); display:flex; gap:10px; flex-wrap:wrap;">
+          ${p.fecha ? `<span>${escapeHtml(formatearFechaPartido(p.fecha))}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}</span>` : '<span>Sin fecha</span>'}
+          ${detalles.length ? `<span>${detalles.join(' · ')}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ----- Popup de detalle de un partido -----
+
+async function abrirDetallePartido(partidoId) {
+  document.getElementById('fondoModalPartido').classList.remove('oculto');
+  document.getElementById('panelDetallePartido').classList.remove('oculto');
+  const contenido = document.getElementById('detallePartidoContenido');
+  contenido.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/partidos/${partidoId}`);
+    const data = await res.json();
+    if (!data.ok) {
+      contenido.innerHTML = '<p class="sitio-vacio">No se pudo cargar el partido.</p>';
+      return;
+    }
+    contenido.innerHTML = renderDetallePartidoHtml(data.partido, data.estadisticas);
+  } catch (err) {
+    contenido.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function cerrarDetallePartido() {
+  document.getElementById('fondoModalPartido').classList.add('oculto');
+  document.getElementById('panelDetallePartido').classList.add('oculto');
+}
+
+function renderDetallePartidoHtml(p, estadisticas) {
+  const detalles = detallesCanchaPartido(p);
+  const goleadores = estadisticas.filter((e) => e.goles > 0);
+  const tarjetas = estadisticas.filter((e) => e.tarjetas_amarillas > 0 || e.tarjetas_rojas > 0);
+
+  return `
+    <div style="text-align:center; margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:110px;">
+          ${p.club_local_logo_url ? `<img src="${escapeHtml(p.club_local_logo_url)}" alt="" style="width:56px; height:56px; object-fit:contain; border-radius:8px;">` : swatch(p.club_local_color)}
+          <strong>${escapeHtml(p.club_local_nombre)}</strong>
+        </div>
+        <div style="font-size:34px; font-weight:800; font-family: var(--fuente-deportiva);">
+          ${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px; min-width:110px;">
+          ${p.club_visitante_logo_url ? `<img src="${escapeHtml(p.club_visitante_logo_url)}" alt="" style="width:56px; height:56px; object-fit:contain; border-radius:8px;">` : swatch(p.club_visitante_color)}
+          <strong>${escapeHtml(p.club_visitante_nombre)}</strong>
+        </div>
+      </div>
+      ${(p.no_presento_local || p.no_presento_visitante) ? '<p style="margin:10px 0 0;"><span class="badge badge-pendiente">Resultado por incomparecencia (W.O.)</span></p>' : ''}
+    </div>
+    <p style="text-align:center; color:var(--gris-600); margin:6px 0;">
+      ${p.jornada != null ? `Fecha ${p.jornada} · ` : ''}${p.fecha ? escapeHtml(formatearFechaPartido(p.fecha)) : 'Sin fecha'}${p.hora ? ' · ' + escapeHtml(String(p.hora).slice(0, 5)) : ''}
+    </p>
+    ${detalles.length ? `<p style="text-align:center; color:var(--gris-600); font-size:13px; margin:0 0 14px;">${detalles.join(' · ')}</p>` : '<div style="margin-bottom:14px;"></div>'}
+
+    ${goleadores.length ? `
+      <h3 style="margin-bottom:6px;">Goleadores</h3>
+      <table><thead><tr><th>Jugador</th><th>Club</th><th>Goles</th></tr></thead>
+      <tbody>${goleadores.map((g) => `<tr><td>${escapeHtml(g.apellido)}, ${escapeHtml(g.nombre)}</td><td>${escapeHtml(g.club_nombre)}</td><td>${g.goles}</td></tr>`).join('')}</tbody></table>
+    ` : ''}
+
+    ${tarjetas.length ? `
+      <h3 style="margin:14px 0 6px;">Tarjetas</h3>
+      <table><thead><tr><th>Jugador</th><th>Club</th><th>Amarillas</th><th>Rojas</th></tr></thead>
+      <tbody>${tarjetas.map((t) => `<tr><td>${escapeHtml(t.apellido)}, ${escapeHtml(t.nombre)}</td><td>${escapeHtml(t.club_nombre)}</td><td>${t.tarjetas_amarillas}</td><td>${t.tarjetas_rojas}</td></tr>`).join('')}</tbody></table>
+    ` : ''}
+
+    ${!goleadores.length && !tarjetas.length ? '<p class="sitio-vacio" style="text-align:center;">Todavía no hay goleadores ni tarjetas cargados para este partido.</p>' : ''}
+  `;
 }
 
 async function cargarTablaGeneral() {

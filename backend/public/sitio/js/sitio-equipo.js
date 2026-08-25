@@ -73,6 +73,7 @@ async function cargarEquipo() {
     clubIdActual = equipo.club_id;
     document.getElementById('nombreEquipo').textContent = equipo.club_nombre;
     document.title = `${equipo.club_nombre} - Todo Sobre mi Liga`;
+    aplicarTemaLiga(equipo.color_primario, equipo.color_secundario);
     if (equipo.club_logo_url) {
       const logoEl = document.getElementById('equipoLogo');
       logoEl.src = equipo.club_logo_url;
@@ -81,6 +82,16 @@ async function cargarEquipo() {
   } catch (err) {
     document.getElementById('nombreEquipo').textContent = 'Error cargando el equipo';
   }
+}
+
+// El backend devuelve la fecha como fecha/hora ISO completa (ej.
+// "2026-08-01T00:00:00.000Z"); hay que parsearla en UTC para no perder un
+// día y mostrarla en formato local legible (ej. "1/8/2026").
+function formatearFechaPartido(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return String(fecha);
+  return d.toLocaleDateString('es-AR', { timeZone: 'UTC' });
 }
 
 function renderUltimos5Html(ultimos5) {
@@ -142,7 +153,7 @@ function renderProximos() {
     const rival = nombreRival(p);
     return `
       <tr>
-        <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
+        <td>${p.fecha ? escapeHtml(formatearFechaPartido(p.fecha)) : '-'}</td>
         <td>${rival.lv}</td>
         <td>${escudoClub(rival.logoUrl, rival.color)}${escapeHtml(rival.nombre)}</td>
         <td>${p.hora ? escapeHtml(String(p.hora).slice(0, 5)) : '-'}</td>
@@ -164,7 +175,7 @@ function renderResultados(jugados) {
       : `${p.resultado_visitante} - ${p.resultado_local}`;
     return `
       <tr>
-        <td>${p.fecha ? escapeHtml(p.fecha) : '-'}</td>
+        <td>${p.fecha ? escapeHtml(formatearFechaPartido(p.fecha)) : '-'}</td>
         <td>${rival.lv}</td>
         <td>${escudoClub(rival.logoUrl, rival.color)}${escapeHtml(rival.nombre)}</td>
         <td>${resultado}</td>

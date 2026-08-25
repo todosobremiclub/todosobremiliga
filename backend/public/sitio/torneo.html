@@ -37,6 +37,21 @@
   .noticia-card .noticia-fecha { font-size: 12px; color: var(--gris-600); margin-bottom: 8px; }
   .noticia-card img { max-width: 100%; border-radius: 8px; margin-bottom: 8px; }
   .noticia-card .noticia-contenido { margin: 0; font-size: 13px; color: var(--gris-700); }
+  /* Popup de detalle de un partido: mismo criterio que los popups del Panel
+     de Liga (fondo oscuro compartido + tarjeta centrada). */
+  .fondo-modal-generico {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 55;
+  }
+  .popup-modal {
+    position: fixed; top: 6%; left: 50%; transform: translateX(-50%);
+    width: min(560px, 94vw); max-height: 88vh; overflow-y: auto;
+    z-index: 60; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    background: rgba(255,255,255,0.06); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: var(--radio); padding: 20px;
+  }
+  .fila-partido-clickable { cursor: pointer; transition: background 0.15s; }
+  .fila-partido-clickable:hover { background: rgba(255,255,255,0.07); }
 </style>
 </head>
 <body class="liga-fondo-cancha">
@@ -44,7 +59,7 @@
     <div class="sitio-header-inner">
       <div>
         <h1 id="nombreTorneo">Cargando...</h1>
-        <div class="sitio-breadcrumb"><a href="/sitio/index.html">← Todas las Ligas</a></div>
+        <div class="sitio-breadcrumb"><a href="/sitio/index.html" id="linkVolverLiga">← Todas las Ligas</a></div>
       </div>
     </div>
   </div>
@@ -83,10 +98,12 @@
       </div>
 
       <div class="panel oculto" id="seccionFixture">
-        <table>
-          <thead><tr><th>Jornada</th><th>Local</th><th>Resultado</th><th>Visitante</th><th>Fecha</th></tr></thead>
-          <tbody id="tablaFixture"><tr><td colspan="5">Cargando...</td></tr></tbody>
-        </table>
+        <div id="navegadorJornadasPublico" class="oculto" style="display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px;">
+          <button class="btn btn-secundario btn-pequeno" id="btnJornadaAnteriorPublico">← Anterior</button>
+          <span id="tituloJornadaActualPublico" style="font-weight:700;"></span>
+          <button class="btn btn-secundario btn-pequeno" id="btnJornadaSiguientePublico">Siguiente →</button>
+        </div>
+        <div id="contenedorPartidosJornadaPublico"><p class="sitio-vacio">Cargando...</p></div>
       </div>
 
       <div class="panel oculto" id="seccionGoleadores">
@@ -115,6 +132,17 @@
     </div>
   </div>
 
+  <!-- Popup con el detalle grande de un partido (goleadores/tarjetas si
+       hay), al hacer click sobre un partido del Fixture. -->
+  <div class="oculto fondo-modal-generico" id="fondoModalPartido" onclick="cerrarDetallePartido()"></div>
+  <div class="popup-modal oculto" id="panelDetallePartido">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+      <button class="btn btn-secundario btn-pequeno" id="btnCerrarDetallePartido" onclick="cerrarDetallePartido()">Cerrar</button>
+    </div>
+    <div id="detallePartidoContenido"><p class="sitio-vacio">Cargando...</p></div>
+  </div>
+
+  <script src="/sitio/js/sitio-tema.js"></script>
   <script src="/sitio/js/sitio-torneo.js"></script>
 </body>
 </html>

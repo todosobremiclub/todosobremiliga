@@ -26,6 +26,7 @@ async function init() {
       return;
     }
     document.getElementById('nombreLiga').textContent = dataLiga.liga.nombre;
+    aplicarTemaLiga(dataLiga.liga.color_primario, dataLiga.liga.color_secundario);
     if (dataLiga.liga.logo_url) {
       const logo = document.getElementById('logoLiga');
       logo.src = dataLiga.liga.logo_url;

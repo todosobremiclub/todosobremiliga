@@ -52,6 +52,28 @@ router.get('/ligas/:slug', async (req, res) => {
   }
 });
 
+// GET /web/torneos/:torneoId — datos básicos de un Torneo + su Liga (nombre,
+// slug, colores) — usado por la página pública del Torneo/División/Equipo
+// para pintar el breadcrumb hacia la Liga real y aplicar sus colores.
+router.get('/torneos/:torneoId', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT t.id, t.nombre, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
+              l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
+              l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url
+       FROM torneos t
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.torneoId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+    res.json({ ok: true, torneo: rows[0] });
+  } catch (err) {
+    console.error('Error en GET torneo publico:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/torneos — torneos públicos de una Liga
 router.get('/ligas/:slug/torneos', async (req, res) => {
   try {
@@ -206,17 +228,35 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/tabla', async (req, res) 
   }
 });
 
-// GET /web/torneos/:torneoId/categorias/:categoriaId/fixture — fixture y resultados públicos
+// GET /web/torneos/:torneoId/categorias/:categoriaId/fixture — fixture y
+// resultados públicos, con los mismos datos de cancha (dirección del club
+// local, o predio/cancha propia de la Liga con si es techada o al aire
+// libre) que ya usa el Panel de Liga, más la descripción de cada fecha
+// (jornada) para poder agruparlas en el sitio público igual que el panel.
 router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res) => {
   try {
     const subcategoriaId = req.query.subcategoria_id || null;
+
+    const torneoResult = await query(
+      `SELECT t.cancha_juego FROM torneos t
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.torneoId]
+    );
+    if (!torneoResult.rows[0]) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+
     const { rows } = await query(
       `SELECT p.id, p.fecha, p.hora, p.sede, p.jornada, p.estado,
               p.resultado_local, p.resultado_visitante, p.detalle_resultado,
               p.no_presento_local, p.no_presento_visitante,
               el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
               cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
-              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color
+              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color,
+              COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
+              COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
+              COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
+              pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
        JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
@@ -224,14 +264,79 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
        JOIN clubes cv ON cv.id = ev.club_id
        JOIN torneos t ON t.id = p.torneo_id
        JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
+       LEFT JOIN clubes_canchas ccSel ON ccSel.id = p.cancha_club_id
+       LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
+       LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
        WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
          AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST`,
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
-    res.json({ ok: true, partidos: rows });
+
+    const jornadasResult = await query(
+      `SELECT jornada, descripcion FROM fixture_jornadas
+       WHERE torneo_id = $1 AND categoria_id = $2 AND subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+
+    res.json({ ok: true, partidos: rows, cancha_juego: torneoResult.rows[0].cancha_juego, jornadas: jornadasResult.rows });
   } catch (err) {
     console.error('Error en GET fixture publico:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId —
+// detalle público de UN partido puntual (para el popup del fixture): datos
+// grandes del partido + goleadores/tarjetas de ESE partido si se cargaron.
+router.get('/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (req, res) => {
+  try {
+    const partidoResult = await query(
+      `SELECT p.id, p.fecha, p.hora, p.sede, p.jornada, p.estado,
+              p.resultado_local, p.resultado_visitante, p.detalle_resultado, p.observaciones,
+              p.no_presento_local, p.no_presento_visitante,
+              el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
+              cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
+              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color,
+              COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
+              COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
+              COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
+              pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
+       LEFT JOIN clubes_canchas ccSel ON ccSel.id = p.cancha_club_id
+       LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
+       LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
+       WHERE p.id = $1 AND p.torneo_id = $2 AND p.categoria_id = $3
+         AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    const partido = partidoResult.rows[0];
+    if (!partido) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+
+    const { rows: estadisticas } = await query(
+      `SELECT j.nombre, j.apellido, c.nombre AS club_nombre, e.equipo_torneo_id,
+              e.goles, e.tarjetas_amarillas, e.tarjetas_rojas
+       FROM partido_estadisticas_jugador e
+       JOIN jugadores j ON j.id = e.jugador_id
+       JOIN equipos_torneo et ON et.id = e.equipo_torneo_id
+       JOIN clubes c ON c.id = et.club_id
+       WHERE e.partido_id = $1 AND (e.goles > 0 OR e.tarjetas_amarillas > 0 OR e.tarjetas_rojas > 0)
+       ORDER BY c.nombre ASC, j.apellido ASC`,
+      [req.params.partidoId]
+    );
+
+    res.json({ ok: true, partido, estadisticas });
+  } catch (err) {
+    console.error('Error en GET detalle de partido publico:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
@@ -246,7 +351,8 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/equipos/:equipoTorneoId',
               c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
               t.id AS torneo_id, t.nombre AS torneo_nombre,
               cat.id AS categoria_id, cat.nombre AS categoria_nombre,
-              l.nombre AS liga_nombre, l.slug AS liga_slug
+              l.nombre AS liga_nombre, l.slug AS liga_slug,
+              l.color_primario, l.color_secundario
        FROM equipos_torneo et
        JOIN clubes c ON c.id = et.club_id
        JOIN torneos t ON t.id = et.torneo_id
