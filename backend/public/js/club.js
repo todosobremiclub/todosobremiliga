@@ -279,8 +279,9 @@ function poblarFiltroActividad() {
   const valorActual = select.value;
   const activas = actividadesCache.filter((a) => a.activo);
   select.innerHTML = '<option value="">Todas las actividades</option>' +
+    '<option value="__sin__">Sin actividad</option>' +
     activas.map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
-  if (activas.some((a) => a.id === valorActual)) select.value = valorActual;
+  if (valorActual === '__sin__' || activas.some((a) => a.id === valorActual)) select.value = valorActual;
 }
 
 function poblarFiltroCategoriaSocio() {
@@ -288,8 +289,9 @@ function poblarFiltroCategoriaSocio() {
   const valorActual = select.value;
   const activas = categoriasSocioCache.filter((c) => c.activo);
   select.innerHTML = '<option value="">Todas las categorías</option>' +
+    '<option value="__sin__">Sin categoría</option>' +
     activas.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-  if (activas.some((c) => c.id === valorActual)) select.value = valorActual;
+  if (valorActual === '__sin__' || activas.some((c) => c.id === valorActual)) select.value = valorActual;
 }
 
 async function cargarConfiguracion() {
@@ -599,8 +601,12 @@ function renderJugadores() {
       if (!nombreCompleto.includes(texto)) return false;
     }
     if (anio && String(j.anio_nacimiento || '') !== anio) return false;
-    if (actividadId && j.actividad_id !== actividadId) return false;
-    if (categoriaId && j.categoria_socio_id !== categoriaId) return false;
+    if (actividadId === '__sin__') {
+      if (j.actividad_id) return false;
+    } else if (actividadId && j.actividad_id !== actividadId) return false;
+    if (categoriaId === '__sin__') {
+      if (j.categoria_socio_id) return false;
+    } else if (categoriaId && j.categoria_socio_id !== categoriaId) return false;
     return true;
   });
 
