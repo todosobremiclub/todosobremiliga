@@ -667,37 +667,41 @@
                 <option value="eliminacion_directa">Eliminación directa</option>
                 <option value="apertura_clausura">Apertura y Clausura</option>
               </select>
-              <p class="texto-ayuda" style="margin:4px 0 0;">
-                "Liguilla ida y vuelta" es un todos-contra-todos donde cada club juega dos veces contra cada rival: una vez de local y una de visitante (se generan el doble de fechas que en "Todos contra todos"). Al usar "Generar automático" en el Fixture, el tilde "Ida y vuelta" queda marcado por defecto si elegís este formato.
-              </p>
-              <p class="texto-ayuda" style="margin:4px 0 0;">
-                "Apertura y Clausura" genera los mismos cruces dos veces: una primera ronda (Apertura, con su propia tabla y campeón) y una segunda ronda (Clausura, mismos partidos con la localía invertida, con su propia tabla y campeón), además de una tabla general que suma ambas rondas.
-              </p>
             </div>
             <div>
-              <label for="torneoPtsVictoria">Puntos por victoria</label>
-              <input type="number" id="torneoPtsVictoria" value="3">
-            </div>
-            <div>
-              <label for="torneoPtsEmpate">Puntos por empate</label>
-              <input type="number" id="torneoPtsEmpate" value="1">
-            </div>
-            <div>
-              <label for="torneoPtsDerrota">Puntos por derrota</label>
-              <input type="number" id="torneoPtsDerrota" value="0">
+              <label>Puntos por partido</label>
+              <div style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                  <label for="torneoPtsVictoria" style="font-size:11px; font-weight:400;">PG</label>
+                  <input type="number" id="torneoPtsVictoria" value="3">
+                </div>
+                <div style="flex:1;">
+                  <label for="torneoPtsEmpate" style="font-size:11px; font-weight:400;">PE</label>
+                  <input type="number" id="torneoPtsEmpate" value="1">
+                </div>
+                <div style="flex:1;">
+                  <label for="torneoPtsDerrota" style="font-size:11px; font-weight:400;">PP</label>
+                  <input type="number" id="torneoPtsDerrota" value="0">
+                </div>
+              </div>
             </div>
             <div>
               <label for="torneoFechaInicio">Fecha de inicio del torneo</label>
               <input type="date" id="torneoFechaInicio">
             </div>
             <div>
-              <label for="torneoGolesWalkoverGanador">Resultado por incomparecencia — gana</label>
-              <input type="number" id="torneoGolesWalkoverGanador" value="3" min="0">
-              <p class="texto-ayuda" style="margin:4px 0 0;">Cuando un equipo no se presenta a un partido, el otro se lo lleva con este resultado (ej: 3 a 0). Se puede tildar desde la carga de resultado del partido.</p>
-            </div>
-            <div>
-              <label for="torneoGolesWalkoverPerdedor">Resultado por incomparecencia — pierde</label>
-              <input type="number" id="torneoGolesWalkoverPerdedor" value="0" min="0">
+              <label>No presenta equipo</label>
+              <div style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                  <label for="torneoGolesWalkoverGanador" style="font-size:11px; font-weight:400;">Gana</label>
+                  <input type="number" id="torneoGolesWalkoverGanador" value="3" min="0">
+                </div>
+                <div style="flex:1;">
+                  <label for="torneoGolesWalkoverPerdedor" style="font-size:11px; font-weight:400;">Pierde</label>
+                  <input type="number" id="torneoGolesWalkoverPerdedor" value="0" min="0">
+                </div>
+              </div>
+              <p class="texto-ayuda" style="margin:4px 0 0;">Cuando un equipo no se presenta a un partido, el otro se lleva este resultado (ej: 3 a 0). Se puede tildar desde la carga de resultado del partido.</p>
             </div>
             <div>
               <label for="torneoCanchaJuego">¿Dónde se juega?</label>
@@ -705,7 +709,6 @@
                 <option value="clubes">En las canchas de los clubes</option>
                 <option value="propias_liga">En canchas propias de la Liga</option>
               </select>
-              <p class="texto-ayuda" style="margin:4px 0 0;">Si elegís "canchas propias de la Liga", en el Fixture vas a poder asignar el predio y la cancha (cargados en Configuración → Predios y canchas propias) a cada partido.</p>
             </div>
           </div>
           <p class="texto-ayuda">Para deportes sin empate (como vóley), dejá los puntos de empate en 0 — el sistema calcula igual quién gana según el resultado cargado.</p>
