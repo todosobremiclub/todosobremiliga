@@ -54,7 +54,8 @@
   .foto-mini-tab-categoria { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
   .logo-mini-torneo { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px; }
   .tab-btn-general { border-style: dashed; }
-  .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; }
+  .link-club-fichajes { color: inherit; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .tabla-scroll { overflow-x: auto; }
   .link-club-fichajes:hover { color: var(--azul); text-decoration: underline; }
   .bloque-torneo-fichajes-club { margin-bottom: 18px; padding: 12px 14px; border-radius: 10px; background: var(--gris-100); }
   .bloque-torneo-fichajes-club:last-child { margin-bottom: 0; }
@@ -448,6 +449,7 @@
             <button class="btn btn-secundario btn-pequeno" id="btnClubesPaginaSiguienteTop">Siguiente →</button>
           </div>
         </div>
+        <div class="tabla-scroll">
         <table>
           <thead>
             <tr>
@@ -464,6 +466,7 @@
           </thead>
           <tbody id="tablaClubes"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
+        </div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
           <span class="texto-ayuda" id="paginacionClubesInfo"></span>
           <div>
