@@ -1365,7 +1365,7 @@ async function cargarFichajesLiga() {
   tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
-    const params = estado ? `?estado=${estado}` : '';
+    const params = estado ? `?estado=${estado}&todos=true` : '?todos=true';
     const data = await apiFetch(`/liga/fichajes${params}`);
     fichajesLigaCache = data.fichajes;
     poblarFiltroTorneoFichajesLiga();
@@ -1680,8 +1680,8 @@ function cerrarCarnetLiga() {
 // rojo en la pestaña "Fichajes", se vea o no esa sección ahora.
 async function actualizarBadgeFichajesPendientes() {
   try {
-    const data = await apiFetch('/liga/fichajes?estado=pendiente');
-    const cantidad = data.fichajes.length;
+    const data = await apiFetch('/liga/fichajes?estado=pendiente&todos=true');
+    const cantidad = data.total;
     const badge = document.getElementById('badgeFichajesPendientes');
     badge.textContent = cantidad > 99 ? '99+' : String(cantidad);
     badge.classList.toggle('oculto', cantidad === 0);
@@ -1892,11 +1892,11 @@ async function cargarStatsClubes() {
     })
     .catch(() => { document.getElementById('statImpagosMesNumero').textContent = '–'; });
 
-  apiFetch('/liga/fichajes?estado=pendiente')
+  apiFetch('/liga/fichajes?estado=pendiente&todos=true')
     .then((data) => {
       const el = document.getElementById('statFichajesPendientesNumero');
-      el.textContent = data.fichajes.length;
-      document.getElementById('statFichajesPendientes').classList.toggle('sin-pendientes', data.fichajes.length === 0);
+      el.textContent = data.total;
+      document.getElementById('statFichajesPendientes').classList.toggle('sin-pendientes', data.total === 0);
     })
     .catch(() => { document.getElementById('statFichajesPendientesNumero').textContent = '–'; });
 }
@@ -3017,7 +3017,7 @@ async function verFichajesClub(clubId, nombreClub) {
   try {
     const [dataParticipaciones, dataFichajes] = await Promise.all([
       apiFetch(`/liga/clubes/${clubId}/participaciones`),
-      apiFetch(`/liga/fichajes?club_id=${clubId}`)
+      apiFetch(`/liga/fichajes?club_id=${clubId}&todos=true`)
     ]);
     renderFichajesPorTorneoClub(dataParticipaciones.participaciones || [], dataFichajes.fichajes || []);
   } catch (err) {

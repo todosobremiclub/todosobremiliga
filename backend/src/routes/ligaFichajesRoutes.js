@@ -6,44 +6,103 @@ const { query, getClient } = require('../db');
 
 // Todas las rutas usan req.ligaId (calculado por resolveLigaId en app.js).
 
+// Dado un conjunto de filas de fichajes ya traídas (paginadas o no), calcula
+// "otros_fichajes_mismo_dni" (el mismo DNI fichado en otro torneo/categoría/
+// subcategoría de la Liga) con UNA sola consulta adicional, acotada a los
+// DNIs de ESAS filas — no a toda la Liga. Antes esto era una sub-consulta
+// correlacionada dentro del SELECT principal (una vuelta completa a
+// fichajes/jugadores POR CADA FILA), que con muchos fichajes cargados
+// (ej. una prueba de volumen) tardaba decenas de segundos; con esta versión
+// el costo no depende de cuántos fichajes tenga la Liga en total, sólo de
+// cuántas filas se están mostrando.
+async function agregarOtrosFichajesMismoDni(ligaId, filas) {
+  const dnis = [...new Set(filas.map((f) => f.jugador_dni).filter(Boolean))];
+  if (!dnis.length) return filas;
+
+  const { rows: coincidencias } = await query(
+    `SELECT j2.dni, f2.id AS fichaje_id, f2.torneo_id, f2.categoria_id, f2.subcategoria_id, f2.estado,
+            t2.nombre AS torneo_nombre, cat2.nombre AS categoria_nombre, sub2.nombre AS subcategoria_nombre,
+            c2.id AS club_id, c2.nombre AS club_nombre
+     FROM fichajes f2
+     JOIN jugadores j2 ON j2.id = f2.jugador_id
+     JOIN clubes c2 ON c2.id = f2.club_id
+     JOIN torneos t2 ON t2.id = f2.torneo_id
+     LEFT JOIN categorias cat2 ON cat2.id = f2.categoria_id
+     LEFT JOIN categoria_subcategorias sub2 ON sub2.id = f2.subcategoria_id
+     WHERE f2.liga_id = $1
+       AND f2.estado IN ('pendiente', 'aprobado')
+       AND j2.dni = ANY($2::text[])`,
+    [ligaId, dnis]
+  );
+
+  const porDni = {};
+  coincidencias.forEach((c) => {
+    if (!porDni[c.dni]) porDni[c.dni] = [];
+    porDni[c.dni].push(c);
+  });
+
+  return filas.map((f) => {
+    const otros = (porDni[f.jugador_dni] || []).filter((c) =>
+      c.fichaje_id !== f.id &&
+      (c.torneo_id !== f.torneo_id || c.categoria_id !== f.categoria_id || c.subcategoria_id !== f.subcategoria_id)
+    );
+    return {
+      ...f,
+      otros_fichajes_mismo_dni: otros.length
+        ? otros.map((o) => ({
+            torneo_id: o.torneo_id, torneo_nombre: o.torneo_nombre,
+            categoria_nombre: o.categoria_nombre, subcategoria_nombre: o.subcategoria_nombre,
+            club_id: o.club_id, club_nombre: o.club_nombre, estado: o.estado
+          }))
+        : null
+    };
+  });
+}
+
 // GET /liga/fichajes?estado=pendiente&torneo_id=...&categoria_id=...&club_id=... —
-// solicitudes de fichaje de MI liga (por defecto trae todas; se puede
-// filtrar por estado, torneo, división y/o club)
+// solicitudes de fichaje de MI liga, paginado (25 por página por defecto,
+// máximo 100). Se puede filtrar por estado, torneo, división y/o club.
+// ?todos=true trae hasta 1000 sin paginar (para casos como el globito de
+// pendientes o "fichajes de este club", donde se necesita el conjunto
+// completo, no una página).
 router.get('/', async (req, res) => {
   const { estado, torneo_id, categoria_id, subcategoria_id, club_id } = req.query;
   try {
-    let sql = `
+    const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
+    const porPagina = Math.min(100, Math.max(1, parseInt(req.query.por_pagina, 10) || 25));
+    const offset = (pagina - 1) * porPagina;
+    const todos = req.query.todos === 'true';
+
+    const params = [req.ligaId];
+    let filtros = '';
+    if (estado) {
+      params.push(estado);
+      filtros += ` AND f.estado = $${params.length}`;
+    }
+    if (torneo_id) {
+      params.push(torneo_id);
+      filtros += ` AND f.torneo_id = $${params.length}`;
+    }
+    if (categoria_id) {
+      params.push(categoria_id);
+      filtros += ` AND f.categoria_id = $${params.length}`;
+    }
+    if (subcategoria_id) {
+      params.push(subcategoria_id);
+      filtros += ` AND f.subcategoria_id = $${params.length}`;
+    }
+    if (club_id) {
+      params.push(club_id);
+      filtros += ` AND f.club_id = $${params.length}`;
+    }
+
+    const baseSelect = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
              j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento, j.activo AS jugador_activo,
              c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
              t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre, sub.nombre AS subcategoria_nombre,
              car.codigo_qr AS carnet_codigo_qr, car.vigente_desde AS carnet_vigente_desde,
-             car.vigente_hasta AS carnet_vigente_hasta, car.activo AS carnet_activo,
-             (
-               SELECT json_agg(json_build_object(
-                 'torneo_id', t2.id, 'torneo_nombre', t2.nombre,
-                 'categoria_nombre', cat2.nombre, 'subcategoria_nombre', sub2.nombre,
-                 'club_id', c2.id, 'club_nombre', c2.nombre,
-                 'estado', f2.estado
-               ))
-               FROM fichajes f2
-               JOIN torneos t2 ON t2.id = f2.torneo_id
-               JOIN clubes c2 ON c2.id = f2.club_id
-               LEFT JOIN categorias cat2 ON cat2.id = f2.categoria_id
-               LEFT JOIN categoria_subcategorias sub2 ON sub2.id = f2.subcategoria_id
-               WHERE f2.liga_id = f.liga_id
-                 AND f2.id <> f.id
-                 AND f2.estado IN ('pendiente', 'aprobado')
-                 AND (
-                   f2.torneo_id IS DISTINCT FROM f.torneo_id
-                   OR f2.categoria_id IS DISTINCT FROM f.categoria_id
-                   OR f2.subcategoria_id IS DISTINCT FROM f.subcategoria_id
-                 )
-                 AND EXISTS (
-                   SELECT 1 FROM jugadores j2
-                   WHERE j2.id = f2.jugador_id AND j2.dni = j.dni
-                 )
-             ) AS otros_fichajes_mismo_dni
+             car.vigente_hasta AS carnet_vigente_hasta, car.activo AS carnet_activo
       FROM fichajes f
       JOIN jugadores j ON j.id = f.jugador_id
       JOIN clubes c ON c.id = f.club_id
@@ -51,33 +110,39 @@ router.get('/', async (req, res) => {
       LEFT JOIN categorias cat ON cat.id = f.categoria_id
       LEFT JOIN categoria_subcategorias sub ON sub.id = f.subcategoria_id
       LEFT JOIN carnets car ON car.fichaje_id = f.id
-      WHERE f.liga_id = $1
+      WHERE f.liga_id = $1${filtros}
+      ORDER BY f.fecha_solicitud DESC
     `;
-    const params = [req.ligaId];
-    if (estado) {
-      params.push(estado);
-      sql += ` AND f.estado = $${params.length}`;
-    }
-    if (torneo_id) {
-      params.push(torneo_id);
-      sql += ` AND f.torneo_id = $${params.length}`;
-    }
-    if (categoria_id) {
-      params.push(categoria_id);
-      sql += ` AND f.categoria_id = $${params.length}`;
-    }
-    if (subcategoria_id) {
-      params.push(subcategoria_id);
-      sql += ` AND f.subcategoria_id = $${params.length}`;
-    }
-    if (club_id) {
-      params.push(club_id);
-      sql += ` AND f.club_id = $${params.length}`;
-    }
-    sql += ' ORDER BY f.fecha_solicitud DESC';
 
-    const { rows } = await query(sql, params);
-    res.json({ ok: true, fichajes: rows });
+    if (todos) {
+      // Sin tope realista de "cuántos fichajes puede tener una Liga" (con
+      // pruebas de volumen puede haber decenas de miles), pero con un techo
+      // de todos modos para no arriesgarse a traer una cantidad ilimitada
+      // por error de uso.
+      const { rows } = await query(`${baseSelect} LIMIT 50000`, params);
+      const fichajes = await agregarOtrosFichajesMismoDni(req.ligaId, rows);
+      return res.json({ ok: true, fichajes, total: fichajes.length, todos: true });
+    }
+
+    const totalResult = await query(
+      `SELECT COUNT(*)::int AS total FROM fichajes f WHERE f.liga_id = $1${filtros}`,
+      params
+    );
+
+    params.push(porPagina, offset);
+    const { rows } = await query(
+      `${baseSelect} LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    const fichajes = await agregarOtrosFichajesMismoDni(req.ligaId, rows);
+
+    res.json({
+      ok: true,
+      fichajes,
+      total: totalResult.rows[0].total,
+      pagina,
+      por_pagina: porPagina
+    });
   } catch (err) {
     console.error('Error en GET /liga/fichajes:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
