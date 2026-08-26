@@ -1802,6 +1802,20 @@ async function actualizarBadgeFichajesPendientes() {
 }
 
 async function aprobarFichaje(fichajeId) {
+  // Si el mismo DNI ya está fichado en otro Torneo/División/Categoría (o en
+  // otro club), avisamos ANTES de aprobar y pedimos confirmación explícita
+  // en vez de dejar que el aviso quede solo como un ⚠ pasivo en la tabla.
+  const fichaje = fichajesLigaCache.find((f) => f.id === fichajeId);
+  if (fichaje && fichaje.otros_fichajes_mismo_dni && fichaje.otros_fichajes_mismo_dni.length) {
+    const detalle = fichaje.otros_fichajes_mismo_dni
+      .map((o) => `- ${o.torneo_nombre}${o.categoria_nombre ? ' - ' + o.categoria_nombre : ''}${o.subcategoria_nombre ? ' (' + o.subcategoria_nombre + ')' : ''} — ${o.club_nombre} (${o.estado})`)
+      .join('\n');
+    const nombreJugador = `${fichaje.jugador_nombre || ''} ${fichaje.jugador_apellido || ''}`.trim();
+    const confirmado = confirm(
+      `${nombreJugador || 'Este jugador'} ya figura fichado (mismo DNI) en:\n\n${detalle}\n\n¿Confirmás que igual querés aprobar este fichaje?`
+    );
+    if (!confirmado) return;
+  }
   try {
     await apiFetch(`/liga/fichajes/${fichajeId}/aprobar`, { method: 'PATCH' });
     cargarFichajesLiga();
