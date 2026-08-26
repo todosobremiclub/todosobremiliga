@@ -3123,6 +3123,7 @@ async function verFichajesClub(clubId, nombreClub) {
   // socios en varias divisiones no deben mostrar de entrada una lista larga.
   torneosFichajesClubExpandidos.clear();
   categoriasFichajesClubExpandidas.clear();
+  subcategoriasFichajesClubExpandidas.clear();
   try {
     const [dataParticipaciones, dataFichajes] = await Promise.all([
       apiFetch(`/liga/clubes/${clubId}/participaciones`),
@@ -3139,6 +3140,7 @@ async function verFichajesClub(clubId, nombreClub) {
 // verFichajesClub().
 const torneosFichajesClubExpandidos = new Set();
 const categoriasFichajesClubExpandidas = new Set();
+const subcategoriasFichajesClubExpandidas = new Set();
 
 function toggleTorneoFichajesClub(torneoKey) {
   if (torneosFichajesClubExpandidos.has(torneoKey)) torneosFichajesClubExpandidos.delete(torneoKey);
@@ -3152,15 +3154,26 @@ function toggleCategoriaFichajesClub(categoriaKey) {
   renderFichajesPorTorneoClub(participacionesPorTorneoClubCache, fichajesPorTorneoClubCache);
 }
 
+function toggleSubcategoriaFichajesClub(subcategoriaKey) {
+  if (subcategoriasFichajesClubExpandidas.has(subcategoriaKey)) subcategoriasFichajesClubExpandidas.delete(subcategoriaKey);
+  else subcategoriasFichajesClubExpandidas.add(subcategoriaKey);
+  renderFichajesPorTorneoClub(participacionesPorTorneoClubCache, fichajesPorTorneoClubCache);
+}
+
 let participacionesPorTorneoClubCache = [];
 let fichajesPorTorneoClubCache = [];
 
-// Combina en un solo árbol Torneo → División → Fichajes:
-// - Las PARTICIPACIONES (equipos_torneo) definen qué torneos y divisiones
-//   tiene el club, aunque todavía no tenga ningún jugador fichado ahí.
-// - Los FICHAJES aportan los jugadores dentro de cada división, y también
-//   pueden traer torneos/divisiones si por algún motivo ya no hay una
-//   participación activa (ej: se dio de baja el equipo pero el fichaje quedó).
+// Combina en un solo árbol Torneo → División (Zona) → Categoría (año) →
+// Fichajes. Un jugador queda fichado a una División Y una Categoría
+// específicas dentro de ella (no sólo a la División), así que este tercer
+// nivel es el que realmente identifica dónde está cada fichado.
+// - Las PARTICIPACIONES (equipos_torneo) definen qué torneos, divisiones y
+//   categorías tiene el club, aunque todavía no tenga ningún jugador fichado
+//   ahí (ya vienen ordenadas por cat.orden/sub.orden desde el backend).
+// - Los FICHAJES aportan los jugadores dentro de cada categoría, y también
+//   pueden traer torneos/divisiones/categorías si por algún motivo ya no hay
+//   una participación activa (ej: se dio de baja el equipo pero el fichaje
+//   quedó).
 function armarArbolTorneosFichajesClub(participaciones, fichajes) {
   const torneos = new Map(); // key: torneoId || 'sin-torneo'
 
@@ -3177,23 +3190,34 @@ function armarArbolTorneosFichajesClub(participaciones, fichajes) {
   function getCategoria(torneoEntry, categoriaId, categoriaNombre) {
     const key = categoriaId || 'sin-division';
     if (!torneoEntry.categorias.has(key)) {
-      torneoEntry.categorias.set(key, { categoriaId, categoriaNombre: categoriaNombre || 'Sin división', subcategorias: new Set(), fichajes: [] });
+      torneoEntry.categorias.set(key, { categoriaId, categoriaNombre: categoriaNombre || 'Sin división', subcategorias: new Map() });
     }
     const c = torneoEntry.categorias.get(key);
     if (categoriaNombre && c.categoriaNombre === 'Sin división') c.categoriaNombre = categoriaNombre;
     return c;
   }
 
+  function getSubcategoria(categoriaEntry, subcategoriaId, subcategoriaNombre) {
+    const key = subcategoriaId || 'sin-categoria';
+    if (!categoriaEntry.subcategorias.has(key)) {
+      categoriaEntry.subcategorias.set(key, { subcategoriaId, subcategoriaNombre: subcategoriaNombre || 'Sin categoría', fichajes: [] });
+    }
+    const s = categoriaEntry.subcategorias.get(key);
+    if (subcategoriaNombre && s.subcategoriaNombre === 'Sin categoría') s.subcategoriaNombre = subcategoriaNombre;
+    return s;
+  }
+
   participaciones.forEach((p) => {
     const t = getTorneo(p.torneo_id, p.torneo_nombre);
     const c = getCategoria(t, p.categoria_id, p.categoria_nombre);
-    if (p.subcategoria_nombre) c.subcategorias.add(p.subcategoria_nombre);
+    getSubcategoria(c, p.subcategoria_id, p.subcategoria_nombre);
   });
 
   fichajes.forEach((f) => {
     const t = getTorneo(f.torneo_id, f.torneo_nombre);
     const c = getCategoria(t, f.categoria_id, f.categoria_nombre);
-    c.fichajes.push(f);
+    const s = getSubcategoria(c, f.subcategoria_id, f.subcategoria_nombre);
+    s.fichajes.push(f);
   });
 
   return torneos;
@@ -3217,39 +3241,57 @@ function renderFichajesPorTorneoClub(participaciones, fichajes) {
 
   cont.innerHTML = torneosOrdenados.map(([torneoKey, torneoEntry]) => {
     const torneoExpandido = torneosFichajesClubExpandidos.has(torneoKey);
-    const totalFichajesTorneo = Array.from(torneoEntry.categorias.values()).reduce((acc, c) => acc + c.fichajes.length, 0);
+    const totalFichajesTorneo = Array.from(torneoEntry.categorias.values())
+      .reduce((acc, c) => acc + Array.from(c.subcategorias.values()).reduce((acc2, s) => acc2 + s.fichajes.length, 0), 0);
     const categoriasOrdenadas = Array.from(torneoEntry.categorias.entries())
       .sort(([, a], [, b]) => (a.categoriaNombre || '').localeCompare(b.categoriaNombre || ''));
 
     const bloquesCategorias = !torneoExpandido ? '' : categoriasOrdenadas.map(([categoriaKeyPart, catEntry]) => {
       const categoriaKey = `${torneoKey}::${categoriaKeyPart}`;
       const categoriaExpandida = categoriasFichajesClubExpandidas.has(categoriaKey);
-      const fichajesCategoria = catEntry.fichajes.slice()
-        .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
-      const chipsSubcategorias = catEntry.subcategorias.size
-        ? `<span class="texto-ayuda"> — ${Array.from(catEntry.subcategorias).map(escapeHtml).join(', ')}</span>`
-        : '';
-      const filas = !categoriaExpandida ? '' : (fichajesCategoria.length
-        ? fichajesCategoria.map((f) => `
-            <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
-              ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
-              <span style="flex:1;">
-                ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
-                ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
-              </span>
-              <span class="texto-ayuda" style="min-width:90px;">DNI ${escapeHtml(f.jugador_dni || '-')}</span>
-              <span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span>
-              ${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : ''}
-            </div>
-          `).join('')
-        : '<p class="texto-ayuda" style="margin:4px 0 0;">Todavía no hay fichajes cargados en esta división.</p>');
+      const totalFichajesCategoria = Array.from(catEntry.subcategorias.values()).reduce((acc, s) => acc + s.fichajes.length, 0);
+      // Las subcategorías (años) ya vienen ordenadas por "orden" desde el
+      // backend (participaciones), así que no se reordenan acá — sólo se
+      // agrupan sin fichajes que no tengan categoría asignada quedan al final.
+      const subcategoriasEntries = Array.from(catEntry.subcategorias.entries());
+
+      const bloquesSubcategorias = !categoriaExpandida ? '' : subcategoriasEntries.map(([subKeyPart, subEntry]) => {
+        const subcategoriaKey = `${categoriaKey}::${subKeyPart}`;
+        const subcategoriaExpandida = subcategoriasFichajesClubExpandidas.has(subcategoriaKey);
+        const fichajesSubcategoria = subEntry.fichajes.slice()
+          .sort((a, b) => (a.jugador_apellido || '').localeCompare(b.jugador_apellido || ''));
+        const filas = !subcategoriaExpandida ? '' : (fichajesSubcategoria.length
+          ? fichajesSubcategoria.map((f) => `
+              <div class="fila-jugador-fichaje-club ${f.jugador_activo === false ? 'fila-jugador-retraido' : ''}" style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-200);">
+                ${fotoJugadorHtml(f.jugador_foto_url, 'foto-jugador-mini')}
+                <span style="flex:1;">
+                  ${escapeHtml(f.jugador_nombre)} ${escapeHtml(f.jugador_apellido)}
+                  ${f.jugador_activo === false ? '<span class="badge badge-inactivo">Retraído</span>' : ''}
+                </span>
+                <span class="texto-ayuda" style="min-width:90px;">DNI ${escapeHtml(f.jugador_dni || '-')}</span>
+                <span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span>
+                ${f.carnet_codigo_qr ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>` : ''}
+              </div>
+            `).join('')
+          : '<p class="texto-ayuda" style="margin:4px 0 0;">Todavía no hay fichajes cargados en esta categoría.</p>');
+        return `
+          <div class="bloque-subcategoria-fichajes-club" style="margin-left:16px;">
+            <h5 class="fila-grupo-club-clickable" style="margin-bottom:4px; cursor:pointer;" onclick="toggleSubcategoriaFichajesClub('${subcategoriaKey}')">
+              <span class="flecha-grupo-club">${subcategoriaExpandida ? '▾' : '▸'}</span>
+              ${escapeHtml(subEntry.subcategoriaNombre)} <span class="texto-ayuda">(${subEntry.fichajes.length} fichado(s))</span>
+            </h5>
+            ${filas}
+          </div>
+        `;
+      }).join('');
+
       return `
         <div class="bloque-categoria-fichajes-club">
           <h4 class="fila-grupo-club-clickable" style="margin-bottom:4px; cursor:pointer;" onclick="toggleCategoriaFichajesClub('${categoriaKey}')">
             <span class="flecha-grupo-club">${categoriaExpandida ? '▾' : '▸'}</span>
-            ${escapeHtml(catEntry.categoriaNombre)}${chipsSubcategorias} <span class="texto-ayuda">(${catEntry.fichajes.length} fichado(s))</span>
+            ${escapeHtml(catEntry.categoriaNombre)} <span class="texto-ayuda">(${totalFichajesCategoria} fichado(s))</span>
           </h4>
-          ${filas}
+          ${bloquesSubcategorias}
         </div>
       `;
     }).join('');
