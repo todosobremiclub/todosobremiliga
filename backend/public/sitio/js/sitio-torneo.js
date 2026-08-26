@@ -32,6 +32,10 @@ let categoriaSeleccionadaId = null;
 let subcategoriaSeleccionadaId = null;
 let mostrandoTablaGeneral = false;
 let hayTablaGeneral = false;
+// Pestaña "General" DENTRO de una división (suma sus categorías, ej. 2013 a
+// 2019, en una sola tabla + fixture consolidado) — distinta de la "Tabla
+// general" de todo el torneo (mostrandoTablaGeneral, arriba).
+let mostrandoGeneralCategoria = false;
 let tablaCache = [];
 // División/categoría pedidas por URL (ej. al volver desde la página de
 // un Equipo) — si vienen, se seleccionan en vez de la primera división por
@@ -225,12 +229,13 @@ function renderTabsSubcategorias() {
   }
   cont.classList.remove('oculto');
   cont.innerHTML = categoria.subcategorias.map((s) => `
-    <button class="tab-btn ${subcategoriaSeleccionadaId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoria('${s.id}')">${escapeHtml(s.nombre)}</button>
-  `).join('');
+    <button class="tab-btn ${!mostrandoGeneralCategoria && subcategoriaSeleccionadaId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoria('${s.id}')">${escapeHtml(s.nombre)}</button>
+  `).join('') + `<button class="tab-btn tab-btn-general ${mostrandoGeneralCategoria ? 'activo' : ''}" onclick="seleccionarGeneralCategoria()">General</button>`;
 }
 
 function seleccionarCategoria(categoriaId) {
   mostrandoTablaGeneral = false;
+  mostrandoGeneralCategoria = false;
   categoriaSeleccionadaId = categoriaId;
   subcategoriaSeleccionadaId = null;
   tablaCache = [];
@@ -246,6 +251,7 @@ function seleccionarCategoria(categoriaId) {
 }
 
 function seleccionarSubcategoria(subcategoriaId) {
+  mostrandoGeneralCategoria = false;
   subcategoriaSeleccionadaId = subcategoriaId;
   tablaCache = [];
   renderTabsSubcategorias();
@@ -254,17 +260,38 @@ function seleccionarSubcategoria(subcategoriaId) {
 
 function seleccionarTablaGeneral() {
   mostrandoTablaGeneral = true;
+  mostrandoGeneralCategoria = false;
   renderTabsCategorias();
   document.getElementById('tabsSubcategorias').classList.add('oculto');
   document.getElementById('mensajeSinSeleccion').classList.add('oculto');
   document.getElementById('bloqueContenidoCategoria').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoria').classList.add('oculto');
   document.getElementById('bloqueTablaGeneral').classList.remove('oculto');
   cargarTablaGeneral();
+}
+
+// "General" DENTRO de una división puntual: no confundir con
+// seleccionarTablaGeneral() (esa es la del torneo completo). Suma las
+// categorías (años) de la división actual y muestra el fixture consolidado
+// de todas ellas, agrupado por jornada.
+function seleccionarGeneralCategoria() {
+  mostrandoGeneralCategoria = true;
+  subcategoriaSeleccionadaId = null;
+  renderTabsSubcategorias();
+  document.getElementById('mensajeSinSeleccion').classList.add('oculto');
+  document.getElementById('bloqueContenidoCategoria').classList.add('oculto');
+  document.getElementById('bloqueTablaGeneral').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoria').classList.remove('oculto');
+  const categoria = categoriasCache.find((c) => c.id === categoriaSeleccionadaId);
+  document.getElementById('tituloGeneralCategoria').textContent = categoria ? categoria.nombre : 'General';
+  cargarTablaGeneralCategoria();
+  cargarFixtureGeneralCategoria();
 }
 
 function mostrarMensajeSinSeleccion(texto) {
   document.getElementById('bloqueContenidoCategoria').classList.add('oculto');
   document.getElementById('bloqueTablaGeneral').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoria').classList.add('oculto');
   const mensaje = document.getElementById('mensajeSinSeleccion');
   mensaje.textContent = texto;
   mensaje.classList.remove('oculto');
@@ -273,6 +300,7 @@ function mostrarMensajeSinSeleccion(texto) {
 function mostrarBloqueContenidoCategoria() {
   document.getElementById('mensajeSinSeleccion').classList.add('oculto');
   document.getElementById('bloqueTablaGeneral').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoria').classList.add('oculto');
   document.getElementById('bloqueContenidoCategoria').classList.remove('oculto');
   const tabsValidas = ['tabla', 'fixture', 'goleadores', 'tarjetas'];
   const tabInicial = tabsValidas.includes(tabInicialDesdeUrl) ? tabInicialDesdeUrl : 'tabla';
@@ -644,6 +672,89 @@ async function cargarTablaGeneral() {
     `).join('');
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Tabla general de la pestaña "General" DENTRO de una división: suma las
+// categorías (años) de esa división nada más, no todo el torneo.
+async function cargarTablaGeneralCategoria() {
+  const tbody = document.getElementById('tablaGeneralCategoria');
+  tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/tabla-general`);
+    const data = await res.json();
+    if (!data.ok || !data.tabla.length) {
+      tbody.innerHTML = '<tr><td colspan="9">Todavía no hay datos para la tabla general.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.tabla.map((f) => `
+      <tr>
+        <td>${escudoClub(f.club_logo_url, f.club_color_primario)}${escapeHtml(f.club_nombre)}</td>
+        <td>${f.partidos_jugados}</td>
+        <td>${f.ganados}</td>
+        <td>${f.empatados}</td>
+        <td>${f.perdidos}</td>
+        <td>${f.a_favor}</td>
+        <td>${f.en_contra}</td>
+        <td>${f.diferencia}</td>
+        <td><strong>${f.puntos}</strong></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Fixture consolidado de la pestaña "General": todos los partidos de la
+// división (de sus 7 categorías/años juntas), agrupados por jornada.
+async function cargarFixtureGeneralCategoria() {
+  const cont = document.getElementById('fixtureGeneralCategoria');
+  cont.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/fixture-general`);
+    const data = await res.json();
+    if (!data.ok || !data.partidos.length) {
+      cont.innerHTML = '<p class="sitio-vacio">Todavía no hay partidos programados.</p>';
+      return;
+    }
+    const descripciones = {};
+    (data.jornadas || []).forEach((j) => { descripciones[j.jornada] = j.descripcion; });
+
+    const jornadas = {};
+    data.partidos.forEach((p) => {
+      const key = p.jornada != null ? String(p.jornada) : 'sin-jornada';
+      if (!jornadas[key]) jornadas[key] = [];
+      jornadas[key].push(p);
+    });
+    const claves = Object.keys(jornadas).sort((a, b) => {
+      if (a === 'sin-jornada') return 1;
+      if (b === 'sin-jornada') return -1;
+      return Number(a) - Number(b);
+    });
+
+    cont.innerHTML = claves.map((key) => {
+      const titulo = key === 'sin-jornada' ? 'Sin fecha asignada' : (descripciones[key] || formatearIndicadorDia(jornadas[key][0].fecha) || `Fecha ${key}`);
+      const filas = jornadas[key].map((p) => {
+        const resultado = (p.resultado_local != null && p.resultado_visitante != null)
+          ? `<strong>${p.resultado_local} - ${p.resultado_visitante}</strong>`
+          : (p.hora ? String(p.hora).slice(0, 5) : 'A definir');
+        return `
+          <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-300, #333);">
+            <span style="min-width:60px; font-size:12px; color:var(--gris-600, #999);">${escapeHtml(p.subcategoria_nombre || '')}</span>
+            <span style="flex:1;">${escudoClub(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)} vs ${escapeHtml(p.club_visitante_nombre)}${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}</span>
+            <span style="white-space:nowrap;">${resultado}</span>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div style="margin-bottom:16px;">
+          <h4 style="margin:0 0 6px 0;">${escapeHtml(titulo)}</h4>
+          ${filas}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    cont.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
   }
 }
 

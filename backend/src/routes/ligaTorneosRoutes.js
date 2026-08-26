@@ -299,6 +299,53 @@ router.get('/:torneoId/tabla-general', async (req, res) => {
   }
 });
 
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/tabla-general — la
+// pestaña "General" DENTRO de una división puntual: suma en una sola tabla
+// por club los puntos de TODAS las categorías de esa división (ej: 2013 a
+// 2019) marcadas con "suma_tabla_general", sin mezclarse con las demás
+// divisiones del mismo torneo.
+router.get('/:torneoId/categorias/:categoriaId/tabla-general', async (req, res) => {
+  try {
+    const categoria = await buscarCategoriaDeMiLiga(req.params.categoriaId, req.params.torneoId, req.ligaId);
+    if (!categoria) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const { rows } = await query(
+      `WITH unidades AS (
+         SELECT c.id AS categoria_id, cs.id AS subcategoria_id
+         FROM categorias c
+         LEFT JOIN categoria_subcategorias cs ON cs.categoria_id = c.id
+         WHERE c.id = $2 AND c.torneo_id = $1
+           AND (
+             (cs.id IS NOT NULL AND cs.suma_tabla_general = TRUE)
+             OR (cs.id IS NULL AND c.suma_tabla_general = TRUE)
+           )
+       )
+       SELECT et.club_id, cl.nombre AS club_nombre, cl.logo_url AS club_logo_url, cl.color_primario AS club_color_primario,
+              SUM(tp.partidos_jugados)::int AS partidos_jugados,
+              SUM(tp.ganados)::int AS ganados,
+              SUM(tp.empatados)::int AS empatados,
+              SUM(tp.perdidos)::int AS perdidos,
+              SUM(tp.a_favor)::int AS a_favor,
+              SUM(tp.en_contra)::int AS en_contra,
+              SUM(tp.diferencia)::int AS diferencia,
+              SUM(tp.puntos)::int AS puntos,
+              COUNT(*)::int AS categorias_sumadas
+       FROM tabla_posiciones tp
+       JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
+       JOIN clubes cl ON cl.id = et.club_id
+       JOIN unidades u ON u.categoria_id = tp.categoria_id AND u.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = 'general'
+       GROUP BY et.club_id, cl.nombre, cl.logo_url, cl.color_primario
+       ORDER BY puntos DESC, diferencia DESC, club_nombre ASC`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    res.json({ ok: true, tabla: rows });
+  } catch (err) {
+    console.error('Error en GET tabla-general por categoria:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/torneos/:torneoId/categorias — alta de una división
 router.post('/:torneoId/categorias', async (req, res) => {
   const { nombre, genero, edad_minima, edad_maxima, orden, precio_inscripcion, suma_tabla_general, foto_url } = req.body;

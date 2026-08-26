@@ -860,6 +860,23 @@
           </table>
         </div>
 
+        <!-- "General" DENTRO de una división: suma puntos de todas sus
+             categorías (ej: 2013 a 2019) en una sola tabla, y debajo el
+             fixture consolidado agrupado por jornada con las 7 categorías
+             juntas. -->
+        <div id="bloqueGeneralCategoriaLiga" class="oculto">
+          <div class="panel-header">
+            <h3 id="tituloGeneralCategoria" style="margin:0;">División</h3>
+          </div>
+          <p class="texto-ayuda">Suma los puntos de todas las categorías de esta división marcadas con el tilde "Suma a la tabla general".</p>
+          <table>
+            <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+            <tbody id="tablaGeneralCategoria"><tr><td colspan="9">Cargando...</td></tr></tbody>
+          </table>
+          <h4 style="margin-top:20px;">Fixture y resultados consolidados</h4>
+          <div id="fixtureGeneralCategoria"><p class="texto-ayuda">Cargando...</p></div>
+        </div>
+
         <!-- Detalle de la división/categoría elegida: equipos / fixture / tabla -->
         <div id="bloqueDetalleCategoriaLiga" class="oculto">
           <div class="panel-header">

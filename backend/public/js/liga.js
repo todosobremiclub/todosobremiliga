@@ -54,6 +54,10 @@ let subcategoriaActualNombre = '';
 // divisiones arriba como botones — ver verCategorias más abajo).
 let mostrandoTablaGeneralLiga = false;
 let hayTablaGeneralLiga = false;
+// Pestaña "General" DENTRO de una división (suma sus categorías, ej. 2013 a
+// 2019, en una sola tabla + fixture consolidado) — distinta de la "Tabla
+// general" de todo el torneo (mostrandoTablaGeneralLiga, arriba).
+let mostrandoGeneralCategoriaLiga = false;
 let rondaTablaActual = 'general';
 let tiposCanchaCache = [];
 let prediosLigaCache = [];
@@ -3537,6 +3541,7 @@ function verCategorias(torneoId, nombreTorneo) {
   subcategoriaActualId = null;
   subcategoriaActualNombre = '';
   mostrandoTablaGeneralLiga = false;
+  mostrandoGeneralCategoriaLiga = false;
   const torneo = torneosCache.find((t) => t.id === torneoId);
   document.getElementById('checkTorneoHistorico').checked = !!(torneo && torneo.estado === 'historico');
   cargarCategorias(torneoId);
@@ -3589,6 +3594,7 @@ async function cargarCategorias(torneoId) {
       document.getElementById('tabsSubcategoriasLiga').classList.add('oculto');
       document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
       document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+      document.getElementById('bloqueGeneralCategoriaLiga').classList.add('oculto');
       document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
       return;
     }
@@ -3598,6 +3604,15 @@ async function cargarCategorias(torneoId) {
       return;
     }
     const categoriaAConservar = categoriasCache.find((c) => c.id === categoriaActualId);
+    if (categoriaAConservar && mostrandoGeneralCategoriaLiga) {
+      // Se estaba viendo "General" de esta división: se mantiene esa
+      // vista tras el refresco en vez de volver a la primera categoría.
+      categoriaActualId = categoriaAConservar.id;
+      categoriaActualNombre = categoriaAConservar.nombre;
+      renderTabsCategoriasLiga();
+      seleccionarGeneralCategoriaLiga();
+      return;
+    }
     seleccionarCategoriaLiga(categoriaAConservar ? categoriaAConservar.id : categoriasCache[0].id, subcategoriaActualId);
   } catch (err) {
     cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
@@ -3630,12 +3645,15 @@ function renderTabsSubcategoriasLiga() {
   const subcategorias = subcategoriasDeCategoriaActual();
   const gruposSubcategorias = subcategorias.map((s) => `
     <span class="tab-btn-categoria-grupo">
-      <button class="tab-btn ${subcategoriaActualId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoriaLiga('${s.id}')">${escapeHtml(s.nombre)}</button>
+      <button class="tab-btn ${!mostrandoGeneralCategoriaLiga && subcategoriaActualId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoriaLiga('${s.id}')">${escapeHtml(s.nombre)}</button>
       <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="event.stopPropagation(); editarSubcategoria('${s.id}')">${ICONO_LAPIZ}</button>
       <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">${ICONO_BASURA}</button>
     </span>
   `).join('');
-  cont.innerHTML = gruposSubcategorias + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Categoría</button>`;
+  const botonGeneral = subcategorias.length
+    ? `<span class="tab-btn-categoria-grupo"><button class="tab-btn tab-btn-general ${mostrandoGeneralCategoriaLiga ? 'activo' : ''}" onclick="seleccionarGeneralCategoriaLiga()">General</button></span>`
+    : '';
+  cont.innerHTML = gruposSubcategorias + botonGeneral + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Categoría</button>`;
 }
 
 function editarCategoria(categoriaId) {
@@ -3826,6 +3844,7 @@ async function eliminarSubcategoria(subcategoriaId, nombre) {
 
 function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
   mostrandoTablaGeneralLiga = false;
+  mostrandoGeneralCategoriaLiga = false;
   categoriaActualId = categoriaId;
   const categoria = categoriasCache.find((c) => c.id === categoriaId);
   categoriaActualNombre = categoria ? categoria.nombre : '';
@@ -3848,6 +3867,7 @@ function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
 }
 
 function seleccionarSubcategoriaLiga(subcategoriaId) {
+  mostrandoGeneralCategoriaLiga = false;
   const sub = subcategoriasDeCategoriaActual().find((s) => s.id === subcategoriaId);
   subcategoriaActualId = subcategoriaId;
   subcategoriaActualNombre = sub ? sub.nombre : '';
@@ -3858,19 +3878,40 @@ function seleccionarSubcategoriaLiga(subcategoriaId) {
 
 function seleccionarTablaGeneralLiga() {
   mostrandoTablaGeneralLiga = true;
+  mostrandoGeneralCategoriaLiga = false;
   document.getElementById('formCategoria').classList.add('oculto');
   document.getElementById('formSubcategoria').classList.add('oculto');
   renderTabsCategoriasLiga();
   document.getElementById('tabsSubcategoriasLiga').classList.add('oculto');
   document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
   document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoriaLiga').classList.add('oculto');
   document.getElementById('bloqueTablaGeneralLiga').classList.remove('oculto');
   cargarTablaGeneral(torneoActualId);
+}
+
+// "General" DENTRO de una división puntual: no confundir con
+// seleccionarTablaGeneralLiga() (esa es la del torneo completo). Suma las
+// categorías (años) de la división actual y además muestra el fixture
+// consolidado de todas ellas, agrupado por jornada.
+function seleccionarGeneralCategoriaLiga() {
+  mostrandoGeneralCategoriaLiga = true;
+  subcategoriaActualId = null;
+  subcategoriaActualNombre = '';
+  document.getElementById('formSubcategoria').classList.add('oculto');
+  renderTabsSubcategoriasLiga();
+  document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
+  document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoriaLiga').classList.remove('oculto');
+  document.getElementById('tituloGeneralCategoria').textContent = categoriaActualNombre;
+  cargarTablaGeneralCategoria();
+  cargarFixtureGeneralCategoria();
 }
 
 function mostrarMensajeSinSeleccionLiga(texto) {
   document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
   document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoriaLiga').classList.add('oculto');
   const mensaje = document.getElementById('mensajeSinSeleccionLiga');
   mensaje.textContent = texto;
   mensaje.classList.toggle('oculto', !texto);
@@ -3879,6 +3920,7 @@ function mostrarMensajeSinSeleccionLiga(texto) {
 function mostrarBloqueDetalleCategoriaLiga() {
   document.getElementById('mensajeSinSeleccionLiga').classList.add('oculto');
   document.getElementById('bloqueTablaGeneralLiga').classList.add('oculto');
+  document.getElementById('bloqueGeneralCategoriaLiga').classList.add('oculto');
   document.getElementById('bloqueDetalleCategoriaLiga').classList.remove('oculto');
   document.getElementById('tituloDetalleCategoria').textContent = subcategoriaActualNombre
     ? `${categoriaActualNombre} — ${subcategoriaActualNombre}`
@@ -3980,6 +4022,88 @@ async function cargarTablaGeneral(torneoId) {
   }
 }
 
+// Tabla general de la pestaña "General" DENTRO de una división: suma las
+// categorías (años) de esa división nada más, no todo el torneo.
+async function cargarTablaGeneralCategoria() {
+  const tbody = document.getElementById('tablaGeneralCategoria');
+  tbody.innerHTML = '<tr><td colspan="9">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/tabla-general`);
+    const filas = data.tabla || [];
+    if (!filas.length) {
+      tbody.innerHTML = '<tr><td colspan="9">Todavía no hay datos para la tabla general.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filas.map((f) => `
+      <tr>
+        <td>${escudoOSwatch(f.club_logo_url, f.club_color_primario)}${escapeHtml(f.club_nombre)}</td>
+        <td>${f.partidos_jugados}</td>
+        <td>${f.ganados}</td>
+        <td>${f.empatados}</td>
+        <td>${f.perdidos}</td>
+        <td>${f.a_favor}</td>
+        <td>${f.en_contra}</td>
+        <td>${f.diferencia}</td>
+        <td><strong>${f.puntos}</strong></td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Fixture consolidado de la pestaña "General": todos los partidos de la
+// división (de sus 7 categorías/años juntas), agrupados por jornada.
+async function cargarFixtureGeneralCategoria() {
+  const cont = document.getElementById('fixtureGeneralCategoria');
+  cont.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos-general`);
+    const partidos = data.partidos || [];
+    if (!partidos.length) {
+      cont.innerHTML = '<p class="texto-ayuda">Todavía no hay partidos generados.</p>';
+      return;
+    }
+    const descripciones = {};
+    (data.jornadas || []).forEach((j) => { descripciones[j.jornada] = j.descripcion; });
+
+    const jornadas = {};
+    partidos.forEach((p) => {
+      const key = p.jornada != null ? String(p.jornada) : 'sin-jornada';
+      if (!jornadas[key]) jornadas[key] = [];
+      jornadas[key].push(p);
+    });
+    const claves = Object.keys(jornadas).sort((a, b) => {
+      if (a === 'sin-jornada') return 1;
+      if (b === 'sin-jornada') return -1;
+      return Number(a) - Number(b);
+    });
+
+    cont.innerHTML = claves.map((key) => {
+      const titulo = key === 'sin-jornada' ? 'Sin fecha asignada' : (descripciones[key] || `Fecha ${key}`);
+      const filas = jornadas[key].map((p) => {
+        const resultado = (p.resultado_local != null && p.resultado_visitante != null)
+          ? `<strong>${p.resultado_local} - ${p.resultado_visitante}</strong>`
+          : (p.fecha ? formatearFecha(p.fecha) : 'A definir');
+        return `
+          <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--borde, #333);">
+            <span style="min-width:70px; font-size:12px; color:var(--gris-600, #999);">${escapeHtml(p.subcategoria_nombre || '')}</span>
+            <span style="flex:1;">${escudoOSwatch(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)} vs ${escapeHtml(p.club_visitante_nombre)}${escudoOSwatch(p.club_visitante_logo_url, p.club_visitante_color)}</span>
+            <span style="white-space:nowrap;">${resultado}</span>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div style="margin-bottom:16px;">
+          <h4 style="margin:0 0 6px 0;">${escapeHtml(titulo)}</h4>
+          ${filas}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    cont.innerHTML = `<p class="mensaje-error">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
 
 function cambiarRondaTabla(ronda) {
   rondaTablaActual = ronda;

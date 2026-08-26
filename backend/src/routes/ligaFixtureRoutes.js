@@ -252,6 +252,80 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
   }
 });
 
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/partidos-general —
+// fixture consolidado de la pestaña "General": TODOS los partidos de la
+// división, de TODAS sus subcategorías juntas (sin filtrar por una sola),
+// con el nombre de la subcategoría de cada partido para poder agruparlos
+// visualmente por jornada.
+router.get('/:torneoId/categorias/:categoriaId/partidos-general', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const { rows } = await query(
+      `SELECT p.*, cl.id AS club_local_id, cv.id AS club_visitante_id,
+              cl.nombre AS club_local_nombre, cv.nombre AS club_visitante_nombre,
+              cl.color_primario AS club_local_color, cv.color_primario AS club_visitante_color,
+              cl.logo_url AS club_local_logo_url, cv.logo_url AS club_visitante_logo_url,
+              COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
+              COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
+              COALESCE(ccSel.tamanio, ccl.tamanio) AS club_local_cancha_tamanio,
+              COALESCE(ccSel.piso, ccl.piso) AS club_local_cancha_piso,
+              COALESCE(tcSel.nombre, tcl.nombre) AS club_local_cancha_tipo_nombre,
+              COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
+              pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
+              cp.nombre AS cancha_predio_nombre,
+              cp.tipo_techo AS cancha_predio_techo, cp.tamanio AS cancha_predio_tamanio,
+              tcp.nombre AS cancha_predio_tipo_nombre,
+              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       LEFT JOIN categoria_subcategorias cs ON cs.id = el.subcategoria_id
+       LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
+       LEFT JOIN tipos_cancha tcl ON tcl.id = ccl.tipo_cancha_id
+       LEFT JOIN clubes_canchas ccSel ON ccSel.id = p.cancha_club_id
+       LEFT JOIN tipos_cancha tcSel ON tcSel.id = ccSel.tipo_cancha_id
+       LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
+       LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
+       LEFT JOIN tipos_cancha tcp ON tcp.id = cp.tipo_cancha_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2
+       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST, cs.orden ASC NULLS LAST, p.hora ASC NULLS LAST`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+
+    const arbitrosResult = rows.length
+      ? await query(
+          `SELECT pa.partido_id, a.id, a.nombre, a.apellido, a.tipo
+           FROM partido_arbitros pa
+           JOIN arbitros_liga a ON a.id = pa.arbitro_id
+           WHERE pa.partido_id = ANY($1::uuid[])
+           ORDER BY a.apellido ASC, a.nombre ASC`,
+          [rows.map((p) => p.id)]
+        )
+      : { rows: [] };
+    const partidos = rows.map((p) => ({
+      ...p,
+      arbitros: arbitrosResult.rows.filter((a) => a.partido_id === p.id).map((a) => ({ id: a.id, nombre: a.nombre, apellido: a.apellido, tipo: a.tipo }))
+    }));
+
+    const jornadasResult = await query(
+      `SELECT jornada, MAX(descripcion) AS descripcion
+       FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2
+       GROUP BY jornada`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+
+    res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, jornadas: jornadasResult.rows });
+  } catch (err) {
+    console.error('Error en GET partidos-general:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // PUT /liga/torneos/:torneoId/categorias/:categoriaId/jornadas/:jornada —
 // guarda (o borra, si viene vacía) la descripción de una fecha del fixture
 // (ej: "Sábado 8 de Agosto" o "Semana del 1 al 8").

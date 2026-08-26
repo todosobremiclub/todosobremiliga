@@ -362,6 +362,67 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
   }
 });
 
+// GET /web/torneos/:torneoId/categorias/:categoriaId/fixture-general —
+// fixture consolidado de la pestaña "General" pública: TODOS los partidos
+// de la división, de TODAS sus subcategorías juntas (sin filtrar por una
+// sola), con el nombre de la subcategoría de cada partido para agruparlos
+// visualmente por jornada.
+router.get('/torneos/:torneoId/categorias/:categoriaId/fixture-general', async (req, res) => {
+  try {
+    const torneoResult = await query(
+      `SELECT t.cancha_juego FROM torneos t
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
+      [req.params.torneoId]
+    );
+    if (!torneoResult.rows[0]) return res.status(404).json({ ok: false, error: 'Torneo no encontrado' });
+
+    const { rows } = await query(
+      `SELECT p.id, p.fecha, p.hora, p.sede, p.jornada, p.estado,
+              p.resultado_local, p.resultado_visitante, p.detalle_resultado,
+              p.no_presento_local, p.no_presento_visitante,
+              el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
+              cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
+              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color,
+              COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
+              COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
+              COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
+              pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
+              pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
+              cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo,
+              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN categoria_subcategorias cs ON cs.id = el.subcategoria_id
+       LEFT JOIN clubes_canchas ccl ON ccl.club_id = cl.id AND ccl.es_principal = TRUE
+       LEFT JOIN clubes_canchas ccSel ON ccSel.id = p.cancha_club_id
+       LEFT JOIN canchas_predio cp ON cp.id = p.cancha_predio_id
+       LEFT JOIN predios_liga pr ON pr.id = cp.predio_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2
+         AND l.activo = TRUE AND l.tipo = 'productiva'
+       ORDER BY p.jornada ASC NULLS LAST, p.fecha ASC NULLS LAST, cs.orden ASC NULLS LAST, p.hora ASC NULLS LAST`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+
+    const jornadasResult = await query(
+      `SELECT jornada, MAX(descripcion) AS descripcion
+       FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2
+       GROUP BY jornada`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+
+    res.json({ ok: true, partidos: rows, cancha_juego: torneoResult.rows[0].cancha_juego, jornadas: jornadasResult.rows });
+  } catch (err) {
+    console.error('Error en GET fixture-general publico:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId —
 // detalle público de UN partido puntual (para el popup del fixture): datos
 // grandes del partido + goleadores/tarjetas de ESE partido si se cargaron.
