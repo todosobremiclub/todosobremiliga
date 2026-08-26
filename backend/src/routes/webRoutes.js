@@ -656,56 +656,118 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
     );
     if (!clubResult.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en esta Liga' });
 
+    // Una división (categoría/Zona) con categorías (subcategorías, ej. años)
+    // adentro se muestra como UNA sola tarjeta con la TABLA GENERAL de esa
+    // Zona (sumando todas sus categorías marcadas "suma a tabla general"),
+    // no una tarjeta por cada año — mismo criterio que ya usa la pestaña
+    // "General" de la página del Torneo. Una división SIN categorías
+    // (formato simple, sin años adentro) sigue mostrando su propia tabla,
+    // como antes.
     const { rows: participaciones } = await query(
-      `WITH participaciones AS (
+      `WITH mis_equipos AS (
          SELECT et.id AS equipo_torneo_id, et.torneo_id, et.categoria_id, et.subcategoria_id
          FROM equipos_torneo et
          JOIN torneos t ON t.id = et.torneo_id
          JOIN ligas l ON l.id = t.liga_id
          WHERE et.club_id = $1 AND l.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'
        ),
-       ranking AS (
+
+       -- ----- Divisiones SIN categorías (subcategoria_id NULL): una tarjeta
+       -- por división, igual que antes. -----
+       ranking_simple AS (
          SELECT et.id AS equipo_torneo_id,
                 RANK() OVER (
-                  PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id
+                  PARTITION BY et.torneo_id, et.categoria_id
                   ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC
                 ) AS puesto,
-                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id) AS total_equipos,
+                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id) AS total_equipos,
                 COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
                 COALESCE(tp.ganados, 0) AS ganados, COALESCE(tp.empatados, 0) AS empatados,
                 COALESCE(tp.perdidos, 0) AS perdidos, COALESCE(tp.diferencia, 0) AS diferencia
          FROM equipos_torneo et
-         JOIN participaciones p2
-           ON p2.torneo_id = et.torneo_id AND p2.categoria_id = et.categoria_id
-           AND p2.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+         JOIN mis_equipos me
+           ON me.torneo_id = et.torneo_id AND me.categoria_id = et.categoria_id AND me.subcategoria_id IS NULL
          LEFT JOIN tabla_posiciones tp
            ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = 'general'
+         WHERE et.subcategoria_id IS NULL
+       ),
+       filas_simples AS (
+         SELECT me.equipo_torneo_id, me.torneo_id, me.categoria_id, NULL::uuid AS subcategoria_id, NULL::text AS subcategoria_nombre,
+                r.puesto, r.total_equipos, r.puntos, r.partidos_jugados, r.ganados, r.empatados, r.perdidos, r.diferencia,
+                ARRAY[me.equipo_torneo_id] AS equipo_ids_proximo
+         FROM mis_equipos me
+         JOIN ranking_simple r ON r.equipo_torneo_id = me.equipo_torneo_id
+         WHERE me.subcategoria_id IS NULL
+       ),
+
+       -- ----- Divisiones CON categorías: una tarjeta por Zona con la TABLA
+       -- GENERAL (suma de sus categorías marcadas "suma a tabla general").
+       -- Se calcula para TODOS los clubes de esa Zona (no sólo el mío) para
+       -- poder rankear mi puesto entre todos. -----
+       mis_zonas_generales AS (
+         SELECT DISTINCT torneo_id, categoria_id FROM mis_equipos WHERE subcategoria_id IS NOT NULL
+       ),
+       stats_generales AS (
+         SELECT z.torneo_id, z.categoria_id, et.club_id,
+                SUM(tp.partidos_jugados)::int AS partidos_jugados,
+                SUM(tp.ganados)::int AS ganados,
+                SUM(tp.empatados)::int AS empatados,
+                SUM(tp.perdidos)::int AS perdidos,
+                SUM(tp.a_favor)::int AS a_favor,
+                SUM(tp.en_contra)::int AS en_contra,
+                SUM(tp.diferencia)::int AS diferencia,
+                SUM(tp.puntos)::int AS puntos,
+                array_agg(et.id) AS equipo_ids
+         FROM mis_zonas_generales z
+         JOIN equipos_torneo et ON et.torneo_id = z.torneo_id AND et.categoria_id = z.categoria_id
+         JOIN categoria_subcategorias cs ON cs.id = et.subcategoria_id AND cs.suma_tabla_general = TRUE
+         JOIN tabla_posiciones tp
+           ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = 'general'
+         GROUP BY z.torneo_id, z.categoria_id, et.club_id
+       ),
+       ranking_general AS (
+         SELECT *,
+                RANK() OVER (PARTITION BY torneo_id, categoria_id ORDER BY puntos DESC, diferencia DESC, a_favor DESC) AS puesto,
+                COUNT(*) OVER (PARTITION BY torneo_id, categoria_id) AS total_equipos
+         FROM stats_generales
+       ),
+       filas_generales AS (
+         SELECT NULL::uuid AS equipo_torneo_id, g.torneo_id, g.categoria_id, NULL::uuid AS subcategoria_id, 'General'::text AS subcategoria_nombre,
+                g.puesto, g.total_equipos, g.puntos, g.partidos_jugados, g.ganados, g.empatados, g.perdidos, g.diferencia,
+                g.equipo_ids AS equipo_ids_proximo
+         FROM ranking_general g
+         WHERE g.club_id = $1
+       ),
+
+       filas AS (
+         SELECT * FROM filas_simples
+         UNION ALL
+         SELECT * FROM filas_generales
        )
-       SELECT p.equipo_torneo_id, p.torneo_id, t.nombre AS torneo_nombre, t.logo_url AS torneo_logo_url, t.estado AS torneo_estado,
-              p.categoria_id, c.nombre AS categoria_nombre, p.subcategoria_id, cs.nombre AS subcategoria_nombre,
-              r.puesto, r.total_equipos, r.puntos, r.partidos_jugados, r.ganados, r.empatados, r.perdidos, r.diferencia,
+
+       SELECT f.equipo_torneo_id, f.torneo_id, t.nombre AS torneo_nombre, t.logo_url AS torneo_logo_url, t.estado AS torneo_estado,
+              f.categoria_id, c.nombre AS categoria_nombre, f.subcategoria_id, f.subcategoria_nombre,
+              f.puesto, f.total_equipos, f.puntos, f.partidos_jugados, f.ganados, f.empatados, f.perdidos, f.diferencia,
               prox.fecha AS proximo_fecha, prox.hora AS proximo_hora, prox.rival_nombre, prox.rival_logo_url, prox.lv AS proximo_lv
-       FROM participaciones p
-       JOIN torneos t ON t.id = p.torneo_id
-       JOIN categorias c ON c.id = p.categoria_id
-       LEFT JOIN categoria_subcategorias cs ON cs.id = p.subcategoria_id
-       JOIN ranking r ON r.equipo_torneo_id = p.equipo_torneo_id
+       FROM filas f
+       JOIN torneos t ON t.id = f.torneo_id
+       JOIN categorias c ON c.id = f.categoria_id
        LEFT JOIN LATERAL (
          SELECT pa.fecha, pa.hora,
-                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN 'V' ELSE 'L' END AS lv,
-                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN cv.nombre ELSE cl.nombre END AS rival_nombre,
-                CASE WHEN pa.equipo_local_id = p.equipo_torneo_id THEN cv.logo_url ELSE cl.logo_url END AS rival_logo_url
+                CASE WHEN pa.equipo_local_id = ANY(f.equipo_ids_proximo) THEN 'V' ELSE 'L' END AS lv,
+                CASE WHEN pa.equipo_local_id = ANY(f.equipo_ids_proximo) THEN cv.nombre ELSE cl.nombre END AS rival_nombre,
+                CASE WHEN pa.equipo_local_id = ANY(f.equipo_ids_proximo) THEN cv.logo_url ELSE cl.logo_url END AS rival_logo_url
          FROM partidos pa
          JOIN equipos_torneo el ON el.id = pa.equipo_local_id
          JOIN equipos_torneo ev ON ev.id = pa.equipo_visitante_id
          JOIN clubes cl ON cl.id = el.club_id
          JOIN clubes cv ON cv.id = ev.club_id
-         WHERE (pa.equipo_local_id = p.equipo_torneo_id OR pa.equipo_visitante_id = p.equipo_torneo_id)
+         WHERE (pa.equipo_local_id = ANY(f.equipo_ids_proximo) OR pa.equipo_visitante_id = ANY(f.equipo_ids_proximo))
            AND (pa.resultado_local IS NULL OR pa.resultado_visitante IS NULL)
          ORDER BY pa.fecha ASC NULLS LAST, pa.jornada ASC NULLS LAST
          LIMIT 1
        ) prox ON true
-       ORDER BY t.nombre ASC, c.nombre ASC, cs.nombre ASC`,
+       ORDER BY t.nombre ASC, c.nombre ASC, f.subcategoria_nombre ASC NULLS FIRST`,
       [req.params.clubId, req.params.slug]
     );
 
