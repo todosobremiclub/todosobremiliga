@@ -100,9 +100,7 @@ function conectarEventos() {
   });
   document.getElementById('btnMostrarFichajeMasivo').addEventListener('click', abrirFichajeMasivo);
 
-  document.getElementById('btnCerrarSolicitarFichaje').addEventListener('click', () => {
-    document.getElementById('panelSolicitarFichaje').classList.add('oculto');
-  });
+  document.getElementById('btnCerrarSolicitarFichaje').addEventListener('click', cerrarSolicitarFichaje);
   document.getElementById('fichajeLiga').addEventListener('change', onCambioLigaFichaje);
   document.getElementById('fichajeTorneo').addEventListener('change', onCambioTorneoFichaje);
   document.getElementById('fichajeCategoria').addEventListener('change', onCambioCategoriaFichaje);
@@ -844,9 +842,15 @@ function abrirFichajeMasivo() {
   abrirPopupFichaje(`Fichaje masivo para ${ids.length} jugador(es): ${nombres.join(', ')}`, ids);
 }
 
+function cerrarSolicitarFichaje() {
+  document.getElementById('panelSolicitarFichaje').classList.add('oculto');
+  document.getElementById('fondoModalSolicitarFichaje').classList.add('oculto');
+}
+
 async function abrirPopupFichaje(titulo, jugadorIds) {
   fichajeJugadorIdsActual = jugadorIds;
   document.getElementById('panelSolicitarFichaje').classList.remove('oculto');
+  document.getElementById('fondoModalSolicitarFichaje').classList.remove('oculto');
   document.getElementById('tituloSolicitarFichaje').textContent = titulo;
   document.getElementById('fichajeFormError').classList.add('oculto');
   document.getElementById('fichajeFormOk').classList.add('oculto');
