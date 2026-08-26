@@ -14,6 +14,8 @@ function fotoJugadorHtml(fotoUrl, clase) {
 let jugadoresCache = [];
 let ordenJugadoresCampo = 'nombre';
 let ordenJugadoresDireccion = 'asc';
+let paginaJugadoresActual = 1;
+const JUGADORES_POR_PAGINA = 20;
 let ligasClubCache = [];
 let fichajesCache = [];
 let jugadoresSeleccionados = new Set();
@@ -66,10 +68,29 @@ function conectarEventos() {
   document.getElementById('jugadorFotoArchivo').addEventListener('change', onElegirFotoJugador);
   document.getElementById('formJugador').addEventListener('submit', guardarJugador);
 
-  document.getElementById('buscadorJugadores').addEventListener('input', renderJugadores);
-  document.getElementById('filtroAnioNacimientoJugadores').addEventListener('change', renderJugadores);
-  document.getElementById('filtroActividadJugadores').addEventListener('change', renderJugadores);
-  document.getElementById('filtroCategoriaSocioJugadores').addEventListener('change', renderJugadores);
+  document.getElementById('buscadorJugadores').addEventListener('input', () => {
+    paginaJugadoresActual = 1;
+    renderJugadores();
+  });
+  document.getElementById('filtroAnioNacimientoJugadores').addEventListener('change', () => {
+    paginaJugadoresActual = 1;
+    renderJugadores();
+  });
+  document.getElementById('filtroActividadJugadores').addEventListener('change', () => {
+    paginaJugadoresActual = 1;
+    renderJugadores();
+  });
+  document.getElementById('filtroCategoriaSocioJugadores').addEventListener('change', () => {
+    paginaJugadoresActual = 1;
+    renderJugadores();
+  });
+  document.getElementById('btnJugadoresPaginaAnterior').addEventListener('click', () => {
+    if (paginaJugadoresActual > 1) { paginaJugadoresActual -= 1; renderJugadores(); }
+  });
+  document.getElementById('btnJugadoresPaginaSiguiente').addEventListener('click', () => {
+    paginaJugadoresActual += 1;
+    renderJugadores();
+  });
   document.getElementById('checkTodosJugadores').addEventListener('change', (e) => {
     const marcar = e.target.checked;
     document.querySelectorAll('.check-jugador').forEach((chk) => {
@@ -568,6 +589,7 @@ async function cargarJugadores() {
     const data = await apiFetch('/club/jugadores');
     jugadoresCache = data.jugadores;
     jugadoresSeleccionados.clear();
+    paginaJugadoresActual = 1;
     poblarFiltroAnioNacimiento();
     actualizarFlechasOrdenJugadores();
     renderJugadores();
@@ -670,15 +692,32 @@ function renderJugadores() {
 
   ordenarListaJugadores(lista);
 
+  const paginacionEl = document.getElementById('paginacionJugadores');
+
   if (!jugadoresCache.length) {
     tbody.innerHTML = '<tr><td colspan="9">Todavía no cargaste ningún jugador.</td></tr>';
+    paginacionEl.style.display = 'none';
     return;
   }
   if (!lista.length) {
     tbody.innerHTML = '<tr><td colspan="9">No se encontraron jugadores con ese filtro.</td></tr>';
+    paginacionEl.style.display = 'none';
     return;
   }
-  tbody.innerHTML = lista.map((j) => `
+
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / JUGADORES_POR_PAGINA));
+  if (paginaJugadoresActual > totalPaginas) paginaJugadoresActual = totalPaginas;
+  if (paginaJugadoresActual < 1) paginaJugadoresActual = 1;
+  const inicioPagina = (paginaJugadoresActual - 1) * JUGADORES_POR_PAGINA;
+  const listaPagina = lista.slice(inicioPagina, inicioPagina + JUGADORES_POR_PAGINA);
+
+  paginacionEl.style.display = 'flex';
+  document.getElementById('paginacionJugadoresInfo').textContent =
+    `Mostrando ${inicioPagina + 1}-${Math.min(inicioPagina + JUGADORES_POR_PAGINA, lista.length)} de ${lista.length} (página ${paginaJugadoresActual} de ${totalPaginas})`;
+  document.getElementById('btnJugadoresPaginaAnterior').disabled = paginaJugadoresActual <= 1;
+  document.getElementById('btnJugadoresPaginaSiguiente').disabled = paginaJugadoresActual >= totalPaginas;
+
+  tbody.innerHTML = listaPagina.map((j) => `
     <tr>
       <td><input type="checkbox" class="check-jugador" data-jugador-id="${j.id}" onchange="toggleSeleccionJugador('${j.id}', this.checked)" ${jugadoresSeleccionados.has(j.id) ? 'checked' : ''}></td>
       <td>${fotoJugadorHtml(j.foto_url, 'foto-jugador-mini')}</td>
