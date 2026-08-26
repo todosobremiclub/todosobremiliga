@@ -198,6 +198,54 @@ router.get('/torneos/:torneoId/tabla-general', async (req, res) => {
   }
 });
 
+// GET /web/torneos/:torneoId/categorias/:categoriaId/tabla-general — tabla
+// general pública de UNA categoría/División puntual (ej: "División A" de un
+// torneo "Super Liga" con Divisiones A-Z): suma en una sola tabla por club
+// los puntos de todas las subcategorías de esa categoría (ej: 2013 a 2019)
+// marcadas con "suma_tabla_general", sin mezclarse con las demás Divisiones
+// del mismo torneo. Si la categoría no tiene subcategorías cargadas, usa
+// directamente su propia tabla (sin sumar nada, ya que hay una sola unidad).
+router.get('/torneos/:torneoId/categorias/:categoriaId/tabla-general', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `WITH unidades AS (
+         SELECT c.id AS categoria_id, cs.id AS subcategoria_id
+         FROM categorias c
+         JOIN torneos t ON t.id = c.torneo_id
+         JOIN ligas l ON l.id = t.liga_id
+         LEFT JOIN categoria_subcategorias cs ON cs.categoria_id = c.id
+         WHERE c.id = $2 AND c.torneo_id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'
+           AND (
+             (cs.id IS NOT NULL AND cs.suma_tabla_general = TRUE)
+             OR (cs.id IS NULL AND c.suma_tabla_general = TRUE)
+           )
+       )
+       SELECT et.club_id, cl.nombre AS club_nombre, cl.logo_url AS club_logo_url, cl.color_primario AS club_color_primario,
+              SUM(tp.partidos_jugados)::int AS partidos_jugados,
+              SUM(tp.ganados)::int AS ganados,
+              SUM(tp.empatados)::int AS empatados,
+              SUM(tp.perdidos)::int AS perdidos,
+              SUM(tp.a_favor)::int AS a_favor,
+              SUM(tp.en_contra)::int AS en_contra,
+              SUM(tp.diferencia)::int AS diferencia,
+              SUM(tp.puntos)::int AS puntos,
+              COUNT(*)::int AS subcategorias_sumadas
+       FROM tabla_posiciones tp
+       JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
+       JOIN clubes cl ON cl.id = et.club_id
+       JOIN unidades u ON u.categoria_id = tp.categoria_id AND u.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+       WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = 'general'
+       GROUP BY et.club_id, cl.nombre, cl.logo_url, cl.color_primario
+       ORDER BY puntos DESC, diferencia DESC, club_nombre ASC`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    res.json({ ok: true, tabla: rows });
+  } catch (err) {
+    console.error('Error en GET /web/torneos/:torneoId/categorias/:categoriaId/tabla-general:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/torneos/:torneoId/categorias/:categoriaId/tabla — tabla de posiciones pública
 // LEFT JOIN desde equipos_torneo (no desde tabla_posiciones): así se ven todos
 // los equipos inscriptos desde el primer momento, en 0, aunque todavía no se
