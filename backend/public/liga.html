@@ -1102,6 +1102,9 @@
           <select id="filtroCategoriaFichajesLiga" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
             <option value="">Todas las divisiones</option>
           </select>
+          <select id="filtroSubcategoriaFichajesLiga" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+            <option value="">Todas las categorías</option>
+          </select>
         </div>
         <div class="barra-acciones-masivas" id="barraAccionesMasivasFichajes">
           <span id="cantidadFichajesSeleccionados">0 seleccionados</span>
@@ -1112,10 +1115,10 @@
           <thead>
             <tr>
               <th><input type="checkbox" id="chkSeleccionarTodosFichajes"></th>
-              <th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>División</th><th>Estado</th><th>Carnet</th><th>Acciones</th>
+              <th>Foto</th><th>Jugador</th><th>DNI</th><th>Torneo</th><th>División</th><th>Categoría</th><th>Estado</th><th>Carnet</th><th>Acciones</th>
             </tr>
           </thead>
-          <tbody id="tablaFichajesLiga"><tr><td colspan="9">Cargando...</td></tr></tbody>
+          <tbody id="tablaFichajesLiga"><tr><td colspan="10">Cargando...</td></tr></tbody>
         </table>
         <div id="paginacionFichajesLiga" style="display:flex; align-items:center; gap:12px; margin-top:14px;">
           <button class="btn btn-secundario btn-pequeno" id="btnFichajesPaginaAnterior">← Anterior</button>
@@ -1141,6 +1144,10 @@
         <div>
           <label for="editarFichajeCategoria">División</label>
           <select id="editarFichajeCategoria"></select>
+        </div>
+        <div>
+          <label for="editarFichajeSubcategoria">Categoría</label>
+          <select id="editarFichajeSubcategoria"></select>
         </div>
       </div>
       <p class="mensaje-error oculto" id="editarFichajeError"></p>

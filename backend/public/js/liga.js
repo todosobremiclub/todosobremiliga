@@ -545,10 +545,16 @@ function conectarEventos() {
   });
   document.getElementById('filtroTorneoFichajesLiga').addEventListener('change', () => {
     poblarFiltroCategoriaFichajesLiga();
+    poblarFiltroSubcategoriaFichajesLiga();
     paginaFichajesLigaActual = 1;
     renderFichajesLiga();
   });
   document.getElementById('filtroCategoriaFichajesLiga').addEventListener('change', () => {
+    poblarFiltroSubcategoriaFichajesLiga();
+    paginaFichajesLigaActual = 1;
+    renderFichajesLiga();
+  });
+  document.getElementById('filtroSubcategoriaFichajesLiga').addEventListener('change', () => {
     paginaFichajesLigaActual = 1;
     renderFichajesLiga();
   });
@@ -563,6 +569,7 @@ function conectarEventos() {
     const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
     const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
     const categoriaId = document.getElementById('filtroCategoriaFichajesLiga').value;
+    const subcategoriaId = document.getElementById('filtroSubcategoriaFichajesLiga').value;
     const lista = fichajesLigaCache.filter((f) => {
       if (texto) {
         const nombreCompleto = `${f.jugador_nombre} ${f.jugador_apellido}`.toLowerCase();
@@ -571,6 +578,7 @@ function conectarEventos() {
       }
       if (torneoId && f.torneo_id !== torneoId) return false;
       if (categoriaId && f.categoria_id !== categoriaId) return false;
+      if (subcategoriaId && f.subcategoria_id !== subcategoriaId) return false;
       return true;
     });
     lista.forEach((f) => { if (e.target.checked) fichajesSeleccionadosIds.add(f.id); else fichajesSeleccionadosIds.delete(f.id); });
@@ -588,6 +596,7 @@ function conectarEventos() {
     ocultarFondoModal();
   });
   document.getElementById('editarFichajeTorneo').addEventListener('change', () => poblarCategoriasEditarFichaje(null));
+  document.getElementById('editarFichajeCategoria').addEventListener('change', () => poblarSubcategoriasEditarFichaje(null));
   document.getElementById('btnGuardarEdicionFichaje').addEventListener('click', guardarEdicionFichaje);
   document.getElementById('btnCerrarVerCarnetLiga').addEventListener('click', cerrarCarnetLiga);
 
@@ -1378,7 +1387,7 @@ async function guardarArbitro(e) {
 
 async function cargarFichajesLiga() {
   const tbody = document.getElementById('tablaFichajesLiga');
-  tbody.innerHTML = '<tr><td colspan="8">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10">Cargando...</td></tr>';
   const estado = document.getElementById('filtroEstadoFichaje').value;
   try {
     const params = estado ? `?estado=${estado}&todos=true` : '?todos=true';
@@ -1387,9 +1396,10 @@ async function cargarFichajesLiga() {
     paginaFichajesLigaActual = 1;
     poblarFiltroTorneoFichajesLiga();
     poblarFiltroCategoriaFichajesLiga();
+    poblarFiltroSubcategoriaFichajesLiga();
     renderFichajesLiga();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
   actualizarBadgeFichajesPendientes();
 }
@@ -1430,6 +1440,30 @@ function poblarFiltroCategoriaFichajesLiga() {
   if (categorias.some((c) => c.id === actual)) select.value = actual;
 }
 
+// La Categoría (subcategoría, p. ej. el año de nacimiento dentro de una
+// División/Zona) es el segundo nivel de fichaje: un jugador se ficha a una
+// División Y una Categoría específicas, no sólo a la División.
+function poblarFiltroSubcategoriaFichajesLiga() {
+  const select = document.getElementById('filtroSubcategoriaFichajesLiga');
+  const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
+  const categoriaId = document.getElementById('filtroCategoriaFichajesLiga').value;
+  const actual = select.value;
+  const subcategorias = [];
+  const vistos = new Set();
+  fichajesLigaCache.forEach((f) => {
+    if (torneoId && f.torneo_id !== torneoId) return;
+    if (categoriaId && f.categoria_id !== categoriaId) return;
+    if (f.subcategoria_id && !vistos.has(f.subcategoria_id)) {
+      vistos.add(f.subcategoria_id);
+      subcategorias.push({ id: f.subcategoria_id, nombre: f.subcategoria_nombre });
+    }
+  });
+  subcategorias.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  select.innerHTML = '<option value="">Todas las categorías</option>' +
+    subcategorias.map((s) => `<option value="${s.id}">${escapeHtml(s.nombre || '-')}</option>`).join('');
+  if (subcategorias.some((s) => s.id === actual)) select.value = actual;
+}
+
 // Nombres de los clubes cuyo grupo está expandido en la tabla de fichajes de
 // Liga (agrupada por club). Arranca vacío = todos los clubes colapsados,
 // mostrando sólo el nombre del club hasta que se toca la flechita.
@@ -1446,6 +1480,7 @@ function renderFichajesLiga() {
   const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
   const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
   const categoriaId = document.getElementById('filtroCategoriaFichajesLiga').value;
+  const subcategoriaId = document.getElementById('filtroSubcategoriaFichajesLiga').value;
 
   const lista = fichajesLigaCache.filter((f) => {
     if (texto) {
@@ -1455,19 +1490,20 @@ function renderFichajesLiga() {
     }
     if (torneoId && f.torneo_id !== torneoId) return false;
     if (categoriaId && f.categoria_id !== categoriaId) return false;
+    if (subcategoriaId && f.subcategoria_id !== subcategoriaId) return false;
     return true;
   });
 
   const paginacionEl = document.getElementById('paginacionFichajesLiga');
 
   if (!fichajesLigaCache.length) {
-    tbody.innerHTML = '<tr><td colspan="9">No hay solicitudes de fichaje en este estado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10">No hay solicitudes de fichaje en este estado.</td></tr>';
     document.getElementById('chkSeleccionarTodosFichajes').checked = false;
     paginacionEl.style.display = 'none';
     return;
   }
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="9">No se encontraron fichajes con ese filtro.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10">No se encontraron fichajes con ese filtro.</td></tr>';
     paginacionEl.style.display = 'none';
     return;
   }
@@ -1507,7 +1543,7 @@ function renderFichajesLiga() {
     window.__clubesFichajesLigaPorId.set(clubKey, clubNombre);
     const filaGrupo = `
       <tr class="fila-grupo-club fila-grupo-club-clickable" onclick="toggleGrupoFichajesLiga(window.__clubesFichajesLigaPorId.get('${clubKey}'))">
-        <td colspan="9"><span class="flecha-grupo-club">${expandido ? '▾' : '▸'}</span> ${escapeHtml(clubNombre)} <span class="texto-ayuda">(${fichajesClub.length})</span></td>
+        <td colspan="10"><span class="flecha-grupo-club">${expandido ? '▾' : '▸'}</span> ${escapeHtml(clubNombre)} <span class="texto-ayuda">(${fichajesClub.length})</span></td>
       </tr>
     `;
     if (!expandido) return filaGrupo;
@@ -1519,6 +1555,7 @@ function renderFichajesLiga() {
         <td>${escapeHtml(f.jugador_dni || '-')} ${f.otros_fichajes_mismo_dni && f.otros_fichajes_mismo_dni.length ? `<span class="badge badge-alerta" title="Mismo DNI ya fichado en: ${escapeHtml(f.otros_fichajes_mismo_dni.map((o) => `${o.torneo_nombre}${o.categoria_nombre ? ' - ' + o.categoria_nombre : ''}${o.subcategoria_nombre ? ' (' + o.subcategoria_nombre + ')' : ''} (${o.club_nombre})`).join(', '))}">⚠ Ya fichado</span>` : ''}</td>
         <td>${escapeHtml(f.torneo_nombre || '-')}</td>
         <td>${escapeHtml(f.categoria_nombre || '-')}</td>
+        <td>${escapeHtml(f.subcategoria_nombre || '-')}</td>
         <td><span class="badge ${badgesEstado[f.estado] || ''}">${escapeHtml(f.estado)}</span></td>
         <td>${f.carnet_codigo_qr
           ? `<button class="btn btn-secundario btn-pequeno" onclick="abrirCarnetLiga('${f.id}')">Ver carnet</button>`
@@ -1594,8 +1631,10 @@ async function abrirEditarFichaje(fichajeId) {
   mostrarFondoModal();
   const selectTorneo = document.getElementById('editarFichajeTorneo');
   const selectCategoria = document.getElementById('editarFichajeCategoria');
+  const selectSubcategoria = document.getElementById('editarFichajeSubcategoria');
   selectTorneo.innerHTML = '<option value="">Cargando...</option>';
   selectCategoria.innerHTML = '';
+  selectSubcategoria.innerHTML = '';
   try {
     const dataTorneos = await apiFetch('/liga/torneos');
     torneosEditarFichajeCache = dataTorneos.torneos;
@@ -1603,29 +1642,54 @@ async function abrirEditarFichaje(fichajeId) {
       .map((t) => `<option value="${t.id}" ${t.id === f.torneo_id ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`)
       .join('');
     await poblarCategoriasEditarFichaje(f.categoria_id);
+    poblarSubcategoriasEditarFichaje(f.subcategoria_id);
   } catch (err) {
     selectTorneo.innerHTML = `<option value="">Error: ${escapeHtml(err.message)}</option>`;
   }
 }
 
 let torneosEditarFichajeCache = [];
+let categoriasEditarFichajeCache = [];
 
 async function poblarCategoriasEditarFichaje(categoriaIdSeleccionada) {
   const torneoId = document.getElementById('editarFichajeTorneo').value;
   const selectCategoria = document.getElementById('editarFichajeCategoria');
   if (!torneoId) {
     selectCategoria.innerHTML = '';
+    categoriasEditarFichajeCache = [];
+    poblarSubcategoriasEditarFichaje(null);
     return;
   }
   selectCategoria.innerHTML = '<option value="">Cargando...</option>';
   try {
     const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
+    categoriasEditarFichajeCache = data.categorias;
     selectCategoria.innerHTML = data.categorias
       .map((c) => `<option value="${c.id}" ${c.id === categoriaIdSeleccionada ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`)
       .join('');
+    poblarSubcategoriasEditarFichaje(null);
   } catch (err) {
     selectCategoria.innerHTML = `<option value="">Error: ${escapeHtml(err.message)}</option>`;
   }
+}
+
+// La Categoría (subcategoría — p. ej. el año dentro de una División/Zona) se
+// arma en memoria a partir de la División ya elegida (categoriasEditarFichajeCache
+// trae las subcategorías anidadas), sin pegarle de nuevo al server.
+function poblarSubcategoriasEditarFichaje(subcategoriaIdSeleccionada) {
+  const categoriaId = document.getElementById('editarFichajeCategoria').value;
+  const selectSubcategoria = document.getElementById('editarFichajeSubcategoria');
+  const categoria = categoriasEditarFichajeCache.find((c) => c.id === categoriaId);
+  const subcategorias = categoria ? (categoria.subcategorias || []) : [];
+  if (!subcategorias.length) {
+    selectSubcategoria.innerHTML = '<option value="">(sin categorías)</option>';
+    selectSubcategoria.required = false;
+    return;
+  }
+  selectSubcategoria.required = true;
+  selectSubcategoria.innerHTML = subcategorias
+    .map((s) => `<option value="${s.id}" ${s.id === subcategoriaIdSeleccionada ? 'selected' : ''}>${escapeHtml(s.nombre)}</option>`)
+    .join('');
 }
 
 async function guardarEdicionFichaje() {
@@ -1634,13 +1698,20 @@ async function guardarEdicionFichaje() {
   const id = document.getElementById('fichajeIdEdicion').value;
   const torneo_id = document.getElementById('editarFichajeTorneo').value;
   const categoria_id = document.getElementById('editarFichajeCategoria').value;
+  const selectSubcategoria = document.getElementById('editarFichajeSubcategoria');
+  const subcategoria_id = selectSubcategoria.value || null;
   if (!torneo_id || !categoria_id) {
     errorEl.textContent = 'Elegí torneo y división.';
     errorEl.classList.remove('oculto');
     return;
   }
+  if (selectSubcategoria.required && !subcategoria_id) {
+    errorEl.textContent = 'Elegí la categoría dentro de la división.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
   try {
-    await apiFetch(`/liga/fichajes/${id}`, { method: 'PUT', body: JSON.stringify({ torneo_id, categoria_id }) });
+    await apiFetch(`/liga/fichajes/${id}`, { method: 'PUT', body: JSON.stringify({ torneo_id, categoria_id, subcategoria_id }) });
     document.getElementById('modalEditarFichaje').classList.add('oculto');
     ocultarFondoModal();
     cargarFichajesLiga();
