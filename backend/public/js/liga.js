@@ -23,6 +23,8 @@ let tiposIngresoCache = [];
 let cuentasLigaCache = [];
 let fichajesLigaCache = [];
 let fichajesSeleccionadosIds = new Set();
+let paginaFichajesLigaActual = 1;
+const FICHAJES_CLUBES_POR_PAGINA = 20;
 
 // ----- Íconos SVG reutilizados en botones de acciones (evitan depender de
 // librerías externas de íconos y quedan livianos). -----
@@ -537,12 +539,26 @@ function conectarEventos() {
 
   // ---- Fichajes ----
   document.getElementById('filtroEstadoFichaje').addEventListener('change', cargarFichajesLiga);
-  document.getElementById('buscadorFichajesLiga').addEventListener('input', renderFichajesLiga);
-  document.getElementById('filtroTorneoFichajesLiga').addEventListener('change', () => {
-    poblarFiltroCategoriaFichajesLiga();
+  document.getElementById('buscadorFichajesLiga').addEventListener('input', () => {
+    paginaFichajesLigaActual = 1;
     renderFichajesLiga();
   });
-  document.getElementById('filtroCategoriaFichajesLiga').addEventListener('change', renderFichajesLiga);
+  document.getElementById('filtroTorneoFichajesLiga').addEventListener('change', () => {
+    poblarFiltroCategoriaFichajesLiga();
+    paginaFichajesLigaActual = 1;
+    renderFichajesLiga();
+  });
+  document.getElementById('filtroCategoriaFichajesLiga').addEventListener('change', () => {
+    paginaFichajesLigaActual = 1;
+    renderFichajesLiga();
+  });
+  document.getElementById('btnFichajesPaginaAnterior').addEventListener('click', () => {
+    if (paginaFichajesLigaActual > 1) { paginaFichajesLigaActual -= 1; renderFichajesLiga(); }
+  });
+  document.getElementById('btnFichajesPaginaSiguiente').addEventListener('click', () => {
+    paginaFichajesLigaActual += 1;
+    renderFichajesLiga();
+  });
   document.getElementById('chkSeleccionarTodosFichajes').addEventListener('change', (e) => {
     const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
     const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
@@ -1368,6 +1384,7 @@ async function cargarFichajesLiga() {
     const params = estado ? `?estado=${estado}&todos=true` : '?todos=true';
     const data = await apiFetch(`/liga/fichajes${params}`);
     fichajesLigaCache = data.fichajes;
+    paginaFichajesLigaActual = 1;
     poblarFiltroTorneoFichajesLiga();
     poblarFiltroCategoriaFichajesLiga();
     renderFichajesLiga();
@@ -1441,13 +1458,17 @@ function renderFichajesLiga() {
     return true;
   });
 
+  const paginacionEl = document.getElementById('paginacionFichajesLiga');
+
   if (!fichajesLigaCache.length) {
     tbody.innerHTML = '<tr><td colspan="9">No hay solicitudes de fichaje en este estado.</td></tr>';
     document.getElementById('chkSeleccionarTodosFichajes').checked = false;
+    paginacionEl.style.display = 'none';
     return;
   }
   if (!lista.length) {
     tbody.innerHTML = '<tr><td colspan="9">No se encontraron fichajes con ese filtro.</td></tr>';
+    paginacionEl.style.display = 'none';
     return;
   }
 
@@ -1456,7 +1477,24 @@ function renderFichajesLiga() {
   // plano mezclando todos los clubes. Cada grupo arranca colapsado y se
   // expande tocando la flechita, para ver de un vistazo la lista de clubes
   // sin desplazarse por todos los jugadores.
-  const clubesOrdenados = Array.from(new Set(lista.map((f) => f.club_nombre))).sort((a, b) => (a || '').localeCompare(b || ''));
+  const todosLosClubes = Array.from(new Set(lista.map((f) => f.club_nombre))).sort((a, b) => (a || '').localeCompare(b || ''));
+
+  // Paginado por club (no por fichaje individual), para no listar cientos de
+  // clubes en una sola pantalla. La búsqueda/filtros siguen operando sobre
+  // el listado completo (fichajesLigaCache); sólo la porción visible de
+  // clubes se recorta acá.
+  const totalPaginasFichajes = Math.max(1, Math.ceil(todosLosClubes.length / FICHAJES_CLUBES_POR_PAGINA));
+  if (paginaFichajesLigaActual > totalPaginasFichajes) paginaFichajesLigaActual = totalPaginasFichajes;
+  if (paginaFichajesLigaActual < 1) paginaFichajesLigaActual = 1;
+  const inicioPagina = (paginaFichajesLigaActual - 1) * FICHAJES_CLUBES_POR_PAGINA;
+  const clubesOrdenados = todosLosClubes.slice(inicioPagina, inicioPagina + FICHAJES_CLUBES_POR_PAGINA);
+
+  paginacionEl.style.display = 'flex';
+  document.getElementById('paginacionFichajesLigaInfo').textContent =
+    `Mostrando clubes ${todosLosClubes.length ? inicioPagina + 1 : 0}-${Math.min(inicioPagina + FICHAJES_CLUBES_POR_PAGINA, todosLosClubes.length)} de ${todosLosClubes.length} (página ${paginaFichajesLigaActual} de ${totalPaginasFichajes})`;
+  document.getElementById('btnFichajesPaginaAnterior').disabled = paginaFichajesLigaActual <= 1;
+  document.getElementById('btnFichajesPaginaSiguiente').disabled = paginaFichajesLigaActual >= totalPaginasFichajes;
+
   window.__clubesFichajesLigaPorId = window.__clubesFichajesLigaPorId || new Map();
 
   const badgesEstado = { pendiente: 'badge-pendiente', aprobado: 'badge-activo', rechazado: 'badge-inactivo' };
