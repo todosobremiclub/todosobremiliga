@@ -82,6 +82,8 @@ async function init() {
   document.getElementById('tabBtnTarjetas').addEventListener('click', () => cambiarTab('tarjetas'));
   document.getElementById('btnJornadaAnteriorPublico').addEventListener('click', () => cambiarJornadaFixturePublico(-1));
   document.getElementById('btnJornadaSiguientePublico').addEventListener('click', () => cambiarJornadaFixturePublico(1));
+  document.getElementById('btnJornadaGeneralPublicoAnterior').addEventListener('click', () => cambiarJornadaFixtureGeneralPublico(-1));
+  document.getElementById('btnJornadaGeneralPublicoSiguiente').addEventListener('click', () => cambiarJornadaFixtureGeneralPublico(1));
 
   await cargarCategorias();
   cargarNoticiasTorneo();
@@ -184,7 +186,11 @@ async function cargarCategorias() {
       }
       return acc + (sumaTablaGeneral(c) ? 1 : 0);
     }, 0);
-    hayTablaGeneral = unidadesSumables >= 2;
+    // La "Tabla general" DEL TORNEO (a nivel Divisiones) sólo tiene sentido
+    // con una única división partida en categorías (ej. sólo "Primera" con
+    // 2013 a 2019). Con varias divisiones (Zona A, Zona B...) cada una ya
+    // tiene su propio botón "General" adentro.
+    hayTablaGeneral = categoriasCache.length === 1 && unidadesSumables >= 2;
 
     renderTabsCategorias();
     // Arranca mostrando la división pedida por URL (ej. al volver desde la
@@ -244,7 +250,10 @@ function seleccionarCategoria(categoriaId) {
 
   const categoria = categoriasCache.find((c) => c.id === categoriaId);
   if (categoria && categoria.subcategorias && categoria.subcategorias.length) {
-    mostrarMensajeSinSeleccion('Elegí una categoría para ver su información.');
+    // Al elegir una División con categorías (años) adentro, se muestra de
+    // entrada su tabla general (suma de todas sus categorías) en vez de
+    // forzar a elegir una categoría puntual primero.
+    seleccionarGeneralCategoria();
   } else {
     mostrarBloqueContenidoCategoria();
   }
@@ -726,9 +735,16 @@ function calcularPuntosEquipoPartido(propios, rival, sistemaPuntaje) {
 // jornada, un bloque por cada cruce de dos clubes (2 filas, una por equipo)
 // con el resultado de cada una de las 7 categorías (subcategorías) de la
 // división como columnas, más P.J./Pts. de ESA jornada (sumando sólo esas 7
-// categorías) y el estado de carga.
+// categorías). Se muestra UNA jornada (fecha) a la vez, con navegación
+// Anterior/Siguiente — igual que la pestaña "Fixture" de una categoría
+// puntual — en vez de listar todas las fechas apiladas en una sola tabla.
+let fixtureGeneralPublicoCache = { columnas: [], jornadas: {}, clavesJornada: [], descripciones: {}, sistemaPuntaje: {} };
+let jornadaGeneralPublicoActual = null;
+
 async function cargarFixtureGeneralCategoria() {
   const cont = document.getElementById('fixtureGeneralCategoria');
+  const navegador = document.getElementById('navegadorJornadasGeneralPublico');
+  navegador.classList.add('oculto');
   cont.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
   try {
     const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaSeleccionadaId}/fixture-general`);
@@ -761,79 +777,90 @@ async function cargarFixtureGeneralCategoria() {
       return Number(a) - Number(b);
     });
 
-    const encabezado = `
-      <tr>
-        <th>F.T.</th>
-        <th>Equipos</th>
-        ${columnas.map((c) => `<th style="text-align:center;">${escapeHtml(c.nombre)}</th>`).join('')}
-        <th style="text-align:center;">P.J.</th>
-        <th style="text-align:center;">Pts.</th>
-        <th>Estado</th>
-      </tr>
-    `;
-
-    const cuerpo = clavesJornada.map((key) => {
-      const titulo = key === 'sin-jornada' ? 'Sin fecha' : (descripciones[key] || formatearIndicadorDia(jornadas[key][0].fecha) || `Fecha ${key}`);
-
-      const cruces = {};
-      const ordenCruces = [];
-      jornadas[key].forEach((p) => {
-        const cruceKey = `${p.club_local_id}__${p.club_visitante_id}`;
-        if (!cruces[cruceKey]) {
-          cruces[cruceKey] = { local: p, partidosPorSub: {} };
-          ordenCruces.push(cruceKey);
-        }
-        cruces[cruceKey].partidosPorSub[p.subcategoria_id] = p;
-      });
-
-      return ordenCruces.map((cruceKey, idx) => {
-        const cruce = cruces[cruceKey];
-        const partidosCruce = columnas.map((c) => cruce.partidosPorSub[c.id] || null);
-        const jugados = partidosCruce.filter((p) => p && p.estado === 'jugado' && p.resultado_local != null && p.resultado_visitante != null);
-        const pj = jugados.length;
-        const ptsLocal = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_local, p.resultado_visitante, sistemaPuntaje) || 0), 0);
-        const ptsVisitante = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_visitante, p.resultado_local, sistemaPuntaje) || 0), 0);
-        let estado = 'A definir';
-        if (jugados.length === columnas.length && columnas.length > 0) estado = 'Verificado';
-        else if (jugados.length > 0) estado = 'Parcial';
-
-        const celdaLocal = columnas.map((c) => {
-          const p = cruce.partidosPorSub[c.id];
-          const val = (p && p.resultado_local != null) ? p.resultado_local : '';
-          return `<td style="text-align:center;">${val}</td>`;
-        }).join('');
-        const celdaVisitante = columnas.map((c) => {
-          const p = cruce.partidosPorSub[c.id];
-          const val = (p && p.resultado_visitante != null) ? p.resultado_visitante : '';
-          return `<td style="text-align:center;">${val}</td>`;
-        }).join('');
-
-        const primeraFilaJornada = idx === 0
-          ? `<td rowspan="${ordenCruces.length * 2}" style="vertical-align:middle; font-weight:600;">${escapeHtml(titulo)}</td>`
-          : '';
-
-        return `
-          <tr style="border-top:2px solid var(--gris-300, #333);">
-            ${primeraFilaJornada}
-            <td>${escudoClub(cruce.local.club_local_logo_url, cruce.local.club_local_color)}${escapeHtml(cruce.local.club_local_nombre)}</td>
-            ${celdaLocal}
-            <td rowspan="2" style="text-align:center; vertical-align:middle;">${pj}</td>
-            <td style="text-align:center;">${ptsLocal}</td>
-            <td rowspan="2" style="text-align:center; vertical-align:middle;">${escapeHtml(estado)}</td>
-          </tr>
-          <tr>
-            <td>${escudoClub(cruce.local.club_visitante_logo_url, cruce.local.club_visitante_color)}${escapeHtml(cruce.local.club_visitante_nombre)}</td>
-            ${celdaVisitante}
-            <td style="text-align:center;">${ptsVisitante}</td>
-          </tr>
-        `;
-      }).join('');
-    }).join('');
-
-    cont.innerHTML = `<div style="overflow-x:auto;"><table class="tabla-fixture-general">${encabezado}${cuerpo}</table></div>`;
+    fixtureGeneralPublicoCache = { columnas, jornadas, clavesJornada, descripciones, sistemaPuntaje };
+    jornadaGeneralPublicoActual = clavesJornada[0];
+    navegador.classList.remove('oculto');
+    renderJornadaFixtureGeneralPublico();
   } catch (err) {
+    navegador.classList.add('oculto');
     cont.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
   }
+}
+
+function cambiarJornadaFixtureGeneralPublico(delta) {
+  const { clavesJornada } = fixtureGeneralPublicoCache;
+  const idx = clavesJornada.indexOf(jornadaGeneralPublicoActual);
+  const nuevoIdx = idx + delta;
+  if (nuevoIdx < 0 || nuevoIdx >= clavesJornada.length) return;
+  jornadaGeneralPublicoActual = clavesJornada[nuevoIdx];
+  renderJornadaFixtureGeneralPublico();
+}
+
+function renderJornadaFixtureGeneralPublico() {
+  const cont = document.getElementById('fixtureGeneralCategoria');
+  const { columnas, jornadas, clavesJornada, descripciones, sistemaPuntaje } = fixtureGeneralPublicoCache;
+  const key = jornadaGeneralPublicoActual;
+  const partidosJornada = jornadas[key] || [];
+  const titulo = key === 'sin-jornada' ? 'Sin fecha' : (descripciones[key] || (partidosJornada[0] && formatearIndicadorDia(partidosJornada[0].fecha)) || `Fecha ${key}`);
+  document.getElementById('tituloJornadaGeneralPublico').textContent = titulo;
+  document.getElementById('btnJornadaGeneralPublicoAnterior').disabled = clavesJornada.indexOf(key) === 0;
+  document.getElementById('btnJornadaGeneralPublicoSiguiente').disabled = clavesJornada.indexOf(key) === clavesJornada.length - 1;
+
+  const encabezado = `
+    <tr>
+      <th>Equipos</th>
+      ${columnas.map((c) => `<th style="text-align:center;">${escapeHtml(c.nombre)}</th>`).join('')}
+      <th style="text-align:center;">P.J.</th>
+      <th style="text-align:center;">Pts.</th>
+    </tr>
+  `;
+
+  const cruces = {};
+  const ordenCruces = [];
+  partidosJornada.forEach((p) => {
+    const cruceKey = `${p.club_local_id}__${p.club_visitante_id}`;
+    if (!cruces[cruceKey]) {
+      cruces[cruceKey] = { local: p, partidosPorSub: {} };
+      ordenCruces.push(cruceKey);
+    }
+    cruces[cruceKey].partidosPorSub[p.subcategoria_id] = p;
+  });
+
+  const cuerpo = ordenCruces.map((cruceKey) => {
+    const cruce = cruces[cruceKey];
+    const partidosCruce = columnas.map((c) => cruce.partidosPorSub[c.id] || null);
+    const jugados = partidosCruce.filter((p) => p && p.estado === 'jugado' && p.resultado_local != null && p.resultado_visitante != null);
+    const pj = jugados.length;
+    const ptsLocal = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_local, p.resultado_visitante, sistemaPuntaje) || 0), 0);
+    const ptsVisitante = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_visitante, p.resultado_local, sistemaPuntaje) || 0), 0);
+
+    const celdaLocal = columnas.map((c) => {
+      const p = cruce.partidosPorSub[c.id];
+      const val = (p && p.resultado_local != null) ? p.resultado_local : '';
+      return `<td style="text-align:center;">${val}</td>`;
+    }).join('');
+    const celdaVisitante = columnas.map((c) => {
+      const p = cruce.partidosPorSub[c.id];
+      const val = (p && p.resultado_visitante != null) ? p.resultado_visitante : '';
+      return `<td style="text-align:center;">${val}</td>`;
+    }).join('');
+
+    return `
+      <tr style="border-top:2px solid var(--gris-300, #333);">
+        <td>${escudoClub(cruce.local.club_local_logo_url, cruce.local.club_local_color)}${escapeHtml(cruce.local.club_local_nombre)}</td>
+        ${celdaLocal}
+        <td rowspan="2" style="text-align:center; vertical-align:middle;">${pj}</td>
+        <td style="text-align:center;">${ptsLocal}</td>
+      </tr>
+      <tr>
+        <td>${escudoClub(cruce.local.club_visitante_logo_url, cruce.local.club_visitante_color)}${escapeHtml(cruce.local.club_visitante_nombre)}</td>
+        ${celdaVisitante}
+        <td style="text-align:center;">${ptsVisitante}</td>
+      </tr>
+    `;
+  }).join('');
+
+  cont.innerHTML = `<div style="overflow-x:auto;"><table class="tabla-fixture-general">${encabezado}${cuerpo}</table></div>`;
 }
 
 function swatch(color) {
