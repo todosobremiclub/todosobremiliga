@@ -657,12 +657,12 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
     if (!clubResult.rows[0]) return res.status(404).json({ ok: false, error: 'Club no encontrado en esta Liga' });
 
     // Una división (categoría/Zona) con categorías (subcategorías, ej. años)
-    // adentro se muestra como UNA sola tarjeta con la TABLA GENERAL de esa
-    // Zona (sumando todas sus categorías marcadas "suma a tabla general"),
-    // no una tarjeta por cada año — mismo criterio que ya usa la pestaña
-    // "General" de la página del Torneo. Una división SIN categorías
-    // (formato simple, sin años adentro) sigue mostrando su propia tabla,
-    // como antes.
+    // adentro muestra UNA tarjeta por cada categoría (como siempre) MÁS una
+    // tarjeta extra "General" con la TABLA GENERAL de esa Zona (suma de
+    // todas sus categorías marcadas "suma a tabla general") — mismo criterio
+    // que ya usa la pestaña "General" de la página del Torneo. Una división
+    // SIN categorías (formato simple, sin años adentro) sigue mostrando su
+    // propia tabla, sola, como antes.
     const { rows: participaciones } = await query(
       `WITH mis_equipos AS (
          SELECT et.id AS equipo_torneo_id, et.torneo_id, et.categoria_id, et.subcategoria_id
@@ -700,10 +700,40 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
          WHERE me.subcategoria_id IS NULL
        ),
 
-       -- ----- Divisiones CON categorías: una tarjeta por Zona con la TABLA
-       -- GENERAL (suma de sus categorías marcadas "suma a tabla general").
-       -- Se calcula para TODOS los clubes de esa Zona (no sólo el mío) para
-       -- poder rankear mi puesto entre todos. -----
+       -- ----- Divisiones CON categorías: una tarjeta por cada categoría
+       -- (año), igual que siempre. -----
+       ranking_por_categoria AS (
+         SELECT et.id AS equipo_torneo_id,
+                RANK() OVER (
+                  PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id
+                  ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC
+                ) AS puesto,
+                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id) AS total_equipos,
+                COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
+                COALESCE(tp.ganados, 0) AS ganados, COALESCE(tp.empatados, 0) AS empatados,
+                COALESCE(tp.perdidos, 0) AS perdidos, COALESCE(tp.diferencia, 0) AS diferencia
+         FROM equipos_torneo et
+         JOIN mis_equipos me
+           ON me.torneo_id = et.torneo_id AND me.categoria_id = et.categoria_id
+           AND me.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+         LEFT JOIN tabla_posiciones tp
+           ON tp.equipo_torneo_id = et.id AND tp.torneo_id = et.torneo_id AND tp.categoria_id = et.categoria_id AND tp.ronda = 'general'
+         WHERE et.subcategoria_id IS NOT NULL
+       ),
+       filas_por_categoria AS (
+         SELECT me.equipo_torneo_id, me.torneo_id, me.categoria_id, me.subcategoria_id, cs.nombre AS subcategoria_nombre,
+                r.puesto, r.total_equipos, r.puntos, r.partidos_jugados, r.ganados, r.empatados, r.perdidos, r.diferencia,
+                ARRAY[me.equipo_torneo_id] AS equipo_ids_proximo
+         FROM mis_equipos me
+         JOIN ranking_por_categoria r ON r.equipo_torneo_id = me.equipo_torneo_id
+         JOIN categoria_subcategorias cs ON cs.id = me.subcategoria_id
+         WHERE me.subcategoria_id IS NOT NULL
+       ),
+
+       -- ----- Tarjeta EXTRA "General" por cada Zona con categorías: la
+       -- TABLA GENERAL (suma de sus categorías marcadas "suma a tabla
+       -- general"). Se calcula para TODOS los clubes de esa Zona (no sólo
+       -- el mío) para poder rankear mi puesto entre todos. -----
        mis_zonas_generales AS (
          SELECT DISTINCT torneo_id, categoria_id FROM mis_equipos WHERE subcategoria_id IS NOT NULL
        ),
@@ -742,6 +772,8 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
        filas AS (
          SELECT * FROM filas_simples
          UNION ALL
+         SELECT * FROM filas_por_categoria
+         UNION ALL
          SELECT * FROM filas_generales
        )
 
@@ -767,7 +799,9 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
          ORDER BY pa.fecha ASC NULLS LAST, pa.jornada ASC NULLS LAST
          LIMIT 1
        ) prox ON true
-       ORDER BY t.nombre ASC, c.nombre ASC, f.subcategoria_nombre ASC NULLS FIRST`,
+       ORDER BY t.nombre ASC, c.nombre ASC,
+                (CASE WHEN f.subcategoria_nombre = 'General' THEN 0 ELSE 1 END),
+                f.subcategoria_nombre ASC NULLS FIRST`,
       [req.params.clubId, req.params.slug]
     );
 
