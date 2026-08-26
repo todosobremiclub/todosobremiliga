@@ -370,7 +370,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
 router.get('/torneos/:torneoId/categorias/:categoriaId/fixture-general', async (req, res) => {
   try {
     const torneoResult = await query(
-      `SELECT t.cancha_juego FROM torneos t
+      `SELECT t.cancha_juego, t.sistema_puntaje FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
        WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
       [req.params.torneoId]
@@ -382,15 +382,15 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture-general', async (
               p.resultado_local, p.resultado_visitante, p.detalle_resultado,
               p.no_presento_local, p.no_presento_visitante,
               el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
-              cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
-              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color,
+              cl.id AS club_local_id, cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
+              cv.id AS club_visitante_id, cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color,
               COALESCE(ccSel.direccion, ccl.direccion, cl.direccion) AS club_local_direccion,
               COALESCE(ccSel.tipo_techo, ccl.tipo_techo) AS club_local_cancha_techo,
               COALESCE(ccSel.nombre, ccl.nombre) AS club_local_cancha_nombre,
               pr.nombre AS predio_nombre, pr.direccion AS predio_direccion,
               pr.ciudad AS predio_ciudad, pr.provincia AS predio_provincia,
               cp.nombre AS cancha_predio_nombre, cp.tipo_techo AS cancha_predio_techo,
-              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre
+              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre, cs.orden AS subcategoria_orden
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
        JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
@@ -416,7 +416,7 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture-general', async (
       [req.params.torneoId, req.params.categoriaId]
     );
 
-    res.json({ ok: true, partidos: rows, cancha_juego: torneoResult.rows[0].cancha_juego, jornadas: jornadasResult.rows });
+    res.json({ ok: true, partidos: rows, cancha_juego: torneoResult.rows[0].cancha_juego, sistema_puntaje: torneoResult.rows[0].sistema_puntaje, jornadas: jornadasResult.rows });
   } catch (err) {
     console.error('Error en GET fixture-general publico:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });

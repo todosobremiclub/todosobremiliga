@@ -278,7 +278,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos-general', async (req, re
               cp.nombre AS cancha_predio_nombre,
               cp.tipo_techo AS cancha_predio_techo, cp.tamanio AS cancha_predio_tamanio,
               tcp.nombre AS cancha_predio_tipo_nombre,
-              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre
+              cs.id AS subcategoria_id, cs.nombre AS subcategoria_nombre, cs.orden AS subcategoria_orden
        FROM partidos p
        JOIN equipos_torneo el ON el.id = p.equipo_local_id
        JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
@@ -319,7 +319,7 @@ router.get('/:torneoId/categorias/:categoriaId/partidos-general', async (req, re
       [req.params.torneoId, req.params.categoriaId]
     );
 
-    res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, jornadas: jornadasResult.rows });
+    res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, sistema_puntaje: contexto.sistema_puntaje, jornadas: jornadasResult.rows });
   } catch (err) {
     console.error('Error en GET partidos-general:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });

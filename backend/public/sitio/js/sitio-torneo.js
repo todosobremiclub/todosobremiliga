@@ -707,6 +707,26 @@ async function cargarTablaGeneralCategoria() {
 
 // Fixture consolidado de la pestaña "General": todos los partidos de la
 // división (de sus 7 categorías/años juntas), agrupados por jornada.
+// Calcula los puntos que se lleva UN equipo de UN partido, según el
+// sistema_puntaje del torneo (mismo criterio que src/utils/tablaPosiciones.js
+// en el backend). Sólo soporta el modo "goles" (fútbol); si el partido no
+// está jugado devuelve null.
+function calcularPuntosEquipoPartido(propios, rival, sistemaPuntaje) {
+  if (propios == null || rival == null) return null;
+  const sp = sistemaPuntaje || {};
+  const v = sp.victoria ?? 3;
+  const e = sp.empate ?? 1;
+  const d = sp.derrota ?? 0;
+  if (propios > rival) return v;
+  if (propios < rival) return d;
+  return e;
+}
+
+// Fixture y Resultados consolidados de la pestaña "General": arma, por
+// jornada, un bloque por cada cruce de dos clubes (2 filas, una por equipo)
+// con el resultado de cada una de las 7 categorías (subcategorías) de la
+// división como columnas, más P.J./Pts. de ESA jornada (sumando sólo esas 7
+// categorías) y el estado de carga.
 async function cargarFixtureGeneralCategoria() {
   const cont = document.getElementById('fixtureGeneralCategoria');
   cont.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
@@ -717,8 +737,17 @@ async function cargarFixtureGeneralCategoria() {
       cont.innerHTML = '<p class="sitio-vacio">Todavía no hay partidos programados.</p>';
       return;
     }
+    const sistemaPuntaje = data.sistema_puntaje || {};
     const descripciones = {};
     (data.jornadas || []).forEach((j) => { descripciones[j.jornada] = j.descripcion; });
+
+    const columnasMap = {};
+    data.partidos.forEach((p) => {
+      if (p.subcategoria_id && !columnasMap[p.subcategoria_id]) {
+        columnasMap[p.subcategoria_id] = { id: p.subcategoria_id, nombre: p.subcategoria_nombre, orden: p.subcategoria_orden ?? 999 };
+      }
+    });
+    const columnas = Object.values(columnasMap).sort((a, b) => (a.orden - b.orden) || String(a.nombre).localeCompare(String(b.nombre)));
 
     const jornadas = {};
     data.partidos.forEach((p) => {
@@ -726,33 +755,82 @@ async function cargarFixtureGeneralCategoria() {
       if (!jornadas[key]) jornadas[key] = [];
       jornadas[key].push(p);
     });
-    const claves = Object.keys(jornadas).sort((a, b) => {
+    const clavesJornada = Object.keys(jornadas).sort((a, b) => {
       if (a === 'sin-jornada') return 1;
       if (b === 'sin-jornada') return -1;
       return Number(a) - Number(b);
     });
 
-    cont.innerHTML = claves.map((key) => {
-      const titulo = key === 'sin-jornada' ? 'Sin fecha asignada' : (descripciones[key] || formatearIndicadorDia(jornadas[key][0].fecha) || `Fecha ${key}`);
-      const filas = jornadas[key].map((p) => {
-        const resultado = (p.resultado_local != null && p.resultado_visitante != null)
-          ? `<strong>${p.resultado_local} - ${p.resultado_visitante}</strong>`
-          : (p.hora ? String(p.hora).slice(0, 5) : 'A definir');
+    const encabezado = `
+      <tr>
+        <th>F.T.</th>
+        <th>Equipos</th>
+        ${columnas.map((c) => `<th style="text-align:center;">${escapeHtml(c.nombre)}</th>`).join('')}
+        <th style="text-align:center;">P.J.</th>
+        <th style="text-align:center;">Pts.</th>
+        <th>Estado</th>
+      </tr>
+    `;
+
+    const cuerpo = clavesJornada.map((key) => {
+      const titulo = key === 'sin-jornada' ? 'Sin fecha' : (descripciones[key] || formatearIndicadorDia(jornadas[key][0].fecha) || `Fecha ${key}`);
+
+      const cruces = {};
+      const ordenCruces = [];
+      jornadas[key].forEach((p) => {
+        const cruceKey = `${p.club_local_id}__${p.club_visitante_id}`;
+        if (!cruces[cruceKey]) {
+          cruces[cruceKey] = { local: p, partidosPorSub: {} };
+          ordenCruces.push(cruceKey);
+        }
+        cruces[cruceKey].partidosPorSub[p.subcategoria_id] = p;
+      });
+
+      return ordenCruces.map((cruceKey, idx) => {
+        const cruce = cruces[cruceKey];
+        const partidosCruce = columnas.map((c) => cruce.partidosPorSub[c.id] || null);
+        const jugados = partidosCruce.filter((p) => p && p.estado === 'jugado' && p.resultado_local != null && p.resultado_visitante != null);
+        const pj = jugados.length;
+        const ptsLocal = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_local, p.resultado_visitante, sistemaPuntaje) || 0), 0);
+        const ptsVisitante = jugados.reduce((acc, p) => acc + (calcularPuntosEquipoPartido(p.resultado_visitante, p.resultado_local, sistemaPuntaje) || 0), 0);
+        let estado = 'A definir';
+        if (jugados.length === columnas.length && columnas.length > 0) estado = 'Verificado';
+        else if (jugados.length > 0) estado = 'Parcial';
+
+        const celdaLocal = columnas.map((c) => {
+          const p = cruce.partidosPorSub[c.id];
+          const val = (p && p.resultado_local != null) ? p.resultado_local : '';
+          return `<td style="text-align:center;">${val}</td>`;
+        }).join('');
+        const celdaVisitante = columnas.map((c) => {
+          const p = cruce.partidosPorSub[c.id];
+          const val = (p && p.resultado_visitante != null) ? p.resultado_visitante : '';
+          return `<td style="text-align:center;">${val}</td>`;
+        }).join('');
+
+        const primeraFilaJornada = idx === 0
+          ? `<td rowspan="${ordenCruces.length * 2}" style="vertical-align:middle; font-weight:600;">${escapeHtml(titulo)}</td>`
+          : '';
+
         return `
-          <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--gris-300, #333);">
-            <span style="min-width:60px; font-size:12px; color:var(--gris-600, #999);">${escapeHtml(p.subcategoria_nombre || '')}</span>
-            <span style="flex:1;">${escudoClub(p.club_local_logo_url, p.club_local_color)}${escapeHtml(p.club_local_nombre)} vs ${escapeHtml(p.club_visitante_nombre)}${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}</span>
-            <span style="white-space:nowrap;">${resultado}</span>
-          </div>
+          <tr style="border-top:2px solid var(--gris-300, #333);">
+            ${primeraFilaJornada}
+            <td>${escudoClub(cruce.local.club_local_logo_url, cruce.local.club_local_color)}${escapeHtml(cruce.local.club_local_nombre)}</td>
+            ${celdaLocal}
+            <td rowspan="2" style="text-align:center; vertical-align:middle;">${pj}</td>
+            <td style="text-align:center;">${ptsLocal}</td>
+            <td rowspan="2" style="text-align:center; vertical-align:middle;">${escapeHtml(estado)}</td>
+          </tr>
+          <tr>
+            <td>${escudoClub(cruce.local.club_visitante_logo_url, cruce.local.club_visitante_color)}${escapeHtml(cruce.local.club_visitante_nombre)}</td>
+            ${celdaVisitante}
+            <td style="text-align:center;">${ptsVisitante}</td>
+          </tr>
         `;
       }).join('');
-      return `
-        <div style="margin-bottom:16px;">
-          <h4 style="margin:0 0 6px 0;">${escapeHtml(titulo)}</h4>
-          ${filas}
-        </div>
-      `;
     }).join('');
+
+    cont.innerHTML = `<div style="overflow-x:auto;"><table class="tabla-fixture-general">${encabezado}${cuerpo}</table></div>`;
   } catch (err) {
     cont.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
   }
