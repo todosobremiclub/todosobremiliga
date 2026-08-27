@@ -553,9 +553,12 @@ button.btn-peligro:hover { background: #fee2e2; }
 
 .card-link:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 
-/* Marca de agua muy suave con el logo del torneo (o el de la división, en
-   los botones de división del sitio público) — sólo se pinta si el elemento
-   trae la variable --foto-fondo cargada (ver JS que genera estas tarjetas). */
+/* Fondo con el logo del torneo (o el de la división, en los botones de
+   división del sitio público) estirado a todo el ancho de la tarjeta, como
+   una portada — sólo se pinta si el elemento trae la variable --foto-fondo
+   cargada (ver JS que genera estas tarjetas). Un degradado oscuro (::after)
+   se pinta encima para que el título/texto siempre se lean bien, sea cual
+   sea el logo. */
 .card-link.con-foto-fondo::before {
   content: '';
   position: absolute;
@@ -563,10 +566,27 @@ button.btn-peligro:hover { background: #fee2e2; }
   background-image: var(--foto-fondo);
   background-repeat: no-repeat;
   background-position: center;
-  background-size: contain;
-  opacity: 0.08;
+  background-size: cover;
+  transform: scale(1.08);
+  filter: saturate(1.05);
+  opacity: 0.55;
   z-index: 0;
   pointer-events: none;
+}
+
+.card-link.con-foto-fondo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10,10,20,0.15) 0%, rgba(10,10,20,0.55) 65%, rgba(10,10,20,0.85) 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.card-link.con-foto-fondo h3,
+.card-link.con-foto-fondo p {
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.55);
 }
 
 .card-link h3,
