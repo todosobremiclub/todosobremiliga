@@ -16,11 +16,11 @@ let ordenJugadoresCampo = 'nombre';
 let ordenJugadoresDireccion = 'asc';
 let paginaJugadoresActual = 1;
 const JUGADORES_POR_PAGINA = 20;
-let ligasClubCache = [];
 let fichajesCache = [];
 let jugadoresSeleccionados = new Set();
 let fichajeJugadorIdsActual = [];
 let categoriasFichajeCache = [];
+let participacionesFichajeCache = [];
 let jugadorIdEdicion = null;
 let actividadesCache = [];
 let categoriasSocioCache = [];
@@ -870,22 +870,35 @@ async function abrirPopupFichaje(titulo, jugadorIds) {
   const selectLiga = document.getElementById('fichajeLiga');
   selectLiga.innerHTML = '<option value="">Cargando...</option>';
   try {
-    if (!ligasClubCache.length) {
-      const data = await apiFetch('/club/ligas');
-      ligasClubCache = data.ligas;
-    }
-    if (!ligasClubCache.length) {
-      selectLiga.innerHTML = '<option value="">Tu club todavía no participa en ninguna Liga</option>';
+    // Traemos siempre fresco /club/torneos (las inscripciones REALES del
+    // club vía equipos_torneo) para que acá sólo aparezcan la Liga, el
+    // Torneo, la División y la Categoría en las que el club efectivamente
+    // participa — antes se listaban TODOS los torneos/divisiones de la Liga
+    // (endpoints públicos /web/...), aunque el club no estuviera anotado.
+    const data = await apiFetch('/club/torneos');
+    participacionesFichajeCache = data.ok ? data.torneos : [];
+
+    const ligasUnicas = [];
+    const vistosLiga = new Set();
+    participacionesFichajeCache.forEach((p) => {
+      if (!vistosLiga.has(p.liga_id)) {
+        vistosLiga.add(p.liga_id);
+        ligasUnicas.push({ id: p.liga_id, nombre: p.liga_nombre });
+      }
+    });
+
+    if (!ligasUnicas.length) {
+      selectLiga.innerHTML = '<option value="">Tu club todavía no está inscripto en ningún Torneo</option>';
       return;
     }
     selectLiga.innerHTML = '<option value="">Seleccioná una Liga</option>' +
-      ligasClubCache.map((l) => `<option value="${l.id}" data-slug="${escapeHtml(l.slug)}">${escapeHtml(l.nombre)}</option>`).join('');
+      ligasUnicas.map((l) => `<option value="${l.id}">${escapeHtml(l.nombre)}</option>`).join('');
   } catch (err) {
     selectLiga.innerHTML = '<option value="">Error cargando Ligas</option>';
   }
 }
 
-async function onCambioLigaFichaje() {
+function onCambioLigaFichaje() {
   const selectLiga = document.getElementById('fichajeLiga');
   const selectTorneo = document.getElementById('fichajeTorneo');
   const selectCategoria = document.getElementById('fichajeCategoria');
@@ -896,35 +909,40 @@ async function onCambioLigaFichaje() {
   selectSubcategoria.disabled = true;
   categoriasFichajeCache = [];
 
-  const opcionElegida = selectLiga.options[selectLiga.selectedIndex];
-  const slug = opcionElegida ? opcionElegida.dataset.slug : null;
-  if (!slug) {
+  const ligaId = selectLiga.value;
+  if (!ligaId) {
     selectTorneo.innerHTML = '';
     selectTorneo.disabled = true;
     return;
   }
 
-  selectTorneo.innerHTML = '<option value="">Cargando...</option>';
-  selectTorneo.disabled = true;
-  try {
-    const res = await fetch(`/web/ligas/${slug}/torneos`);
-    const data = await res.json();
-    if (!data.ok || !data.torneos.length) {
-      selectTorneo.innerHTML = '<option value="">Esta Liga todavía no tiene torneos</option>';
-      return;
-    }
-    selectTorneo.innerHTML = '<option value="">Seleccioná un Torneo</option>' +
-      data.torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)} (${escapeHtml(t.deporte)})</option>`).join('');
-    selectTorneo.disabled = false;
-  } catch (err) {
-    selectTorneo.innerHTML = '<option value="">Error cargando torneos</option>';
+  const torneosUnicos = [];
+  const vistosTorneo = new Set();
+  participacionesFichajeCache
+    .filter((p) => p.liga_id === ligaId)
+    .forEach((p) => {
+      if (!vistosTorneo.has(p.torneo_id)) {
+        vistosTorneo.add(p.torneo_id);
+        torneosUnicos.push({ id: p.torneo_id, nombre: p.torneo_nombre, deporte: p.torneo_deporte });
+      }
+    });
+
+  if (!torneosUnicos.length) {
+    selectTorneo.innerHTML = '<option value="">Tu club no está inscripto en ningún Torneo de esta Liga</option>';
+    selectTorneo.disabled = true;
+    return;
   }
+  selectTorneo.innerHTML = '<option value="">Seleccioná un Torneo</option>' +
+    torneosUnicos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}${t.deporte ? ' (' + escapeHtml(t.deporte) + ')' : ''}</option>`).join('');
+  selectTorneo.disabled = false;
 }
 
-async function onCambioTorneoFichaje() {
+function onCambioTorneoFichaje() {
+  const selectLiga = document.getElementById('fichajeLiga');
   const selectTorneo = document.getElementById('fichajeTorneo');
   const selectCategoria = document.getElementById('fichajeCategoria');
   const selectSubcategoria = document.getElementById('fichajeSubcategoria');
+  const ligaId = selectLiga.value;
   const torneoId = selectTorneo.value;
   selectSubcategoria.innerHTML = '';
   selectSubcategoria.disabled = true;
@@ -935,22 +953,33 @@ async function onCambioTorneoFichaje() {
     return;
   }
 
-  selectCategoria.innerHTML = '<option value="">Cargando...</option>';
-  selectCategoria.disabled = true;
-  try {
-    const res = await fetch(`/web/torneos/${torneoId}/categorias`);
-    const data = await res.json();
-    categoriasFichajeCache = data.ok ? data.categorias : [];
-    if (!data.ok || !data.categorias.length) {
-      selectCategoria.innerHTML = '<option value="">Sin divisiones</option>';
-      return;
-    }
-    selectCategoria.innerHTML = '<option value="">Elegí una división...</option>' +
-      data.categorias.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
-    selectCategoria.disabled = false;
-  } catch (err) {
-    selectCategoria.innerHTML = '<option value="">Error cargando divisiones</option>';
+  // Arma las Divisiones (con sus Categorías anidadas, si tiene) a partir de
+  // las inscripciones reales del club en ESTE torneo — no de todas las
+  // divisiones que el torneo tenga en la Liga.
+  const categoriasMap = new Map();
+  participacionesFichajeCache
+    .filter((p) => p.liga_id === ligaId && p.torneo_id === torneoId)
+    .forEach((p) => {
+      if (!categoriasMap.has(p.categoria_id)) {
+        categoriasMap.set(p.categoria_id, { id: p.categoria_id, nombre: p.categoria_nombre, subcategorias: [] });
+      }
+      if (p.subcategoria_id) {
+        const cat = categoriasMap.get(p.categoria_id);
+        if (!cat.subcategorias.some((s) => s.id === p.subcategoria_id)) {
+          cat.subcategorias.push({ id: p.subcategoria_id, nombre: p.subcategoria_nombre });
+        }
+      }
+    });
+  categoriasFichajeCache = Array.from(categoriasMap.values());
+
+  if (!categoriasFichajeCache.length) {
+    selectCategoria.innerHTML = '<option value="">Tu club no está inscripto en ninguna División de este Torneo</option>';
+    selectCategoria.disabled = true;
+    return;
   }
+  selectCategoria.innerHTML = '<option value="">Elegí una división...</option>' +
+    categoriasFichajeCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+  selectCategoria.disabled = false;
 }
 
 function onCambioCategoriaFichaje() {
