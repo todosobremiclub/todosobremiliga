@@ -62,9 +62,17 @@ router.get('/torneos/:torneoId', async (req, res) => {
       `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
               l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
-              l.facebook_url, l.instagram_url, l.youtube_url
+              l.facebook_url, l.instagram_url, l.youtube_url,
+              reglamento.reglamento_nombre, reglamento.reglamento_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN LATERAL (
+         SELECT td.nombre AS reglamento_nombre, td.archivo_url AS reglamento_url
+         FROM torneo_documentos td
+         WHERE td.torneo_id = t.id
+         ORDER BY td.creado_at DESC
+         LIMIT 1
+       ) reglamento ON TRUE
        WHERE t.id = $1 AND l.activo = TRUE AND l.tipo = 'productiva'`,
       [req.params.torneoId]
     );
@@ -86,9 +94,17 @@ router.get('/ligas/:slug/torneos/:torneoSlug', async (req, res) => {
       `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
               l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
-              l.facebook_url, l.instagram_url, l.youtube_url
+              l.facebook_url, l.instagram_url, l.youtube_url,
+              reglamento.reglamento_nombre, reglamento.reglamento_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN LATERAL (
+         SELECT td.nombre AS reglamento_nombre, td.archivo_url AS reglamento_url
+         FROM torneo_documentos td
+         WHERE td.torneo_id = t.id
+         ORDER BY td.creado_at DESC
+         LIMIT 1
+       ) reglamento ON TRUE
        WHERE l.slug = $1 AND t.slug = $2 AND l.activo = TRUE AND l.tipo = 'productiva'`,
       [req.params.slug, req.params.torneoSlug]
     );
@@ -104,9 +120,17 @@ router.get('/ligas/:slug/torneos/:torneoSlug', async (req, res) => {
 router.get('/ligas/:slug/torneos', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin, t.logo_url
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.formato_juego, t.estado, t.fecha_inicio, t.fecha_fin, t.logo_url,
+              reglamento.reglamento_nombre, reglamento.reglamento_url
        FROM torneos t
        JOIN ligas l ON l.id = t.liga_id
+       LEFT JOIN LATERAL (
+         SELECT td.nombre AS reglamento_nombre, td.archivo_url AS reglamento_url
+         FROM torneo_documentos td
+         WHERE td.torneo_id = t.id
+         ORDER BY td.creado_at DESC
+         LIMIT 1
+       ) reglamento ON TRUE
        WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva'
        ORDER BY t.creado_at DESC`,
       [req.params.slug]
@@ -946,7 +970,7 @@ router.post('/clubes/:clubId/socios', async (req, res) => {
 router.get('/ligas/:slug/noticias', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.video_youtube_url, n.destacada, n.publicado_at
        FROM noticias n
        JOIN ligas l ON l.id = n.liga_id
        WHERE l.slug = $1 AND l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'
@@ -969,7 +993,7 @@ router.get('/ligas/:slug/noticias', async (req, res) => {
 router.get('/ligas/:slug/clubes/:clubId/noticias', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.video_youtube_url, n.destacada, n.publicado_at
        FROM noticias n
        JOIN ligas l ON l.id = n.liga_id
        LEFT JOIN clubes c ON c.id = $2
@@ -1000,7 +1024,7 @@ router.get('/torneos/:torneoId/noticias', async (req, res) => {
   try {
     const categoriaId = req.query.categoria_id || null;
     const { rows } = await query(
-      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.destacada, n.publicado_at
+      `SELECT n.id, n.titulo, n.contenido, n.imagen_url, n.video_youtube_url, n.destacada, n.publicado_at
        FROM noticias n
        JOIN ligas l ON l.id = n.liga_id
        WHERE l.activo = TRUE AND l.tipo = 'productiva' AND n.estado = 'publicada'

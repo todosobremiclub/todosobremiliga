@@ -63,14 +63,7 @@ async function cargarNoticiasGlobales() {
       contenedor.innerHTML = '<p class="sitio-vacio">Todavía no hay noticias publicadas.</p>';
       return;
     }
-    contenedor.innerHTML = data.noticias.map((n) => `
-      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
-        <h3>${escapeHtml(n.titulo)}</h3>
-        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
-        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
-      </div>
-    `).join('');
+    renderCarruselNoticias('listaNoticiasGlobales', data.noticias);
   } catch (err) {
     contenedor.innerHTML = `<p class="sitio-vacio">Error cargando noticias: ${escapeHtml(err.message)}</p>`;
   }

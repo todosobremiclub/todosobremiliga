@@ -61,7 +61,7 @@ async function init() {
   if (torneoId) {
     // URL vieja (/sitio/torneo.html?id=...): el id ya viaja en la URL.
     torneoIdActual = torneoId;
-    if (nombre) document.getElementById('nombreTorneo').textContent = nombre;
+    if (nombre) document.getElementById('textoNombreTorneo').textContent = nombre;
     cargarLigaDelTorneo();
   } else {
     // URL "linda" (/<liga>/<torneo>): hay que resolver el id contra el
@@ -101,7 +101,7 @@ async function cargarLigaDelTorneo() {
     // El nombre del Torneo se pisa acá siempre (venga o no por query string
     // en la URL vieja) para que el título nunca se quede en "Cargando..."
     // -- ej. cuando se llega desde un link que no incluye &nombre=... .
-    document.getElementById('nombreTorneo').textContent = data.torneo.nombre;
+    document.getElementById('textoNombreTorneo').textContent = data.torneo.nombre;
     aplicarBreadcrumbYTemaDeTorneo(data.torneo);
   } catch (err) {
     // si falla, seguimos con el tema/breadcrumb por defecto
@@ -117,7 +117,7 @@ async function resolverTorneoPorSlugs(ligaSlug, torneoSlug) {
     const data = await res.json();
     if (!data.ok) return;
     torneoIdActual = data.torneo.id;
-    document.getElementById('nombreTorneo').textContent = data.torneo.nombre;
+    document.getElementById('textoNombreTorneo').textContent = data.torneo.nombre;
     aplicarBreadcrumbYTemaDeTorneo(data.torneo);
   } catch (err) {
     // si falla, torneoIdActual queda null y init() muestra el mensaje de error
@@ -130,6 +130,17 @@ function aplicarBreadcrumbYTemaDeTorneo(torneo) {
     const link = document.getElementById('linkVolverLiga');
     link.href = `/${encodeURIComponent(torneo.liga_slug)}`;
     link.textContent = `← ${torneo.liga_nombre}`;
+  }
+  // Referencia chiquita al reglamento del torneo (si la Liga subió uno),
+  // al lado del título.
+  const linkReglamento = document.getElementById('linkReglamentoTorneo');
+  if (linkReglamento) {
+    if (torneo.reglamento_url) {
+      linkReglamento.href = torneo.reglamento_url;
+      linkReglamento.classList.remove('oculto');
+    } else {
+      linkReglamento.classList.add('oculto');
+    }
   }
   renderFooterLiga({
     logoUrl: torneo.liga_logo_url,
@@ -149,14 +160,7 @@ async function cargarNoticiasTorneo() {
     if (!data.ok || !data.noticias.length) return;
 
     document.getElementById('bloqueNoticiasTorneo').classList.remove('oculto');
-    document.getElementById('listaNoticiasTorneo').innerHTML = data.noticias.map((n) => `
-      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
-        <h3>${escapeHtml(n.titulo)}</h3>
-        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
-        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
-      </div>
-    `).join('');
+    renderCarruselNoticias('listaNoticiasTorneo', data.noticias);
   } catch (err) {
     // si falla, no se muestra el bloque de noticias; no bloquea el resto de la página
   }

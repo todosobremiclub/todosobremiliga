@@ -57,10 +57,13 @@ async function init() {
       return;
     }
     contenedorTorneos.innerHTML = dataTorneos.torneos.map((t) => `
-      <a class="card-link ${t.logo_url ? 'con-foto-fondo' : ''}" ${t.logo_url ? `style="--foto-fondo: url('${escapeHtml(t.logo_url)}')"` : ''} href="${t.slug ? `/${encodeURIComponent(slug)}/${encodeURIComponent(t.slug)}` : `/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}`}">
-        <h3>${escapeHtml(t.nombre)}</h3>
-        <p>${escapeHtml(t.deporte)} · ${escapeHtml(t.temporada || '')} · ${escapeHtml(t.estado || 'planificado')}</p>
-      </a>
+      <div class="card-torneo-wrap">
+        <a class="card-link ${t.logo_url ? 'con-foto-fondo' : ''}" ${t.logo_url ? `style="--foto-fondo: url('${escapeHtml(t.logo_url)}')"` : ''} href="${t.slug ? `/${encodeURIComponent(slug)}/${encodeURIComponent(t.slug)}` : `/sitio/torneo.html?id=${t.id}&nombre=${encodeURIComponent(t.nombre)}`}">
+          <h3>${escapeHtml(t.nombre)}</h3>
+          <p>${escapeHtml(t.deporte)} · ${escapeHtml(t.temporada || '')} · ${escapeHtml(t.estado || 'planificado')}</p>
+        </a>
+        ${t.reglamento_url ? `<a class="link-reglamento" href="${t.reglamento_url}" target="_blank" rel="noopener" title="Ver reglamento del torneo">📄 Reglamento</a>` : ''}
+      </div>
     `).join('');
   } catch (err) {
     contenedorTorneos.innerHTML = `<p class="sitio-vacio">Error cargando torneos: ${escapeHtml(err.message)}</p>`;
@@ -74,14 +77,7 @@ async function init() {
       contenedorNoticias.innerHTML = '<p class="sitio-vacio">Esta Liga todavía no publicó noticias.</p>';
       return;
     }
-    contenedorNoticias.innerHTML = dataNoticias.noticias.map((n) => `
-      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
-        <h3>${escapeHtml(n.titulo)}</h3>
-        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
-        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
-      </div>
-    `).join('');
+    renderCarruselNoticias('listaNoticias', dataNoticias.noticias);
   } catch (err) {
     contenedorNoticias.innerHTML = `<p class="sitio-vacio">Error cargando noticias: ${escapeHtml(err.message)}</p>`;
   }

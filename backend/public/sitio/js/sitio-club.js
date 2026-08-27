@@ -64,14 +64,7 @@ async function cargarNoticiasClub(ligaSlug, clubId) {
     if (!data.ok || !data.noticias.length) return;
 
     document.getElementById('bloqueNoticiasClub').classList.remove('oculto');
-    document.getElementById('listaNoticiasClub').innerHTML = data.noticias.map((n) => `
-      <div class="noticia-card ${n.destacada ? 'destacada' : ''}">
-        <h3>${escapeHtml(n.titulo)}</h3>
-        <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-        ${n.imagen_url ? `<img src="${escapeHtml(n.imagen_url)}" alt="">` : ''}
-        <p class="noticia-contenido">${escapeHtml(n.contenido)}</p>
-      </div>
-    `).join('');
+    renderCarruselNoticias('listaNoticiasClub', data.noticias);
   } catch (err) {
     // si falla, no se muestra el bloque de noticias; no bloquea el resto de la página
   }

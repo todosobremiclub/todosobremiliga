@@ -28,6 +28,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Valida que el link de YouTube (opcional) sea realmente de YouTube, antes
+// de guardarlo. Acepta cualquier formato de link de YouTube (watch?v=,
+// youtu.be/, /embed/, /shorts/): la conversión al formato embed se hace en
+// el frontend público al mostrarlo, acá solo filtramos que no sea "cualquier
+// cosa" pegada en el campo.
+function esLinkDeYoutubeValido(url) {
+  if (!url) return true;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host === 'youtube.com' || host === 'youtu.be' || host === 'm.youtube.com';
+  } catch (err) {
+    return false;
+  }
+}
+
 // Valida los datos de segmentación ("Mostrar a") de una noticia. Devuelve
 // un mensaje de error (string) si algo no es válido, o null si está OK.
 async function validarSegmentoNoticia(ligaId, segmento) {
@@ -67,7 +82,7 @@ async function validarSegmentoNoticia(ligaId, segmento) {
 // POST /liga/noticias — crear una noticia
 router.post('/', async (req, res) => {
   const {
-    titulo, contenido, imagen_url, destacada, estado,
+    titulo, contenido, imagen_url, video_youtube_url, destacada, estado,
     segmento_tipo, segmento_club_id, segmento_ciudades, segmento_provincias,
     segmento_torneo_id, segmento_categoria_id
   } = req.body;
@@ -79,6 +94,9 @@ router.post('/', async (req, res) => {
   if (estado && !estadosValidos.includes(estado)) {
     return res.status(400).json({ ok: false, error: `Estado inválido. Válidos: ${estadosValidos.join(', ')}` });
   }
+  if (!esLinkDeYoutubeValido(video_youtube_url)) {
+    return res.status(400).json({ ok: false, error: 'El link de video tiene que ser de YouTube' });
+  }
 
   try {
     const errorSegmento = await validarSegmentoNoticia(req.ligaId, req.body);
@@ -87,14 +105,14 @@ router.post('/', async (req, res) => {
     const tipo = segmento_tipo || 'todos';
     const { rows } = await query(
       `INSERT INTO noticias (
-         liga_id, titulo, contenido, imagen_url, destacada, estado, autor_id,
+         liga_id, titulo, contenido, imagen_url, video_youtube_url, destacada, estado, autor_id,
          segmento_tipo, segmento_club_id, segmento_ciudades, segmento_provincias,
          segmento_torneo_id, segmento_categoria_id
        )
-       VALUES ($1, $2, $3, $4, COALESCE($5, FALSE), COALESCE($6, 'publicada'), $7,
-               $8, $9, $10, $11, $12, $13)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, FALSE), COALESCE($7, 'publicada'), $8,
+               $9, $10, $11, $12, $13, $14)
        RETURNING *`,
-      [req.ligaId, titulo.trim(), contenido.trim(), imagen_url || null,
+      [req.ligaId, titulo.trim(), contenido.trim(), imagen_url || null, video_youtube_url || null,
        destacada === true, estado || null, req.usuario.id,
        tipo,
        tipo === 'club' ? segmento_club_id : null,
@@ -113,10 +131,13 @@ router.post('/', async (req, res) => {
 // PUT /liga/noticias/:noticiaId — editar
 router.put('/:noticiaId', async (req, res) => {
   const {
-    titulo, contenido, imagen_url, destacada,
+    titulo, contenido, imagen_url, video_youtube_url, destacada,
     segmento_tipo, segmento_club_id, segmento_ciudades, segmento_provincias,
     segmento_torneo_id, segmento_categoria_id
   } = req.body;
+  if (!esLinkDeYoutubeValido(video_youtube_url)) {
+    return res.status(400).json({ ok: false, error: 'El link de video tiene que ser de YouTube' });
+  }
   try {
     if (segmento_tipo) {
       const errorSegmento = await validarSegmentoNoticia(req.ligaId, req.body);
@@ -128,16 +149,17 @@ router.put('/:noticiaId', async (req, res) => {
          titulo = COALESCE($1, titulo),
          contenido = COALESCE($2, contenido),
          imagen_url = COALESCE($3, imagen_url),
-         destacada = COALESCE($4, destacada),
-         segmento_tipo = COALESCE($5, segmento_tipo),
-         segmento_club_id = CASE WHEN $5 = 'club' THEN $6::uuid WHEN $5 IS NOT NULL THEN NULL ELSE segmento_club_id END,
-         segmento_ciudades = CASE WHEN $5 = 'ciudad' THEN $7::text[] WHEN $5 IS NOT NULL THEN NULL ELSE segmento_ciudades END,
-         segmento_provincias = CASE WHEN $5 = 'provincia' THEN $8::text[] WHEN $5 IS NOT NULL THEN NULL ELSE segmento_provincias END,
-         segmento_torneo_id = CASE WHEN $5 = 'torneo' THEN $9::uuid WHEN $5 IS NOT NULL THEN NULL ELSE segmento_torneo_id END,
-         segmento_categoria_id = CASE WHEN $5 = 'torneo' THEN $10::uuid WHEN $5 IS NOT NULL THEN NULL ELSE segmento_categoria_id END
-       WHERE id = $11 AND liga_id = $12
+         video_youtube_url = COALESCE($4, video_youtube_url),
+         destacada = COALESCE($5, destacada),
+         segmento_tipo = COALESCE($6, segmento_tipo),
+         segmento_club_id = CASE WHEN $6 = 'club' THEN $7::uuid WHEN $6 IS NOT NULL THEN NULL ELSE segmento_club_id END,
+         segmento_ciudades = CASE WHEN $6 = 'ciudad' THEN $8::text[] WHEN $6 IS NOT NULL THEN NULL ELSE segmento_ciudades END,
+         segmento_provincias = CASE WHEN $6 = 'provincia' THEN $9::text[] WHEN $6 IS NOT NULL THEN NULL ELSE segmento_provincias END,
+         segmento_torneo_id = CASE WHEN $6 = 'torneo' THEN $10::uuid WHEN $6 IS NOT NULL THEN NULL ELSE segmento_torneo_id END,
+         segmento_categoria_id = CASE WHEN $6 = 'torneo' THEN $11::uuid WHEN $6 IS NOT NULL THEN NULL ELSE segmento_categoria_id END
+       WHERE id = $12 AND liga_id = $13
        RETURNING *`,
-      [titulo || null, contenido || null, imagen_url || null,
+      [titulo || null, contenido || null, imagen_url || null, video_youtube_url || null,
        typeof destacada === 'boolean' ? destacada : null,
        segmento_tipo || null, segmento_club_id || null, segmento_ciudades || null,
        segmento_provincias || null, segmento_torneo_id || null, segmento_categoria_id || null,

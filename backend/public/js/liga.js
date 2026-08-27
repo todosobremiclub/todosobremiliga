@@ -5241,6 +5241,7 @@ async function guardarNoticia(e) {
     titulo: document.getElementById('noticiaTitulo').value.trim(),
     contenido: document.getElementById('noticiaContenido').value.trim(),
     imagen_url: document.getElementById('noticiaImagenUrl').value.trim() || undefined,
+    video_youtube_url: document.getElementById('noticiaVideoYoutube').value.trim() || undefined,
     destacada: document.getElementById('noticiaDestacada').checked,
     segmento_tipo: segmento
   };
@@ -6362,6 +6363,8 @@ async function cargarReporteClubesPorTorneo() {
     reportesClubesArbol = data.torneos;
     document.getElementById('repClubesTotal').textContent = data.total_clubes;
 
+    const select = document.getElementById('repClubesTorneoSelect');
+
     chartClubesPorTorneo = destruirChart(chartClubesPorTorneo);
     chartClubesPorTorneo = crearChartSeguro(() => new Chart(document.getElementById('chartClubesPorTorneo'), {
       type: 'pie',
@@ -6369,10 +6372,23 @@ async function cargarReporteClubesPorTorneo() {
         labels: reportesClubesArbol.map((t) => t.torneo_nombre),
         datasets: [{ data: reportesClubesArbol.map((t) => t.total_clubes), backgroundColor: PALETA_REPORTES }],
       },
-      options: { plugins: { legend: { position: 'bottom' } } },
+      options: {
+        plugins: { legend: { position: 'bottom' } },
+        // Tocar una porción del gráfico hace lo mismo que elegirlo en el
+        // desplegable: muestra sus Divisiones a la derecha.
+        onClick: (evt, elementos) => {
+          if (!elementos.length) return;
+          const torneo = reportesClubesArbol[elementos[0].index];
+          if (!torneo) return;
+          select.value = torneo.torneo_id;
+          onCambioRepClubesTorneo(torneo.torneo_id);
+        },
+        onHover: (evt, elementos) => {
+          evt.native.target.style.cursor = elementos.length ? 'pointer' : 'default';
+        },
+      },
     }));
 
-    const select = document.getElementById('repClubesTorneoSelect');
     select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
       reportesClubesArbol.map((t) => `<option value="${t.torneo_id}">${escapeHtml(t.torneo_nombre)}</option>`).join('');
     select.onchange = () => onCambioRepClubesTorneo(select.value);
@@ -6385,11 +6401,13 @@ async function cargarReporteClubesPorTorneo() {
 function onCambioRepClubesTorneo(torneoId) {
   const wrapCategoria = document.getElementById('repClubesCategoriaChartWrap');
   const selectCategoria = document.getElementById('repClubesCategoriaSelect');
+  const columnaSubcategoria = document.getElementById('repClubesSubcategoriaColumna');
   const wrapSubcategoria = document.getElementById('repClubesSubcategoriaChartWrap');
 
   if (!torneoId) {
     wrapCategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
+    columnaSubcategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
     return;
   }
@@ -6397,6 +6415,7 @@ function onCambioRepClubesTorneo(torneoId) {
   if (!torneo || !torneo.categorias.length) {
     wrapCategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
+    columnaSubcategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
     return;
   }
@@ -6406,7 +6425,8 @@ function onCambioRepClubesTorneo(torneoId) {
   chartClubesPorCategoria = crearChartSeguro(() => new Chart(document.getElementById('chartClubesPorCategoria'), {
     type: 'pie',
     data: {
-      labels: torneo.categorias.map((c) => c.categoria_nombre),
+      // El nombre de cada división muestra al lado cuántos clubes tiene.
+      labels: torneo.categorias.map((c) => `${c.categoria_nombre} (${c.total_clubes})`),
       datasets: [{ data: torneo.categorias.map((c) => c.total_clubes), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
@@ -6414,12 +6434,14 @@ function onCambioRepClubesTorneo(torneoId) {
 
   const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
   if (tieneSubcategorias) {
+    columnaSubcategoria.classList.remove('oculto');
     selectCategoria.classList.remove('oculto');
     selectCategoria.innerHTML = '<option value="">Elegí una División para ver sus Categorías</option>' +
       torneo.categorias.map((c) => `<option value="${c.categoria_id}">${escapeHtml(c.categoria_nombre)}</option>`).join('');
     selectCategoria.onchange = () => onCambioRepClubesCategoria(torneo, selectCategoria.value);
     onCambioRepClubesCategoria(torneo, '');
   } else {
+    columnaSubcategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
   }
@@ -6572,6 +6594,8 @@ async function cargarReporteFichados() {
     reportesFichadosArbol = data.torneos;
     document.getElementById('repFichadosTotal').textContent = data.total_fichados;
 
+    const select = document.getElementById('repFichadosTorneoSelect');
+
     chartFichadosPorTorneo = destruirChart(chartFichadosPorTorneo);
     chartFichadosPorTorneo = crearChartSeguro(() => new Chart(document.getElementById('chartFichadosPorTorneo'), {
       type: 'pie',
@@ -6579,10 +6603,21 @@ async function cargarReporteFichados() {
         labels: reportesFichadosArbol.map((t) => t.torneo_nombre),
         datasets: [{ data: reportesFichadosArbol.map((t) => t.total_fichados), backgroundColor: PALETA_REPORTES }],
       },
-      options: { plugins: { legend: { position: 'bottom' } } },
+      options: {
+        plugins: { legend: { position: 'bottom' } },
+        onClick: (evt, elementos) => {
+          if (!elementos.length) return;
+          const torneo = reportesFichadosArbol[elementos[0].index];
+          if (!torneo) return;
+          select.value = torneo.torneo_id;
+          onCambioRepFichadosTorneo(torneo.torneo_id);
+        },
+        onHover: (evt, elementos) => {
+          evt.native.target.style.cursor = elementos.length ? 'pointer' : 'default';
+        },
+      },
     }));
 
-    const select = document.getElementById('repFichadosTorneoSelect');
     select.innerHTML = '<option value="">Elegí un Torneo para ver sus Divisiones</option>' +
       reportesFichadosArbol.map((t) => `<option value="${t.torneo_id}">${escapeHtml(t.torneo_nombre)}</option>`).join('');
     select.onchange = () => onCambioRepFichadosTorneo(select.value);
@@ -6595,11 +6630,13 @@ async function cargarReporteFichados() {
 function onCambioRepFichadosTorneo(torneoId) {
   const wrapCategoria = document.getElementById('repFichadosCategoriaChartWrap');
   const selectCategoria = document.getElementById('repFichadosCategoriaSelect');
+  const columnaSubcategoria = document.getElementById('repFichadosSubcategoriaColumna');
   const wrapSubcategoria = document.getElementById('repFichadosSubcategoriaChartWrap');
 
   if (!torneoId) {
     wrapCategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
+    columnaSubcategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
     return;
   }
@@ -6607,6 +6644,7 @@ function onCambioRepFichadosTorneo(torneoId) {
   if (!torneo || !torneo.categorias.length) {
     wrapCategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
+    columnaSubcategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
     return;
   }
@@ -6616,7 +6654,8 @@ function onCambioRepFichadosTorneo(torneoId) {
   chartFichadosPorCategoria = crearChartSeguro(() => new Chart(document.getElementById('chartFichadosPorCategoria'), {
     type: 'pie',
     data: {
-      labels: torneo.categorias.map((c) => c.categoria_nombre),
+      // El nombre de cada división muestra al lado cuántos fichados tiene.
+      labels: torneo.categorias.map((c) => `${c.categoria_nombre} (${c.total_fichados})`),
       datasets: [{ data: torneo.categorias.map((c) => c.total_fichados), backgroundColor: PALETA_REPORTES }],
     },
     options: { plugins: { legend: { position: 'bottom' } } },
@@ -6624,12 +6663,14 @@ function onCambioRepFichadosTorneo(torneoId) {
 
   const tieneSubcategorias = torneo.categorias.some((c) => c.subcategorias.length);
   if (tieneSubcategorias) {
+    columnaSubcategoria.classList.remove('oculto');
     selectCategoria.classList.remove('oculto');
     selectCategoria.innerHTML = '<option value="">Elegí una División para ver sus Categorías</option>' +
       torneo.categorias.map((c) => `<option value="${c.categoria_id || ''}">${escapeHtml(c.categoria_nombre)}</option>`).join('');
     selectCategoria.onchange = () => onCambioRepFichadosCategoria(torneo, selectCategoria.value);
     onCambioRepFichadosCategoria(torneo, '');
   } else {
+    columnaSubcategoria.classList.add('oculto');
     selectCategoria.classList.add('oculto');
     wrapSubcategoria.classList.add('oculto');
   }

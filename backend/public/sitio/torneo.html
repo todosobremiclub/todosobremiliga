@@ -58,7 +58,9 @@
   <div class="sitio-header">
     <div class="sitio-header-inner">
       <div>
-        <h1 id="nombreTorneo">Cargando...</h1>
+        <h1 id="nombreTorneo"><span id="textoNombreTorneo">Cargando...</span>
+          <a href="#" target="_blank" rel="noopener" class="link-reglamento-header oculto" id="linkReglamentoTorneo" title="Ver reglamento del torneo">📄 Reglamento</a>
+        </h1>
         <div class="sitio-breadcrumb"><a href="/sitio/index.html" id="linkVolverLiga">← Todas las Ligas</a></div>
       </div>
     </div>
@@ -162,9 +164,24 @@
     <div id="detallePartidoContenido"><p class="sitio-vacio">Cargando...</p></div>
   </div>
 
+  <!-- Popup compartido con la noticia completa (texto entero, imagen y
+       video de YouTube si tiene), usado por el carrusel de Noticias. -->
+  <div class="oculto fondo-modal-generico" id="fondoModalNoticiaCompleta" onclick="cerrarNoticiaCompleta()"></div>
+  <div class="popup-modal popup-modal-noticia oculto" id="modalNoticiaCompleta">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+      <button class="btn btn-secundario btn-pequeno" onclick="cerrarNoticiaCompleta()">Cerrar</button>
+    </div>
+    <h2 id="tituloNoticiaCompleta" style="margin-top:0;"></h2>
+    <div class="noticia-fecha" id="fechaNoticiaCompleta"></div>
+    <img id="imagenNoticiaCompleta" class="oculto" alt="">
+    <div id="videoNoticiaCompleta" class="noticia-video-embed"></div>
+    <p id="contenidoNoticiaCompleta" class="noticia-contenido" style="white-space:pre-wrap;"></p>
+  </div>
+
   <div id="footerLiga"></div>
 
   <script src="/sitio/js/sitio-tema.js"></script>
+  <script src="/sitio/js/sitio-noticias.js"></script>
   <script src="/sitio/js/sitio-torneo.js"></script>
 </body>
 </html>

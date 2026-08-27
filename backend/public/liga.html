@@ -1196,6 +1196,11 @@
               <input type="hidden" id="noticiaImagenUrl">
             </div>
             <div>
+              <label for="noticiaVideoYoutube">Video de YouTube (opcional)</label>
+              <input type="url" id="noticiaVideoYoutube" placeholder="https://www.youtube.com/watch?v=...">
+              <p class="texto-ayuda" style="margin:4px 0 0;">Si lo cargás, en la web se muestra el reproductor embebido junto a la noticia.</p>
+            </div>
+            <div>
               <label><input type="checkbox" id="noticiaDestacada" style="width:auto; margin-right:6px;">Destacada</label>
             </div>
             <div>
@@ -1540,14 +1545,17 @@
         </div>
         <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
           <div style="flex:1; min-width:280px; max-width:380px;">
+            <p class="texto-ayuda" style="margin-top:0;">Tocá una porción para ver sus Divisiones.</p>
             <div class="contenedor-chart"><canvas id="chartClubesPorTorneo"></canvas></div>
           </div>
-          <div style="flex:1; min-width:280px;">
+          <div style="flex:1; min-width:280px; max-width:380px;">
             <select id="repClubesTorneoSelect" style="margin-bottom:12px;">
               <option value="">Elegí un Torneo para ver sus Divisiones</option>
             </select>
             <div class="contenedor-chart oculto" id="repClubesCategoriaChartWrap"><canvas id="chartClubesPorCategoria"></canvas></div>
-            <select id="repClubesCategoriaSelect" class="oculto" style="margin:12px 0;">
+          </div>
+          <div class="oculto" id="repClubesSubcategoriaColumna" style="flex:1; min-width:280px; max-width:380px;">
+            <select id="repClubesCategoriaSelect" class="oculto" style="margin-bottom:12px;">
               <option value="">Elegí una División para ver sus Categorías</option>
             </select>
             <div class="contenedor-chart oculto" id="repClubesSubcategoriaChartWrap"><canvas id="chartClubesPorSubcategoria"></canvas></div>
@@ -1596,14 +1604,17 @@
         </div>
         <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
           <div style="flex:1; min-width:280px; max-width:380px;">
+            <p class="texto-ayuda" style="margin-top:0;">Tocá una porción para ver sus Divisiones.</p>
             <div class="contenedor-chart"><canvas id="chartFichadosPorTorneo"></canvas></div>
           </div>
-          <div style="flex:1; min-width:280px;">
+          <div style="flex:1; min-width:280px; max-width:380px;">
             <select id="repFichadosTorneoSelect" style="margin-bottom:12px;">
               <option value="">Elegí un Torneo para ver sus Divisiones</option>
             </select>
             <div class="contenedor-chart oculto" id="repFichadosCategoriaChartWrap"><canvas id="chartFichadosPorCategoria"></canvas></div>
-            <select id="repFichadosCategoriaSelect" class="oculto" style="margin:12px 0;">
+          </div>
+          <div class="oculto" id="repFichadosSubcategoriaColumna" style="flex:1; min-width:280px; max-width:380px;">
+            <select id="repFichadosCategoriaSelect" class="oculto" style="margin-bottom:12px;">
               <option value="">Elegí una División para ver sus Categorías</option>
             </select>
             <div class="contenedor-chart oculto" id="repFichadosSubcategoriaChartWrap"><canvas id="chartFichadosPorSubcategoria"></canvas></div>
