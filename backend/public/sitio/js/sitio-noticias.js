@@ -25,9 +25,9 @@ function escaparHtmlNoticias(texto) {
     .replace(/"/g, '&quot;');
 }
 
-// Convierte cualquier formato de link de YouTube (watch?v=, youtu.be/,
-// /embed/, /shorts/) a su URL de embed. Devuelve null si no lo reconoce.
-function youtubeEmbedUrl(url) {
+// Extrae el ID del video de cualquier formato de link de YouTube (watch?v=,
+// youtu.be/, /embed/, /shorts/). Devuelve null si no lo reconoce.
+function youtubeVideoId(url) {
   if (!url) return null;
   try {
     const u = new URL(url);
@@ -40,11 +40,23 @@ function youtubeEmbedUrl(url) {
       else if (u.pathname.startsWith('/embed/')) id = u.pathname.split('/')[2];
       else if (u.pathname.startsWith('/shorts/')) id = u.pathname.split('/')[2];
     }
-    if (!id) return null;
-    return `https://www.youtube.com/embed/${id}`;
+    return id || null;
   } catch (err) {
     return null;
   }
+}
+
+function youtubeEmbedUrl(url) {
+  const id = youtubeVideoId(url);
+  return id ? `https://www.youtube.com/embed/${id}` : null;
+}
+
+// Miniatura del video (la misma que usa YouTube en sus propias vistas
+// previas) — se usa como imagen de la tarjeta cuando la noticia tiene video
+// pero no subió una foto propia.
+function youtubeThumbnailUrl(url) {
+  const id = youtubeVideoId(url);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 function renderCarruselNoticias(containerId, noticias) {
@@ -108,12 +120,23 @@ function tarjetaNoticiaCarruselHtml(containerId, n, indice) {
   const tieneVideo = !!youtubeEmbedUrl(n.video_youtube_url);
   const textoLargo = (n.contenido || '').length > NOTICIAS_UMBRAL_VER_MAS;
   const mostrarVerMas = textoLargo || tieneVideo;
+
+  // Si tiene foto propia se usa esa (con un botón de play encima si además
+  // tiene video); si no tiene foto pero sí video, se usa la miniatura del
+  // video de YouTube como imagen de portada de la tarjeta.
+  const srcImagen = n.imagen_url || (tieneVideo ? youtubeThumbnailUrl(n.video_youtube_url) : null);
+  const imagenHtml = srcImagen ? `
+    <div class="noticia-imagen-wrap">
+      <img src="${escaparHtmlNoticias(srcImagen)}" alt="">
+      ${tieneVideo ? '<span class="noticia-play-badge">▶</span>' : ''}
+    </div>
+  ` : '';
+
   return `
     <div class="noticia-card noticia-card-carrusel ${n.destacada ? 'destacada' : ''}">
       <h3>${escaparHtmlNoticias(n.titulo)}</h3>
       <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-      ${n.imagen_url ? `<div class="noticia-imagen-wrap"><img src="${escaparHtmlNoticias(n.imagen_url)}" alt=""></div>` : ''}
-      ${tieneVideo ? '<span class="noticia-video-badge">🎬 Con video</span>' : ''}
+      ${imagenHtml}
       <p class="noticia-contenido noticia-contenido-clamp">${escaparHtmlNoticias(n.contenido)}</p>
       ${mostrarVerMas ? `<button type="button" class="link-ver-mas-noticia" onclick="verNoticiaCompleta('${containerId}', ${indice})">Ver más</button>` : ''}
     </div>

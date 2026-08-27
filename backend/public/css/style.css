@@ -859,6 +859,7 @@ button.btn-peligro:hover { background: #fee2e2; }
 }
 
 .noticia-card-carrusel .noticia-imagen-wrap {
+  position: relative;
   width: 100%;
   height: 120px;
   flex-shrink: 0;
@@ -877,16 +878,25 @@ button.btn-peligro:hover { background: #fee2e2; }
   object-fit: contain;
 }
 
-.noticia-video-badge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--azul-oscuro);
-  background: rgba(29,78,216,0.1);
-  border-radius: 999px;
-  padding: 3px 9px;
-  margin-bottom: 8px;
-  width: fit-content;
+/* Botón de play centrado sobre la miniatura/foto, cuando la noticia tiene
+   un video de YouTube cargado — reemplaza al texto "Con video" de antes. */
+.noticia-play-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: 1.5px solid rgba(255,255,255,0.75);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding-left: 3px;
+  pointer-events: none;
 }
 
 .noticia-card-carrusel .noticia-contenido-clamp {
