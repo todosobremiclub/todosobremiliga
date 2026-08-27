@@ -1417,10 +1417,18 @@
         <div class="panel-header">
           <h2>Qué pagó y qué adeuda cada club</h2>
         </div>
+        <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+          <input type="text" id="buscadorCobrosClub" placeholder="Buscar por club..." style="flex:1; min-width:200px; padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
+        </div>
         <table>
           <thead><tr><th>Club</th><th>Total adeudado</th><th>Total pagado</th><th>Saldo pendiente</th><th>Acciones</th></tr></thead>
           <tbody id="tablaResumenCobros"><tr><td colspan="5">Cargando...</td></tr></tbody>
         </table>
+        <div id="paginacionCobros" style="display:flex; align-items:center; gap:12px; margin-top:14px;">
+          <button class="btn btn-secundario btn-pequeno" id="btnCobrosPaginaAnterior">← Anterior</button>
+          <span id="paginacionCobrosInfo" class="texto-ayuda"></span>
+          <button class="btn btn-secundario btn-pequeno" id="btnCobrosPaginaSiguiente">Siguiente →</button>
+        </div>
       </div>
 
       <div class="panel">

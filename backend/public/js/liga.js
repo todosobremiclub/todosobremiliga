@@ -9,6 +9,8 @@ let clubLogoBase64Actual = '';
 let ligaSlugActual = null;
 let cobrosTorneoId = null;
 let cobrosResumenCache = [];
+let paginaCobrosActual = 1;
+const COBROS_POR_PAGINA = 20;
 let cobrosClubDeudasActualId = null;
 let cobrosClubDeudasActualNombre = '';
 
@@ -564,6 +566,17 @@ function conectarEventos() {
   document.getElementById('btnFichajesPaginaSiguiente').addEventListener('click', () => {
     paginaFichajesLigaActual += 1;
     renderFichajesLiga();
+  });
+  document.getElementById('buscadorCobrosClub').addEventListener('input', () => {
+    paginaCobrosActual = 1;
+    renderResumenCobros();
+  });
+  document.getElementById('btnCobrosPaginaAnterior').addEventListener('click', () => {
+    if (paginaCobrosActual > 1) { paginaCobrosActual -= 1; renderResumenCobros(); }
+  });
+  document.getElementById('btnCobrosPaginaSiguiente').addEventListener('click', () => {
+    paginaCobrosActual += 1;
+    renderResumenCobros();
   });
   document.getElementById('btnJornadaGeneralLigaAnterior').addEventListener('click', () => cambiarJornadaFixtureGeneralLiga(-1));
   document.getElementById('btnJornadaGeneralLigaSiguiente').addEventListener('click', () => cambiarJornadaFixtureGeneralLiga(1));
@@ -5833,11 +5846,41 @@ async function cargarResumenCobros() {
   try {
     const data = await apiFetch(`/liga/cobros/${cobrosTorneoId}/resumen`);
     cobrosResumenCache = data.resumen;
-    if (!data.resumen.length) {
-      tbody.innerHTML = '<tr><td colspan="5">Todavía no hay clubes inscriptos en este torneo.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.resumen.map((r) => `
+    document.getElementById('buscadorCobrosClub').value = '';
+    paginaCobrosActual = 1;
+    renderResumenCobros();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Filtra por nombre de club (buscadorCobrosClub) y pagina a 20 por hoja,
+// igual que el resto de las tablas grandes del Panel Liga.
+function renderResumenCobros() {
+  const tbody = document.getElementById('tablaResumenCobros');
+  const texto = (document.getElementById('buscadorCobrosClub').value || '').trim().toLowerCase();
+  const filtrados = texto
+    ? cobrosResumenCache.filter((r) => (r.club_nombre || '').toLowerCase().includes(texto))
+    : cobrosResumenCache;
+
+  if (!cobrosResumenCache.length) {
+    tbody.innerHTML = '<tr><td colspan="5">Todavía no hay clubes inscriptos en este torneo.</td></tr>';
+    document.getElementById('paginacionCobros').classList.add('oculto');
+    return;
+  }
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="5">Ningún club coincide con la búsqueda.</td></tr>';
+    document.getElementById('paginacionCobros').classList.add('oculto');
+    return;
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / COBROS_POR_PAGINA));
+  if (paginaCobrosActual > totalPaginas) paginaCobrosActual = totalPaginas;
+  if (paginaCobrosActual < 1) paginaCobrosActual = 1;
+  const inicioPagina = (paginaCobrosActual - 1) * COBROS_POR_PAGINA;
+  const pagina = filtrados.slice(inicioPagina, inicioPagina + COBROS_POR_PAGINA);
+
+  tbody.innerHTML = pagina.map((r) => `
       <tr>
         <td>${escapeHtml(r.club_nombre)}</td>
         <td>${formatearMonto(r.total_adeudado)}</td>
@@ -5846,9 +5889,12 @@ async function cargarResumenCobros() {
         <td><button type="button" class="btn btn-secundario btn-pequeno" onclick="verDeudasClub('${r.club_id}', '${escapeHtml(r.club_nombre).replace(/'/g, "\\'")}')">Ver detalle</button></td>
       </tr>
     `).join('');
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" class="mensaje-error">Error: ${escapeHtml(err.message)}</td></tr>`;
-  }
+
+  document.getElementById('paginacionCobros').classList.remove('oculto');
+  document.getElementById('paginacionCobrosInfo').textContent =
+    `Mostrando ${inicioPagina + 1}-${Math.min(inicioPagina + COBROS_POR_PAGINA, filtrados.length)} de ${filtrados.length} (página ${paginaCobrosActual} de ${totalPaginas})`;
+  document.getElementById('btnCobrosPaginaAnterior').disabled = paginaCobrosActual <= 1;
+  document.getElementById('btnCobrosPaginaSiguiente').disabled = paginaCobrosActual >= totalPaginas;
 }
 
 // Popup de deudas de un club (dentro del torneo elegido en la tab Cobros) +
