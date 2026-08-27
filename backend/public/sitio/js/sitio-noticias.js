@@ -1,16 +1,24 @@
 // Carrusel de Noticias del sitio público: se usa igual en liga.html,
-// torneo.html, club.html e index.html — 2 tarjetas por vez (mismo tamaño
-// siempre), con flechas + puntos si hay más de 2, "Ver más" cuando el texto
-// no entra o hay video, y un popup con la noticia completa (texto entero +
-// imagen + video de YouTube embebido).
+// torneo.html, club.html e index.html — 3 tarjetas visibles a la vez (mismo
+// tamaño siempre, 2 en tablet y 1 en mobile), con flechas + puntos si hay
+// más noticias que tarjetas visibles, "Ver más" cuando el texto no entra o
+// hay video, y un popup con la noticia completa (texto entero + imagen +
+// video de YouTube embebido).
+//
+// "Siguiente"/"Anterior" DESLIZAN de a una tarjeta por vez (no saltan a una
+// página nueva) — todas las tarjetas viven en una sola fila flex más ancha
+// que el visor, y se la corre con transform: translateX. Así "Siguiente"
+// siempre deja 2 tarjetas conocidas + 1 nueva a la vista, en vez de saltar a
+// una página que puede quedar casi vacía cuando el total no es múltiplo de
+// la cantidad visible.
 //
 // Cada página sólo tiene que llamar a renderCarruselNoticias('idDelContenedor', noticias)
 // después de traer las noticias de su endpoint correspondiente, y agregar en
 // su HTML el popup compartido (ver public/sitio/liga.html como referencia:
 // #fondoModalNoticiaCompleta + #modalNoticiaCompleta).
 
-const NOTICIAS_POR_PAGINA_CARRUSEL = 3;
 const NOTICIAS_UMBRAL_VER_MAS = 220; // caracteres de contenido a partir de los cuales se corta con "Ver más"
+const NOTICIAS_CARRUSEL_GAP = 16; // debe coincidir con el "gap" de .carrusel-noticias-fila en css
 
 // Estado por contenedor: permite que una página tenga más de un carrusel de
 // noticias (hoy ninguna lo necesita, pero no cuesta nada dejarlo genérico).
@@ -59,6 +67,14 @@ function youtubeThumbnailUrl(url) {
   return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
+// Cuántas tarjetas se ven a la vez según el ancho del visor — mismos cortes
+// que las media queries de .carrusel-noticias-fila en css (860px/560px).
+function tarjetasVisiblesCarrusel(anchoViewport) {
+  if (anchoViewport < 560) return 1;
+  if (anchoViewport < 860) return 2;
+  return 3;
+}
+
 function renderCarruselNoticias(containerId, noticias) {
   const contenedor = document.getElementById(containerId);
   if (!contenedor) return;
@@ -67,49 +83,85 @@ function renderCarruselNoticias(containerId, noticias) {
     return;
   }
 
-  _estadoCarruselesNoticias[containerId] = { noticias, pagina: 0 };
+  _estadoCarruselesNoticias[containerId] = { noticias, indice: 0, visibles: 3 };
 
   contenedor.innerHTML = `
-    <div class="carrusel-noticias-fila" id="${containerId}_fila"></div>
+    <div class="carrusel-noticias-viewport" id="${containerId}_viewport">
+      <div class="carrusel-noticias-fila" id="${containerId}_fila">
+        ${noticias.map((n, i) => tarjetaNoticiaCarruselHtml(containerId, n, i)).join('')}
+      </div>
+    </div>
     <div class="carrusel-noticias-nav oculto" id="${containerId}_nav">
       <button type="button" class="btn btn-secundario btn-pequeno" id="${containerId}_btnAnterior">← Anterior</button>
       <span class="carrusel-noticias-puntos" id="${containerId}_puntos"></span>
       <button type="button" class="btn btn-secundario btn-pequeno" id="${containerId}_btnSiguiente">Siguiente →</button>
     </div>
   `;
-  document.getElementById(`${containerId}_btnAnterior`).addEventListener('click', () => cambiarPaginaCarruselNoticias(containerId, -1));
-  document.getElementById(`${containerId}_btnSiguiente`).addEventListener('click', () => cambiarPaginaCarruselNoticias(containerId, 1));
+  document.getElementById(`${containerId}_btnAnterior`).addEventListener('click', () => moverCarruselNoticias(containerId, -1));
+  document.getElementById(`${containerId}_btnSiguiente`).addEventListener('click', () => moverCarruselNoticias(containerId, 1));
 
-  renderPaginaCarruselNoticias(containerId);
+  // El ancho de cada tarjeta depende del ancho real del visor (recalcula
+  // también si la ventana cambia de tamaño, ej. al rotar el celular).
+  let temporizadorResize = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(temporizadorResize);
+    temporizadorResize = setTimeout(() => actualizarAnchoCarruselNoticias(containerId), 150);
+  });
+
+  actualizarAnchoCarruselNoticias(containerId);
 }
 
-function cambiarPaginaCarruselNoticias(containerId, delta) {
+function moverCarruselNoticias(containerId, delta) {
   const estado = _estadoCarruselesNoticias[containerId];
   if (!estado) return;
-  const totalPaginas = Math.ceil(estado.noticias.length / NOTICIAS_POR_PAGINA_CARRUSEL);
-  estado.pagina = Math.max(0, Math.min(totalPaginas - 1, estado.pagina + delta));
-  renderPaginaCarruselNoticias(containerId);
+  const indiceMaximo = Math.max(0, estado.noticias.length - estado.visibles);
+  estado.indice = Math.max(0, Math.min(indiceMaximo, estado.indice + delta));
+  aplicarPosicionCarruselNoticias(containerId);
 }
 
-function renderPaginaCarruselNoticias(containerId) {
+// Recalcula cuántas tarjetas entran (según el ancho actual) y el ancho en
+// píxeles de cada una, y se lo aplica a todas las tarjetas de la fila.
+function actualizarAnchoCarruselNoticias(containerId) {
   const estado = _estadoCarruselesNoticias[containerId];
-  if (!estado) return;
-  const { noticias, pagina } = estado;
+  const viewport = document.getElementById(`${containerId}_viewport`);
+  const fila = document.getElementById(`${containerId}_fila`);
+  if (!estado || !viewport || !fila) return;
+
+  const anchoViewport = viewport.clientWidth;
+  const visibles = tarjetasVisiblesCarrusel(anchoViewport);
+  estado.visibles = visibles;
+  estado.anchoCard = (anchoViewport - NOTICIAS_CARRUSEL_GAP * (visibles - 1)) / visibles;
+
+  Array.from(fila.children).forEach((card) => {
+    card.style.width = `${estado.anchoCard}px`;
+  });
+
+  // Si al achicarse la ventana el índice actual ya no entra (quedó fuera de
+  // rango porque ahora hay menos tarjetas visibles), se recorta.
+  const indiceMaximo = Math.max(0, estado.noticias.length - visibles);
+  estado.indice = Math.min(estado.indice, indiceMaximo);
+
+  aplicarPosicionCarruselNoticias(containerId);
+}
+
+function aplicarPosicionCarruselNoticias(containerId) {
+  const estado = _estadoCarruselesNoticias[containerId];
   const fila = document.getElementById(`${containerId}_fila`);
   const nav = document.getElementById(`${containerId}_nav`);
-  const puntos = document.getElementById(`${containerId}_puntos`);
-  const totalPaginas = Math.ceil(noticias.length / NOTICIAS_POR_PAGINA_CARRUSEL);
-  const inicio = pagina * NOTICIAS_POR_PAGINA_CARRUSEL;
-  const visibles = noticias.slice(inicio, inicio + NOTICIAS_POR_PAGINA_CARRUSEL);
+  if (!estado || !fila || !nav) return;
 
-  fila.innerHTML = visibles.map((n, i) => tarjetaNoticiaCarruselHtml(containerId, n, inicio + i)).join('');
+  const { noticias, indice, visibles, anchoCard } = estado;
+  const indiceMaximo = Math.max(0, noticias.length - visibles);
+  const corrimiento = indice * ((anchoCard || 0) + NOTICIAS_CARRUSEL_GAP);
+  fila.style.transform = `translateX(-${corrimiento}px)`;
 
-  if (totalPaginas > 1) {
+  if (indiceMaximo > 0) {
     nav.classList.remove('oculto');
-    document.getElementById(`${containerId}_btnAnterior`).disabled = pagina <= 0;
-    document.getElementById(`${containerId}_btnSiguiente`).disabled = pagina >= totalPaginas - 1;
-    puntos.innerHTML = Array.from({ length: totalPaginas }).map((_, i) =>
-      `<span class="punto-carrusel ${i === pagina ? 'activo' : ''}"></span>`
+    document.getElementById(`${containerId}_btnAnterior`).disabled = indice <= 0;
+    document.getElementById(`${containerId}_btnSiguiente`).disabled = indice >= indiceMaximo;
+    const puntos = document.getElementById(`${containerId}_puntos`);
+    puntos.innerHTML = Array.from({ length: indiceMaximo + 1 }).map((_, i) =>
+      `<span class="punto-carrusel ${i === indice ? 'activo' : ''}"></span>`
     ).join('');
   } else {
     nav.classList.add('oculto');

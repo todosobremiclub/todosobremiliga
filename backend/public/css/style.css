@@ -831,21 +831,26 @@ button.btn-peligro:hover { background: #fee2e2; }
    Se arma en JS desde public/sitio/js/sitio-noticias.js y se usa en
    liga.html, torneo.html, club.html e index.html del sitio público.
    =========================================================================== */
+/* El visor recorta lo que sobresale; adentro, la fila tiene TODAS las
+   tarjetas en una sola línea (más ancha que el visor) y se corre con
+   transform — así "Siguiente"/"Anterior" deslizan de a una tarjeta, en vez
+   de saltar a una página nueva. El ancho de cada tarjeta (.noticia-card-
+   carrusel) se fija por JS según cuántas entran a la vez (ver sitio-
+   noticias.js: tarjetasVisiblesCarrusel). */
+.carrusel-noticias-viewport {
+  overflow: hidden;
+}
+
 .carrusel-noticias-fila {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 16px;
-}
-@media (max-width: 860px) {
-  .carrusel-noticias-fila { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 560px) {
-  .carrusel-noticias-fila { grid-template-columns: 1fr; }
+  transition: transform 0.35s ease;
 }
 
 .noticia-card-carrusel {
   margin-bottom: 0;
   height: 360px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
 }
