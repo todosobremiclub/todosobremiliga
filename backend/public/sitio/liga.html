@@ -35,9 +35,24 @@
     </div>
   </div>
 
+  <!-- Popup compartido con la noticia completa (texto entero, imagen y
+       video de YouTube si tiene), usado por el carrusel de Noticias. -->
+  <div class="oculto fondo-modal-generico" id="fondoModalNoticiaCompleta" onclick="cerrarNoticiaCompleta()"></div>
+  <div class="popup-modal popup-modal-noticia oculto" id="modalNoticiaCompleta">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+      <button class="btn btn-secundario btn-pequeno" onclick="cerrarNoticiaCompleta()">Cerrar</button>
+    </div>
+    <h2 id="tituloNoticiaCompleta" style="margin-top:0;"></h2>
+    <div class="noticia-fecha" id="fechaNoticiaCompleta"></div>
+    <img id="imagenNoticiaCompleta" class="oculto" alt="">
+    <div id="videoNoticiaCompleta" class="noticia-video-embed"></div>
+    <p id="contenidoNoticiaCompleta" class="noticia-contenido" style="white-space:pre-wrap;"></p>
+  </div>
+
   <div id="footerLiga"></div>
 
   <script src="/sitio/js/sitio-tema.js"></script>
+  <script src="/sitio/js/sitio-noticias.js"></script>
   <script src="/sitio/js/sitio-liga.js"></script>
 </body>
 </html>
