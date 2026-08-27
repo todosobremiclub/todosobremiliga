@@ -9,7 +9,7 @@
 // su HTML el popup compartido (ver public/sitio/liga.html como referencia:
 // #fondoModalNoticiaCompleta + #modalNoticiaCompleta).
 
-const NOTICIAS_POR_PAGINA_CARRUSEL = 2;
+const NOTICIAS_POR_PAGINA_CARRUSEL = 3;
 const NOTICIAS_UMBRAL_VER_MAS = 220; // caracteres de contenido a partir de los cuales se corta con "Ver más"
 
 // Estado por contenedor: permite que una página tenga más de un carrusel de
@@ -112,7 +112,7 @@ function tarjetaNoticiaCarruselHtml(containerId, n, indice) {
     <div class="noticia-card noticia-card-carrusel ${n.destacada ? 'destacada' : ''}">
       <h3>${escaparHtmlNoticias(n.titulo)}</h3>
       <div class="noticia-fecha">${new Date(n.publicado_at).toLocaleDateString('es-AR')}</div>
-      ${n.imagen_url ? `<img src="${escaparHtmlNoticias(n.imagen_url)}" alt="">` : ''}
+      ${n.imagen_url ? `<div class="noticia-imagen-wrap"><img src="${escaparHtmlNoticias(n.imagen_url)}" alt=""></div>` : ''}
       ${tieneVideo ? '<span class="noticia-video-badge">🎬 Con video</span>' : ''}
       <p class="noticia-contenido noticia-contenido-clamp">${escaparHtmlNoticias(n.contenido)}</p>
       ${mostrarVerMas ? `<button type="button" class="link-ver-mas-noticia" onclick="verNoticiaCompleta('${containerId}', ${indice})">Ver más</button>` : ''}
