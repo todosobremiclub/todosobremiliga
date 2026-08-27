@@ -109,7 +109,7 @@ function moverPopupsABody() {
     'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo',
     'panelGestionarEquipos', 'fondoModalGestionarEquipos',
     'panelCargarResultado', 'fondoModalResultado',
-    'panelBuscarClubExistente'
+    'panelBuscarClubExistente', 'panelCambiarFechaFixture'
   ];
   ids.forEach((id) => {
     const el = document.getElementById(id);
@@ -280,6 +280,17 @@ function conectarEventos() {
     ocultarFondoModal();
   });
   document.getElementById('fondoModalGenerico').addEventListener('click', () => {
+    // El popup de "Cambiar orden de fechas" vive DENTRO de la pantalla de
+    // Fixture ya abierta (torneo/división actuales) — a diferencia del
+    // resto de los popups de acá abajo, cerrarlo no tiene que resetear
+    // torneoActualId/categoriaActualId/subcategoriaActualId, porque atrás
+    // sigue la misma pantalla de Fixture usándolos.
+    const panelSwap = document.getElementById('panelCambiarFechaFixture');
+    if (panelSwap && !panelSwap.classList.contains('oculto')) {
+      panelSwap.classList.add('oculto');
+      ocultarFondoModal();
+      return;
+    }
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
      'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'panelCategorias', 'modalEditarFichaje',
@@ -488,6 +499,9 @@ function conectarEventos() {
   document.getElementById('btnJornadaAnterior').addEventListener('click', () => cambiarJornadaFixture(-1));
   document.getElementById('btnJornadaSiguiente').addEventListener('click', () => cambiarJornadaFixture(1));
   document.getElementById('btnGuardarDescripcionJornada').addEventListener('click', guardarDescripcionJornada);
+  document.getElementById('btnAbrirCambiarFechaFixture').addEventListener('click', abrirCambiarFechaFixture);
+  document.getElementById('btnCancelarCambiarFechaFixture').addEventListener('click', cerrarCambiarFechaFixture);
+  document.getElementById('btnConfirmarCambiarFechaFixture').addEventListener('click', confirmarCambiarFechaFixture);
 
   document.getElementById('btnInscribirClub').addEventListener('click', inscribirClub);
 
@@ -4610,6 +4624,65 @@ function cambiarJornadaFixture(delta) {
   if (nuevoIdx < 0 || nuevoIdx >= jornadasDisponibles.length) return;
   jornadaFixtureActual = jornadasDisponibles[nuevoIdx];
   renderJornadaFixture(jornadasDisponibles);
+}
+
+// ----- Cambiar el orden de dos fechas del fixture (ej: "la fecha 3 pasa a
+// ser la 6"), pensado para reordenar ANTES de asignar día/hora reales. -----
+
+function abrirCambiarFechaFixture() {
+  const jornadasDisponibles = jornadasDisponiblesSegunRonda();
+  if (jornadasDisponibles.length < 2) {
+    alert('Necesitás al menos 2 fechas cargadas en el fixture para poder intercambiarlas.');
+    return;
+  }
+  const opciones = jornadasDisponibles.map((j) => `<option value="${j}">Fecha ${j}</option>`).join('');
+  const selectA = document.getElementById('selectFechaSwapA');
+  const selectB = document.getElementById('selectFechaSwapB');
+  selectA.innerHTML = opciones;
+  selectB.innerHTML = opciones;
+  selectA.value = jornadasDisponibles[0];
+  selectB.value = jornadasDisponibles[1];
+  document.getElementById('cambiarFechaFixtureError').classList.add('oculto');
+  document.getElementById('panelCambiarFechaFixture').classList.remove('oculto');
+  mostrarFondoModal();
+}
+
+function cerrarCambiarFechaFixture() {
+  document.getElementById('panelCambiarFechaFixture').classList.add('oculto');
+  ocultarFondoModal();
+}
+
+async function confirmarCambiarFechaFixture() {
+  const errorEl = document.getElementById('cambiarFechaFixtureError');
+  errorEl.classList.add('oculto');
+  const jornadaA = Number(document.getElementById('selectFechaSwapA').value);
+  const jornadaB = Number(document.getElementById('selectFechaSwapB').value);
+
+  if (jornadaA === jornadaB) {
+    errorEl.textContent = 'Elegí dos fechas distintas.';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+  const confirmado = confirm(
+    `¿Confirmás que la Fecha ${jornadaA} pasa a ser la Fecha ${jornadaB} (y viceversa)? Si alguna de las dos ya tiene día/hora cargado en algún partido, se va a borrar para que lo vuelvas a configurar.`
+  );
+  if (!confirmado) return;
+
+  try {
+    const resultado = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/jornadas/swap`, {
+      method: 'PATCH',
+      body: JSON.stringify({ jornada_a: jornadaA, jornada_b: jornadaB, subcategoria_id: subcategoriaActualId || undefined })
+    });
+    cerrarCambiarFechaFixture();
+    jornadaFixtureActual = jornadaA;
+    await cargarPartidos();
+    if (resultado.fechas_borradas) {
+      alert('Listo. Como alguna de las dos fechas ya tenía día/hora cargado, se borraron — asignalas de nuevo cuando corresponda.');
+    }
+  } catch (err) {
+    errorEl.textContent = 'Error: ' + err.message;
+    errorEl.classList.remove('oculto');
+  }
 }
 
 function opcionesCanchasPredio(canchaPredioIdSeleccionada) {

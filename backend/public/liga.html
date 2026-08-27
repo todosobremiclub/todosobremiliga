@@ -963,6 +963,28 @@
               <button class="btn btn-secundario btn-pequeno" id="btnJornadaAnterior">← Anterior</button>
               <span id="tituloJornadaActual" style="font-weight:700;"></span>
               <button class="btn btn-secundario btn-pequeno" id="btnJornadaSiguiente">Siguiente →</button>
+              <button class="btn btn-secundario btn-pequeno" id="btnAbrirCambiarFechaFixture">Cambiar orden de fechas</button>
+            </div>
+
+            <!-- Popup: intercambiar el número de dos fechas del fixture (ej:
+                 "la fecha 3 pasa a ser la 6"), antes de asignarles día real. -->
+            <div class="panel oculto popup-modal" id="panelCambiarFechaFixture">
+              <h2 style="margin-top:0;">Cambiar orden de fechas</h2>
+              <p class="texto-ayuda">Elegí dos fechas del fixture para intercambiar entre sí (todos los partidos de una pasan a ser de la otra). Si alguna de las dos ya tiene día/hora cargado en algún partido, se borra para que lo vuelvas a configurar.</p>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+                <label>Fecha
+                  <select id="selectFechaSwapA"></select>
+                </label>
+                <span style="font-weight:700;">↔</span>
+                <label>pasa a ser la fecha
+                  <select id="selectFechaSwapB"></select>
+                </label>
+              </div>
+              <div style="margin-top:18px; display:flex; gap:8px; justify-content:flex-end;">
+                <button type="button" class="btn btn-secundario" id="btnCancelarCambiarFechaFixture">Cancelar</button>
+                <button type="button" class="btn" id="btnConfirmarCambiarFechaFixture">Cambiar</button>
+              </div>
+              <p class="mensaje-error oculto" id="cambiarFechaFixtureError"></p>
             </div>
             <div id="bloqueDescripcionJornada" class="oculto" style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:12px;">
               <label for="inputDescripcionJornada" style="font-size:13px;">Descripción de la fecha:</label>

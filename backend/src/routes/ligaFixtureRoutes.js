@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
 const { generarDeudaInscripcion, generarDeudasPorPartido } = require('../utils/cobros');
@@ -359,6 +359,95 @@ router.put('/:torneoId/categorias/:categoriaId/jornadas/:jornada', async (req, r
     res.json({ ok: true, jornada: rows[0] });
   } catch (err) {
     console.error('Error en PUT jornada descripcion:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/torneos/:torneoId/categorias/:categoriaId/jornadas/swap —
+// intercambia el número de fecha entre dos jornadas del fixture (ej: "la
+// fecha 3 pasa a ser la fecha 6 y viceversa"), moviendo TODOS los partidos
+// de una a la otra. Pensado para reordenar el fixture antes de asignar
+// fechas reales: si alguno de los partidos involucrados ya tenía fecha/hora
+// cargada, se borra (junto con la descripción de esas jornadas, si tenían)
+// para que la Liga la vuelva a configurar — no se intenta adivinar a qué
+// fecha real le corresponde ahora cada partido.
+router.patch('/:torneoId/categorias/:categoriaId/jornadas/swap', async (req, res) => {
+  const { jornada_a, jornada_b, subcategoria_id } = req.body;
+  const jornadaA = Number(jornada_a);
+  const jornadaB = Number(jornada_b);
+  const subcategoriaId = subcategoria_id || null;
+
+  if (!Number.isInteger(jornadaA) || !Number.isInteger(jornadaB) || jornadaA <= 0 || jornadaB <= 0) {
+    return res.status(400).json({ ok: false, error: 'Indicá dos números de fecha válidos' });
+  }
+  if (jornadaA === jornadaB) {
+    return res.status(400).json({ ok: false, error: 'Elegí dos fechas distintas para intercambiar' });
+  }
+
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const partidosResult = await query(
+      `SELECT p.id, p.jornada, p.fecha
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND p.jornada IN ($4, $5)`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId, jornadaA, jornadaB]
+    );
+    const hayFechaA = partidosResult.rows.some((p) => p.jornada === jornadaA);
+    const hayFechaB = partidosResult.rows.some((p) => p.jornada === jornadaB);
+    if (!hayFechaA) return res.status(404).json({ ok: false, error: `No hay partidos cargados en la fecha ${jornadaA} de este fixture` });
+    if (!hayFechaB) return res.status(404).json({ ok: false, error: `No hay partidos cargados en la fecha ${jornadaB} de este fixture` });
+
+    const teniaFechaAsignada = partidosResult.rows.some((p) => p.fecha);
+    const idsInvolucrados = partidosResult.rows.map((p) => p.id);
+
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE partidos SET jornada = CASE WHEN jornada = $2 THEN $3 ELSE $2 END
+         WHERE id = ANY($1::uuid[])`,
+        [idsInvolucrados, jornadaA, jornadaB]
+      );
+
+      // Si alguno de los dos grupos ya tenía fecha/hora cargada, se borra en
+      // ambos: como los partidos cambiaron de número de fecha, la fecha
+      // real vieja ya no tiene sentido y queda para que la Liga la
+      // reconfigure (así lo pidieron: "borrarla y que quede para
+      // configurar", en vez de arrastrarla al nuevo número).
+      if (teniaFechaAsignada) {
+        await client.query(
+          `UPDATE partidos SET fecha = NULL, hora = NULL WHERE id = ANY($1::uuid[])`,
+          [idsInvolucrados]
+        );
+      }
+
+      // Las descripciones de jornada (ej. "Semana del 1 al 8") describen una
+      // fecha real, no el número en sí — se borran junto con las fechas para
+      // no dejar una descripción vieja pegada a partidos que ahora son de
+      // otra jornada.
+      await client.query(
+        `DELETE FROM fixture_jornadas
+         WHERE torneo_id = $1 AND categoria_id = $2 AND subcategoria_id IS NOT DISTINCT FROM $3::uuid
+           AND jornada IN ($4, $5)`,
+        [req.params.torneoId, req.params.categoriaId, subcategoriaId, jornadaA, jornadaB]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    res.json({ ok: true, jornada_a: jornadaA, jornada_b: jornadaB, fechas_borradas: teniaFechaAsignada });
+  } catch (err) {
+    console.error('Error en PATCH jornadas/swap:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
