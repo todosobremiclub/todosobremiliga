@@ -634,7 +634,7 @@
 
     <!-- ===== SECCIÓN TORNEOS ===== -->
     <div id="seccionTorneos" class="oculto">
-      <div class="panel">
+      <div class="panel" id="panelListaTorneos">
         <div class="panel-header">
           <h2>Torneos</h2>
           <button class="btn" id="btnMostrarFormTorneo">+ Nuevo Torneo</button>
@@ -770,12 +770,12 @@
       <!-- Detalle de un torneo: sus divisiones arriba como botones, y debajo
            (según lo que esté elegido) categorías, el detalle de
            fixture/tabla/goleadores/tarjetas, o la tabla general del torneo. -->
-      <div class="panel oculto popup-modal popup-modal-ancho" id="panelCategorias">
+      <div class="panel oculto" id="panelCategorias">
         <div class="panel-header">
           <h2 id="tituloCategorias">Divisiones</h2>
           <div>
             <button class="btn btn-secundario" id="btnMostrarFormCategoria">+ Nueva División</button>
-            <button class="btn btn-secundario" id="btnCerrarCategorias">Cerrar</button>
+            <button class="btn btn-secundario" id="btnCerrarCategorias">← Volver a Torneos</button>
           </div>
         </div>
 

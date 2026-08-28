@@ -105,7 +105,7 @@ function moverPopupsABody() {
     'fondoModalGenerico', 'formClub', 'panelCanchasClub', 'panelUsuariosClub',
     'panelDocumentosClub', 'panelComentariosClub', 'modalParticipacionesClub',
     'modalFichajesClub', 'modalImpagosMes', 'modalAsignarCategoriaMasivo',
-    'formTorneo', 'panelCategorias', 'modalEditarFichaje', 'panelDeudasClub',
+    'formTorneo', 'modalEditarFichaje', 'panelDeudasClub',
     'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo',
     'panelGestionarEquipos', 'fondoModalGestionarEquipos',
     'panelCargarResultado', 'fondoModalResultado',
@@ -293,7 +293,7 @@ function conectarEventos() {
     }
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
-     'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'panelCategorias', 'modalEditarFichaje',
+     'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'modalEditarFichaje',
      'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes', 'panelDocumentosTorneo'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
@@ -452,12 +452,12 @@ function conectarEventos() {
   });
   document.getElementById('btnCerrarCategorias').addEventListener('click', () => {
     document.getElementById('panelCategorias').classList.add('oculto');
+    document.getElementById('panelListaTorneos').classList.remove('oculto');
     torneoActualId = null;
     categoriaActualId = null;
     subcategoriaActualId = null;
     subcategoriaActualNombre = '';
     mostrandoTablaGeneralLiga = false;
-    ocultarFondoModal();
   });
   document.getElementById('btnMostrarFormCategoria').addEventListener('click', () => {
     document.getElementById('formCategoria').reset();
@@ -3725,9 +3725,13 @@ async function guardarTorneo(e) {
 
 function verCategorias(torneoId, nombreTorneo) {
   torneoActualId = torneoId;
-  mostrarFondoModal();
+  // Antes esto se abría como popup encima del listado de Torneos; ahora es
+  // una pantalla propia dentro de la misma sección: se oculta el listado y
+  // se muestra esta (con su botón "Volver a Torneos"), sin fondo oscuro.
+  document.getElementById('panelListaTorneos').classList.add('oculto');
   torneoActualNombre = nombreTorneo;
   document.getElementById('panelCategorias').classList.remove('oculto');
+  window.scrollTo(0, 0);
   document.getElementById('tituloCategorias').textContent = `Divisiones de "${nombreTorneo}"`;
   document.getElementById('formCategoria').classList.add('oculto');
   document.getElementById('formSubcategoria').classList.add('oculto');
@@ -4061,7 +4065,10 @@ function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
   renderTabsSubcategoriasLiga();
 
   if (subcategorias.length && !subcategoriaActualId) {
-    mostrarMensajeSinSeleccionLiga('Elegí una categoría para ver su información.');
+    // Igual que en la web pública: al elegir una División con categorías
+    // (años) adentro, se muestra de entrada su "General" (suma de todas
+    // sus categorías) en vez de forzar a elegir una categoría puntual primero.
+    seleccionarGeneralCategoriaLiga();
   } else {
     mostrarBloqueDetalleCategoriaLiga();
   }
@@ -4834,10 +4841,14 @@ function renderJornadaFixture(jornadasDisponibles) {
     return `
       <div class="panel" style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-          <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:220px;">
-            ${logoLocal}<strong>${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_id)}</strong>
-            <span style="margin:0 8px;">${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</span>
-            <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_id)}</strong>${logoVisitante}
+          <div style="display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:10px; flex:1; min-width:220px;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; text-align:right;">
+              ${logoLocal}<strong>${escapeHtml(p.club_local_nombre)}${posicionEntreParentesisHtml(p.equipo_local_id)}</strong>
+            </div>
+            <span style="white-space:nowrap; font-weight:700;">${p.resultado_local != null ? `${p.resultado_local} - ${p.resultado_visitante}` : 'vs'}</span>
+            <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+              <strong>${escapeHtml(p.club_visitante_nombre)}${posicionEntreParentesisHtml(p.equipo_visitante_id)}</strong>${logoVisitante}
+            </div>
           </div>
           <span class="badge ${p.estado === 'jugado' ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(p.estado || 'programado')}</span>
           ${(p.no_presento_local || p.no_presento_visitante) ? `<span class="badge badge-pendiente" title="${p.no_presento_local ? escapeHtml(p.club_local_nombre) : ''}${p.no_presento_local && p.no_presento_visitante ? ' y ' : ''}${p.no_presento_visitante ? escapeHtml(p.club_visitante_nombre) : ''} no se presentó">W.O.</span>` : ''}
