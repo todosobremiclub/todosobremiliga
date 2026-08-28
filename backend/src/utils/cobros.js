@@ -45,26 +45,42 @@ async function generarDeudaInscripcion(torneoId, clubId) {
   return rows[0] || null;
 }
 
-// Se llama al CARGAR EL RESULTADO de un partido (no al programarlo): recién
-// ahí el partido efectivamente se jugó. Genera la deuda "por partido" para
-// los DOS clubes que jugaron (local y visitante), si el concepto está
-// activo -- así un fixture completo generado de entrada no le carga a los
-// clubes de una la deuda de fechas que todavía no se jugaron.
-async function generarDeudasPorPartido(torneoId, partidoId, clubLocalId, clubVisitanteId, descripcion) {
+// Busca (o crea si no existe) la deuda "por partido" de UN club puntual
+// contra UN partido puntual. Se usa tanto para pre-pagar un partido antes de
+// que tenga resultado (la Liga registra el pago y acá se le crea la deuda ya
+// "cubierta") como al CARGAR EL RESULTADO (si a esa altura no se había
+// pre-pagado, se genera recién ahí -- así un fixture completo generado de
+// entrada no le carga a los clubes de una la deuda de fechas que todavía no
+// se jugaron). Devuelve null si el concepto "por partido" no está activo en
+// este torneo.
+async function asegurarDeudaPorPartido(torneoId, partidoId, clubId, descripcion) {
   const concepto = await buscarConceptoActivo(torneoId, 'por_partido');
-  if (!concepto) return [];
-  const creadas = [];
-  for (const clubId of [clubLocalId, clubVisitanteId]) {
-    const { rows } = await query(
-      `INSERT INTO club_deudas (torneo_id, concepto_id, club_id, tipo, partido_id, descripcion, monto)
-       VALUES ($1, $2, $3, 'por_partido', $4, $5, $6)
-       ON CONFLICT (torneo_id, club_id, concepto_id, partido_id) WHERE tipo = 'por_partido' DO NOTHING
-       RETURNING *`,
-      [torneoId, concepto.id, clubId, partidoId, descripcion || 'Cargo por partido', concepto.monto]
-    );
-    if (rows[0]) creadas.push(rows[0]);
-  }
-  return creadas;
+  if (!concepto) return null;
+
+  const existente = await query(
+    `SELECT * FROM club_deudas
+     WHERE torneo_id = $1 AND club_id = $2 AND concepto_id = $3 AND partido_id = $4 AND tipo = 'por_partido'`,
+    [torneoId, clubId, concepto.id, partidoId]
+  );
+  if (existente.rows[0]) return existente.rows[0];
+
+  const { rows } = await query(
+    `INSERT INTO club_deudas (torneo_id, concepto_id, club_id, tipo, partido_id, descripcion, monto)
+     VALUES ($1, $2, $3, 'por_partido', $4, $5, $6)
+     ON CONFLICT (torneo_id, club_id, concepto_id, partido_id) WHERE tipo = 'por_partido' DO NOTHING
+     RETURNING *`,
+    [torneoId, concepto.id, clubId, partidoId, descripcion || 'Cargo por partido', concepto.monto]
+  );
+  if (rows[0]) return rows[0];
+
+  // Condición de carrera: otra request creó la deuda entre el SELECT y el
+  // INSERT de acá arriba -- la volvemos a buscar en vez de fallar.
+  const retry = await query(
+    `SELECT * FROM club_deudas
+     WHERE torneo_id = $1 AND club_id = $2 AND concepto_id = $3 AND partido_id = $4 AND tipo = 'por_partido'`,
+    [torneoId, clubId, concepto.id, partidoId]
+  );
+  return retry.rows[0] || null;
 }
 
 // Se llama desde el endpoint manual "generar cargo mensual" de un período
@@ -98,6 +114,6 @@ module.exports = {
   periodoActualArgentina,
   buscarConceptoActivo,
   generarDeudaInscripcion,
-  generarDeudasPorPartido,
+  asegurarDeudaPorPartido,
   generarDeudasMensual,
 };

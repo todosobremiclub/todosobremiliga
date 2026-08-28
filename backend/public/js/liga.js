@@ -4507,6 +4507,8 @@ async function inscribirClub() {
 }
 
 let fixtureCanchaJuegoActual = 'clubes';
+let fixtureCobroPorPartidoActivo = false;
+let fixtureCobroPorPartidoMonto = null;
 
 async function cargarPartidos() {
   const contenedor = document.getElementById('contenedorPartidosJornada');
@@ -4541,6 +4543,8 @@ async function cargarPartidos() {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos${qs}`);
     partidosCache = data.partidos;
     fixtureCanchaJuegoActual = data.cancha_juego || 'clubes';
+    fixtureCobroPorPartidoActivo = !!data.cobro_por_partido_activo;
+    fixtureCobroPorPartidoMonto = data.cobro_por_partido_monto;
     jornadasDescripcionCache = {};
     (data.jornadas || []).forEach((j) => { jornadasDescripcionCache[j.jornada] = j.descripcion; });
 
@@ -4798,6 +4802,35 @@ function renderJornadaFixture(jornadasDisponibles) {
         <div style="margin-top:6px;">${chipsArbitrosAsignados || '<span class="texto-ayuda">Sin árbitros asignados.</span>'}</div>
       </div>`;
 
+    // Cargo "por partido": solo se muestra si el torneo lo tiene activado en
+    // Configuración → Cobros. El selector de exención decide si alguno de
+    // los dos equipos directamente no debe pagar este partido puntual; el
+    // que no está eximido muestra un botón para registrar el pago (se puede
+    // hacer aunque el resultado todavía no esté cargado) o un check verde si
+    // ya está pagado.
+    let bloquePago = '';
+    if (fixtureCobroPorPartidoActivo) {
+      const exencion = p.exencion_pago || '';
+      const chipPago = (lado, etiqueta, eximido, pagoInfo) => {
+        if (eximido) return `<span class="texto-ayuda">${etiqueta}: no paga</span>`;
+        if (pagoInfo && pagoInfo.pagado) return `<span class="badge badge-activo">${etiqueta}: pagado ✓</span>`;
+        return `<button type="button" class="btn btn-secundario btn-pequeno" onclick="registrarPagoPartido('${p.id}', '${lado}')">Registrar pago ${etiqueta.toLowerCase()}</button>`;
+      };
+      bloquePago = `
+        <div style="margin-top:10px; border-top:1px solid var(--gris-200); padding-top:10px;">
+          <label style="font-size:12px;">Cargo por partido${fixtureCobroPorPartidoMonto != null ? ` (${Number(fixtureCobroPorPartidoMonto).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })} c/equipo)` : ''}</label>
+          <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:6px;">
+            <select data-partido-id="${p.id}" class="select-exencion-pago-partido" style="padding:6px; border:1px solid var(--gris-300); border-radius:6px; font-size:13px;" onchange="guardarExencionPagoPartido('${p.id}', this.value)">
+              <option value="" ${exencion === '' ? 'selected' : ''}>Pagan ambos equipos</option>
+              <option value="solo_local" ${exencion === 'solo_local' ? 'selected' : ''}>Solo paga el local</option>
+              <option value="solo_visitante" ${exencion === 'solo_visitante' ? 'selected' : ''}>Solo paga el visitante</option>
+            </select>
+            ${chipPago('local', 'Local', exencion === 'solo_visitante', p.pago_local)}
+            ${chipPago('visitante', 'Visitante', exencion === 'solo_local', p.pago_visitante)}
+          </div>
+        </div>`;
+    }
+
     return `
       <div class="panel" style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
@@ -4826,9 +4859,35 @@ function renderJornadaFixture(jornadasDisponibles) {
         <div style="margin-top:10px; border-top:1px solid var(--gris-200); padding-top:10px;">
           ${bloqueArbitros}
         </div>
+        ${bloquePago}
       </div>
     `;
   }).join('');
+}
+
+async function guardarExencionPagoPartido(partidoId, valor) {
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}/exencion-pago`, {
+      method: 'PATCH',
+      body: JSON.stringify({ exencion_pago: valor || null })
+    });
+    await cargarPartidos();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function registrarPagoPartido(partidoId, lado) {
+  const cuerpo = lado === 'local' ? { pagar_local: true } : { pagar_visitante: true };
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos/${partidoId}/pagos`, {
+      method: 'POST',
+      body: JSON.stringify(cuerpo)
+    });
+    await cargarPartidos();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
 }
 
 async function agregarArbitroPartido(partidoId) {

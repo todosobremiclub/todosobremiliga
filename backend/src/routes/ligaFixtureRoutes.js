@@ -4,7 +4,7 @@ const router = express.Router();
 const { query, getClient } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
-const { generarDeudaInscripcion, generarDeudasPorPartido } = require('../utils/cobros');
+const { generarDeudaInscripcion, asegurarDeudaPorPartido, buscarConceptoActivo } = require('../utils/cobros');
 
 // Chequea que la división pertenezca a un torneo de MI liga. Devuelve
 // {torneo, categoria} o null.
@@ -235,9 +235,33 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
           [rows.map((p) => p.id)]
         )
       : { rows: [] };
+
+    // Estado del cargo "por partido" (si el concepto está activo en este
+    // torneo) para cada equipo de cada partido -- alimenta los indicadores
+    // de "Pagado" / "Registrar pago" del Fixture. Puede no existir todavía
+    // la deuda (partido sin resultado y sin pre-pago), en cuyo caso se
+    // informa como no pagado.
+    const pagosResult = rows.length
+      ? await query(
+          `SELECT d.partido_id, d.club_id, d.id AS deuda_id, d.monto AS deuda_monto,
+                  COALESCE(pg.total_pagado, 0) AS total_pagado
+           FROM club_deudas d
+           LEFT JOIN LATERAL (SELECT SUM(monto) AS total_pagado FROM club_pagos WHERE deuda_id = d.id) pg ON true
+           WHERE d.partido_id = ANY($1::uuid[]) AND d.tipo = 'por_partido'`,
+          [rows.map((p) => p.id)]
+        )
+      : { rows: [] };
+    const estadoPago = (partidoId, clubId) => {
+      const d = pagosResult.rows.find((r) => r.partido_id === partidoId && r.club_id === clubId);
+      if (!d) return { deuda_id: null, pagado: false };
+      return { deuda_id: d.deuda_id, pagado: Number(d.total_pagado) >= Number(d.deuda_monto) - 0.009 };
+    };
+
     const partidos = rows.map((p) => ({
       ...p,
-      arbitros: arbitrosResult.rows.filter((a) => a.partido_id === p.id).map((a) => ({ id: a.id, nombre: a.nombre, apellido: a.apellido, tipo: a.tipo }))
+      arbitros: arbitrosResult.rows.filter((a) => a.partido_id === p.id).map((a) => ({ id: a.id, nombre: a.nombre, apellido: a.apellido, tipo: a.tipo })),
+      pago_local: estadoPago(p.id, p.club_local_id),
+      pago_visitante: estadoPago(p.id, p.club_visitante_id)
     }));
 
     const jornadasResult = await query(
@@ -245,7 +269,16 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
-    res.json({ ok: true, partidos, cancha_juego: contexto.cancha_juego, jornadas: jornadasResult.rows });
+    const conceptoPorPartido = await buscarConceptoActivo(req.params.torneoId, 'por_partido');
+
+    res.json({
+      ok: true,
+      partidos,
+      cancha_juego: contexto.cancha_juego,
+      jornadas: jornadasResult.rows,
+      cobro_por_partido_activo: !!conceptoPorPartido,
+      cobro_por_partido_monto: conceptoPorPartido ? conceptoPorPartido.monto : null
+    });
   } catch (err) {
     console.error('Error en GET partidos:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -529,6 +562,97 @@ router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId', async (re
     res.json({ ok: true, partido: rows[0] });
   } catch (err) {
     console.error('Error en PATCH partido:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// PATCH /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId/exencion-pago
+// Marca si para este partido puntual solo debe pagar el cargo "por partido"
+// uno de los dos equipos (o ninguna exención, o sea pagan los dos, que es el
+// valor por defecto). No toca deudas ya generadas -- solo cambia lo que va a
+// pasar la próxima vez que se registre un pago o se cargue el resultado.
+router.patch('/:torneoId/categorias/:categoriaId/partidos/:partidoId/exencion-pago', async (req, res) => {
+  const { exencion_pago } = req.body;
+  if (exencion_pago !== null && exencion_pago !== 'solo_local' && exencion_pago !== 'solo_visitante') {
+    return res.status(400).json({ ok: false, error: "exencion_pago debe ser null, 'solo_local' o 'solo_visitante'" });
+  }
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const { rows } = await query(
+      `UPDATE partidos SET exencion_pago = $1, actualizado_at = NOW()
+       WHERE id = $2 AND torneo_id = $3 AND categoria_id = $4
+       RETURNING *`,
+      [exencion_pago, req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+    res.json({ ok: true, partido: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH exencion-pago:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// POST /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId/pagos
+// Registra el pago del cargo "por partido" para uno de los dos equipos, el
+// otro, o ambos -- se puede usar ANTES de que el partido tenga resultado
+// cargado (la Liga cobra en la cancha el día del partido). Si la deuda
+// todavía no existía, se crea ahí mismo ya cubierta por este pago; si ya
+// existía (por ejemplo porque el resultado ya se había cargado sin que se
+// hubiera pagado), se completa el saldo pendiente. No genera nada para un
+// equipo eximido por `exencion_pago` de este partido.
+router.post('/:torneoId/categorias/:categoriaId/partidos/:partidoId/pagos', async (req, res) => {
+  const { pagar_local, pagar_visitante, fecha, comentario } = req.body;
+  if (!pagar_local && !pagar_visitante) {
+    return res.status(400).json({ ok: false, error: 'Elegí al menos un equipo para registrar el pago' });
+  }
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const partidoResult = await query(
+      `SELECT p.*, el.club_id AS club_local_id, ev.club_id AS club_visitante_id
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       WHERE p.id = $1 AND p.torneo_id = $2 AND p.categoria_id = $3`,
+      [req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    const partido = partidoResult.rows[0];
+    if (!partido) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+
+    const concepto = await buscarConceptoActivo(req.params.torneoId, 'por_partido');
+    if (!concepto) return res.status(400).json({ ok: false, error: 'Este torneo no tiene activado el cobro "por partido"' });
+
+    async function marcarPagado(clubId) {
+      const deuda = await asegurarDeudaPorPartido(req.params.torneoId, partido.id, clubId, 'Cargo por partido');
+      const pagadoResult = await query('SELECT COALESCE(SUM(monto), 0) AS total_pagado FROM club_pagos WHERE deuda_id = $1', [deuda.id]);
+      const saldo = Number(deuda.monto) - Number(pagadoResult.rows[0].total_pagado);
+      if (saldo <= 0.009) return { estado: 'ya_pagado' };
+      await query(
+        `INSERT INTO club_pagos (deuda_id, monto, fecha, comentario, creado_por)
+         VALUES ($1, $2, COALESCE($3, CURRENT_DATE), $4, $5)`,
+        [deuda.id, saldo, fecha || null, comentario || null, req.usuario.id]
+      );
+      return { estado: 'pagado_ahora', monto: saldo };
+    }
+
+    const resultado = {};
+    if (pagar_local) {
+      resultado.local = partido.exencion_pago === 'solo_visitante'
+        ? { estado: 'eximido' }
+        : await marcarPagado(partido.club_local_id);
+    }
+    if (pagar_visitante) {
+      resultado.visitante = partido.exencion_pago === 'solo_local'
+        ? { estado: 'eximido' }
+        : await marcarPagado(partido.club_visitante_id);
+    }
+
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    console.error('Error en POST pago de partido:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
@@ -1341,15 +1465,22 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
     // acá -- al cargar el resultado, es decir cuando el partido efectivamente
     // se jugó -- y no al programarlo. Así un fixture completo generado de
     // entrada no le carga a los clubes la deuda de fechas que todavía no se
-    // jugaron.
+    // jugaron. Si alguno de los dos equipos ya había pre-pagado (ver POST
+    // .../partidos/:partidoId/pagos) la deuda ya existe y ya está cubierta,
+    // así que no se le vuelve a adeudar nada acá. Si el partido tiene
+    // exención de pago para alguno de los dos, directamente no se le genera
+    // deuda a ese equipo.
     const equiposPartido = await query(
       'SELECT id, club_id FROM equipos_torneo WHERE id = ANY($1::uuid[])',
       [[partido.equipo_local_id, partido.equipo_visitante_id]]
     );
     const clubLocalId = equiposPartido.rows.find((e) => e.id === partido.equipo_local_id)?.club_id;
     const clubVisitanteId = equiposPartido.rows.find((e) => e.id === partido.equipo_visitante_id)?.club_id;
-    if (clubLocalId && clubVisitanteId) {
-      await generarDeudasPorPartido(req.params.torneoId, partido.id, clubLocalId, clubVisitanteId);
+    if (clubLocalId && partido.exencion_pago !== 'solo_visitante') {
+      await asegurarDeudaPorPartido(req.params.torneoId, partido.id, clubLocalId, 'Cargo por partido');
+    }
+    if (clubVisitanteId && partido.exencion_pago !== 'solo_local') {
+      await asegurarDeudaPorPartido(req.params.torneoId, partido.id, clubVisitanteId, 'Cargo por partido');
     }
 
     if (Array.isArray(estadisticas_jugadores)) {
