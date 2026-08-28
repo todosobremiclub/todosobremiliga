@@ -526,6 +526,20 @@ button.btn-peligro:hover { background: #fee2e2; }
   background: var(--blanco);
 }
 
+/* Header de la Liga (público): el logo va centrado en la barra, no pegado
+   a la derecha -- se agrega una tercera columna vacía para que el centrado
+   sea real sin importar cuánto ocupe el título del lado izquierdo. */
+.sitio-header-inner.sitio-header-inner-centrado {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.sitio-logo-grande {
+  width: 76px;
+  height: 76px;
+  justify-self: center;
+}
+
 .sitio-contenido {
   max-width: 1400px;
   margin: 0 auto;

@@ -177,8 +177,11 @@ function tarjetaNoticiaCarruselHtml(containerId, n, indice) {
   // tiene video); si no tiene foto pero sí video, se usa la miniatura del
   // video de YouTube como imagen de portada de la tarjeta.
   const srcImagen = n.imagen_url || (tieneVideo ? youtubeThumbnailUrl(n.video_youtube_url) : null);
+  // Si tiene video, la miniatura se puede clickear ahí mismo para
+  // reproducirlo adentro de la tarjeta (sin tener que abrir "Ver más").
+  const idWrapVideo = `${containerId}_video_${indice}`;
   const imagenHtml = srcImagen ? `
-    <div class="noticia-imagen-wrap">
+    <div class="noticia-imagen-wrap" id="${idWrapVideo}" ${tieneVideo ? `onclick="reproducirVideoEnTarjeta('${containerId}', ${indice})" style="cursor:pointer;"` : ''}>
       <img src="${escaparHtmlNoticias(srcImagen)}" alt="">
       ${tieneVideo ? '<span class="noticia-play-badge">▶</span>' : ''}
     </div>
@@ -193,6 +196,25 @@ function tarjetaNoticiaCarruselHtml(containerId, n, indice) {
       ${mostrarVerMas ? `<button type="button" class="link-ver-mas-noticia" onclick="verNoticiaCompleta('${containerId}', ${indice})">Ver más</button>` : ''}
     </div>
   `;
+}
+
+// Reproduce el video de YouTube de una noticia directo en la tarjeta del
+// carrusel (sin abrir el popup de "Ver más"): reemplaza la miniatura +
+// botón de play por un iframe embebido con autoplay, respetando la
+// proporción 16:9 (misma técnica que usa el popup completo).
+function reproducirVideoEnTarjeta(containerId, indice) {
+  const estado = _estadoCarruselesNoticias[containerId];
+  const n = estado && estado.noticias[indice];
+  if (!n) return;
+  const embedUrl = youtubeEmbedUrl(n.video_youtube_url);
+  if (!embedUrl) return;
+
+  const wrap = document.getElementById(`${containerId}_video_${indice}`);
+  if (!wrap) return;
+  wrap.removeAttribute('onclick');
+  wrap.style.cursor = '';
+  wrap.className = 'noticia-video-embed';
+  wrap.innerHTML = `<iframe src="${escaparHtmlNoticias(embedUrl)}?autoplay=1" title="Video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
 }
 
 // Abre el popup compartido (#modalNoticiaCompleta) con el texto entero,

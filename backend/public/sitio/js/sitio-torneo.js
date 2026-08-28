@@ -84,6 +84,8 @@ async function init() {
   document.getElementById('btnJornadaSiguientePublico').addEventListener('click', () => cambiarJornadaFixturePublico(1));
   document.getElementById('btnJornadaGeneralPublicoAnterior').addEventListener('click', () => cambiarJornadaFixtureGeneralPublico(-1));
   document.getElementById('btnJornadaGeneralPublicoSiguiente').addEventListener('click', () => cambiarJornadaFixtureGeneralPublico(1));
+  document.getElementById('tabBtnGeneralTabla').addEventListener('click', () => cambiarTabGeneral('tabla'));
+  document.getElementById('tabBtnGeneralFixture').addEventListener('click', () => cambiarTabGeneral('fixture'));
 
   await cargarCategorias();
   cargarNoticiasTorneo();
@@ -297,8 +299,20 @@ function seleccionarGeneralCategoria() {
   document.getElementById('bloqueGeneralCategoria').classList.remove('oculto');
   const categoria = categoriasCache.find((c) => c.id === categoriaSeleccionadaId);
   document.getElementById('tituloGeneralCategoria').textContent = categoria ? categoria.nombre : 'General';
+  cambiarTabGeneral('tabla');
   cargarTablaGeneralCategoria();
   cargarFixtureGeneralCategoria();
+}
+
+// Alterna entre "Tabla de posiciones" y "Fixture y resultados" DENTRO del
+// bloque General de una división (mismo criterio visual que cambiarTab(),
+// que hace lo mismo para una categoría puntual) -- antes estaban las dos
+// cosas apiladas en la misma pantalla, una arriba de la otra.
+function cambiarTabGeneral(nombre) {
+  document.getElementById('subSeccionGeneralTabla').classList.toggle('oculto', nombre !== 'tabla');
+  document.getElementById('subSeccionGeneralFixture').classList.toggle('oculto', nombre !== 'fixture');
+  document.getElementById('tabBtnGeneralTabla').classList.toggle('activo', nombre === 'tabla');
+  document.getElementById('tabBtnGeneralFixture').classList.toggle('activo', nombre === 'fixture');
 }
 
 function mostrarMensajeSinSeleccion(texto) {

@@ -594,6 +594,8 @@ function conectarEventos() {
   });
   document.getElementById('btnJornadaGeneralLigaAnterior').addEventListener('click', () => cambiarJornadaFixtureGeneralLiga(-1));
   document.getElementById('btnJornadaGeneralLigaSiguiente').addEventListener('click', () => cambiarJornadaFixtureGeneralLiga(1));
+  document.getElementById('tabBtnGeneralLigaTabla').addEventListener('click', () => cambiarTabGeneralLiga('tabla'));
+  document.getElementById('tabBtnGeneralLigaFixture').addEventListener('click', () => cambiarTabGeneralLiga('fixture'));
   document.getElementById('chkSeleccionarTodosFichajes').addEventListener('change', (e) => {
     const texto = (document.getElementById('buscadorFichajesLiga').value || '').trim().toLowerCase();
     const torneoId = document.getElementById('filtroTorneoFichajesLiga').value;
@@ -4112,8 +4114,20 @@ function seleccionarGeneralCategoriaLiga() {
   document.getElementById('bloqueDetalleCategoriaLiga').classList.add('oculto');
   document.getElementById('bloqueGeneralCategoriaLiga').classList.remove('oculto');
   document.getElementById('tituloGeneralCategoria').textContent = categoriaActualNombre;
+  cambiarTabGeneralLiga('tabla');
   cargarTablaGeneralCategoria();
   cargarFixtureGeneralCategoria();
+}
+
+// Alterna entre "Tabla de posiciones" y "Fixture y resultados" DENTRO del
+// bloque General de una división (mismo criterio que cambiarTabDetalle(),
+// que hace lo mismo para una categoría puntual) -- antes estaban las dos
+// cosas apiladas en la misma pantalla, una arriba de la otra.
+function cambiarTabGeneralLiga(nombre) {
+  document.getElementById('subSeccionGeneralLigaTabla').classList.toggle('oculto', nombre !== 'tabla');
+  document.getElementById('subSeccionGeneralLigaFixture').classList.toggle('oculto', nombre !== 'fixture');
+  document.getElementById('tabBtnGeneralLigaTabla').classList.toggle('activo', nombre === 'tabla');
+  document.getElementById('tabBtnGeneralLigaFixture').classList.toggle('activo', nombre === 'fixture');
 }
 
 function mostrarMensajeSinSeleccionLiga(texto) {
