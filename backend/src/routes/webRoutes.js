@@ -639,6 +639,75 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/tarjetas', async (req, re
   }
 });
 
+// GET /web/clubes/buscar?q=... — buscador GLOBAL de clubes, cruzando TODAS
+// las Ligas productivas y activas de la plataforma (a diferencia de
+// /ligas/:slug/clubes/buscar, de más abajo, que busca sólo adentro de una
+// Liga puntual). Pensado para la app: "Buscar mi equipo" sin tener que
+// elegir antes una Liga. Por cada club encontrado devuelve, además, la
+// lista de Ligas en las que está anotado (mismo criterio -- tabla
+// club_liga -- que ya usa el perfil público de un club dentro de una Liga).
+router.get('/clubes/buscar', async (req, res) => {
+  const texto = (req.query.q || '').trim();
+  if (texto.length < 2) {
+    return res.json({ ok: true, clubes: [] });
+  }
+  try {
+    const { rows: clubesRows } = await query(
+      `SELECT DISTINCT c.id, c.nombre, c.logo_url, c.color_primario, c.ciudad, c.provincia
+       FROM clubes c
+       JOIN club_liga cl ON cl.club_id = c.id AND cl.activo = TRUE
+       JOIN ligas l ON l.id = cl.liga_id
+       WHERE l.activo = TRUE AND l.tipo = 'productiva'
+         AND c.nombre ILIKE '%' || $1 || '%'
+       ORDER BY c.nombre ASC
+       LIMIT 20`,
+      [texto]
+    );
+
+    if (clubesRows.length === 0) {
+      return res.json({ ok: true, clubes: [] });
+    }
+
+    const clubIds = clubesRows.map((c) => c.id);
+    const { rows: ligasRows } = await query(
+      `SELECT cl.club_id, l.id, l.nombre, l.slug, l.logo_url, l.color_primario, l.color_secundario
+       FROM club_liga cl
+       JOIN ligas l ON l.id = cl.liga_id
+       WHERE cl.club_id = ANY($1::uuid[]) AND cl.activo = TRUE AND l.activo = TRUE AND l.tipo = 'productiva'
+       ORDER BY l.nombre ASC`,
+      [clubIds]
+    );
+
+    const ligasPorClub = new Map();
+    for (const row of ligasRows) {
+      if (!ligasPorClub.has(row.club_id)) ligasPorClub.set(row.club_id, []);
+      ligasPorClub.get(row.club_id).push({
+        id: row.id,
+        nombre: row.nombre,
+        slug: row.slug,
+        logo_url: row.logo_url,
+        color_primario: row.color_primario,
+        color_secundario: row.color_secundario,
+      });
+    }
+
+    const clubes = clubesRows.map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      logo_url: c.logo_url,
+      color_primario: c.color_primario,
+      ciudad: c.ciudad,
+      provincia: c.provincia,
+      ligas: ligasPorClub.get(c.id) || [],
+    }));
+
+    res.json({ ok: true, clubes });
+  } catch (err) {
+    console.error('Error en GET buscador global de clubes:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // GET /web/ligas/:slug/clubes/buscar?q=... — buscador público de clubes
 // dentro de una Liga (solo clubes con al menos un equipo inscripto en algún
 // torneo de esa Liga), para el buscador de la página pública de la Liga.
