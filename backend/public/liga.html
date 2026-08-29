@@ -521,6 +521,40 @@
         <p class="texto-ayuda">Este es el usuario con el que el club va a poder entrar a su propio panel para cargar jugadores y pedir fichajes.</p>
       </div>
 
+      <!-- Alcance (Torneo/División/Categoría) asignado a una Autoridad -->
+      <div class="panel oculto popup-modal" id="panelAsignacionesAutoridad">
+        <div class="panel-header">
+          <h2 id="tituloAsignacionesAutoridad">Torneos/Divisiones asignados</h2>
+          <button class="btn btn-secundario" id="btnCerrarAsignacionesAutoridad">Cerrar</button>
+        </div>
+        <table>
+          <thead><tr><th>Alcance</th><th>Acciones</th></tr></thead>
+          <tbody id="tablaAsignacionesAutoridad"><tr><td colspan="2">Cargando...</td></tr></tbody>
+        </table>
+        <h3 style="margin-top:16px;">Agregar alcance</h3>
+        <div class="form-grid">
+          <div>
+            <label for="asignacionAutoridadTorneoSelect">Torneo *</label>
+            <select id="asignacionAutoridadTorneoSelect" onchange="onCambioTorneoAsignacionAutoridad()"></select>
+          </div>
+          <div>
+            <label for="asignacionAutoridadCategoriaSelect">División</label>
+            <select id="asignacionAutoridadCategoriaSelect" onchange="onCambioCategoriaAsignacionAutoridad()">
+              <option value="">Todo el Torneo</option>
+            </select>
+          </div>
+          <div>
+            <label for="asignacionAutoridadSubcategoriaSelect">Categoría</label>
+            <select id="asignacionAutoridadSubcategoriaSelect">
+              <option value="">Toda la división</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn" onclick="agregarAsignacionAutoridad()">Agregar</button>
+        <p class="mensaje-error oculto" id="asignacionAutoridadError"></p>
+        <p class="texto-ayuda">Dejá "Todo el Torneo" para que pueda cargar resultados de cualquier partido de ese Torneo, o elegí una División (y opcionalmente una Categoría puntual dentro de ella) para limitarlo a solo eso.</p>
+      </div>
+
       <!-- Documentos del Club (los puede subir la Liga o el propio Club) -->
       <div class="panel oculto popup-modal" id="panelDocumentosClub">
         <div class="panel-header">
@@ -1663,6 +1697,7 @@
         <button class="tab-btn" id="tabBtnConfigTiposCancha">Tipos de cancha</button>
         <button class="tab-btn" id="tabBtnConfigPredios">Predios y canchas propias</button>
         <button class="tab-btn" id="tabBtnConfigArbitros">Árbitros</button>
+        <button class="tab-btn" id="tabBtnConfigAutoridades">Autoridades</button>
         <button class="tab-btn" id="tabBtnConfigCobros">Cobros</button>
       </div>
 
@@ -1846,9 +1881,37 @@
             <button type="button" class="btn btn-secundario" id="btnCancelarFormArbitro">Cancelar</button>
             <p class="mensaje-error oculto" id="arbitroFormError"></p>
           </form>
+          <p class="texto-ayuda">Un árbitro puede además tener acceso a la app para ver solo los partidos que se le asignen.</p>
           <table>
-            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th>Acciones</th></tr></thead>
-            <tbody id="tablaArbitros"><tr><td colspan="4">Cargando...</td></tr></tbody>
+            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th>Acceso a la app</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaArbitros"><tr><td colspan="5">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Autoridades: usuarios que pueden cargar resultados de un
+           Torneo/División/Categoría puntual, sin acceso a nada más. -->
+      <div id="subConfigAutoridades" class="oculto">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Autoridades</h2>
+            <button class="btn" id="btnMostrarFormAutoridad">+ Nueva autoridad</button>
+          </div>
+          <p class="texto-ayuda">Una Autoridad es un usuario al que le asignás uno o más Torneos/Divisiones/Categorías puntuales: solo puede cargar el resultado (goles y tarjetas) de los partidos de lo que le asignes, nada más.</p>
+          <form id="formAutoridad" class="oculto">
+            <div class="form-grid">
+              <div><label for="autoridadNombre">Nombre *</label><input type="text" id="autoridadNombre" required></div>
+              <div><label for="autoridadEmail">Email *</label><input type="email" id="autoridadEmail" required></div>
+              <div><label for="autoridadPassword">Contraseña *</label><input type="password" id="autoridadPassword" required></div>
+            </div>
+            <button type="submit" class="btn">Crear</button>
+            <button type="button" class="btn btn-secundario" id="btnCancelarFormAutoridad">Cancelar</button>
+            <p class="mensaje-error oculto" id="autoridadFormError"></p>
+            <p class="mensaje-ok oculto" id="autoridadFormOk"></p>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="tablaAutoridades"><tr><td colspan="4">Cargando...</td></tr></tbody>
           </table>
         </div>
       </div>

@@ -5,6 +5,21 @@ const { query, getClient } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
 const { generarDeudaInscripcion, asegurarDeudaPorPartido, buscarConceptoActivo } = require('../utils/cobros');
+const { autoridadTieneAlcance } = require('../utils/autoridad');
+
+// El rol "autoridad" comparte este router con liga_admin/super_admin (para
+// poder cargar resultados dentro de su alcance), pero NO debe poder tocar
+// nada más de este archivo (fixture, tabla, edición de partidos, etc). El
+// chequeo de alcance puntual (torneo/división/categoría asignados) se hace
+// además dentro del propio endpoint de resultado.
+router.use((req, res, next) => {
+  if (req.usuario.rol !== 'autoridad') return next();
+  const esCargaDeResultado = req.method === 'PUT' && /\/partidos\/[^/]+\/resultado$/.test(req.path);
+  if (!esCargaDeResultado) {
+    return res.status(403).json({ ok: false, error: 'Tu rol solo puede cargar resultados de partidos dentro de lo que te asignaron' });
+  }
+  next();
+});
 
 // Chequea que la división pertenezca a un torneo de MI liga. Devuelve
 // {torneo, categoria} o null.
@@ -1429,6 +1444,13 @@ router.put('/:torneoId/categorias/:categoriaId/partidos/:partidoId/resultado', a
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    if (req.usuario.rol === 'autoridad') {
+      const tieneAlcance = await autoridadTieneAlcance(req.usuario.id, req.params.torneoId, req.params.categoriaId, req.params.partidoId);
+      if (!tieneAlcance) {
+        return res.status(403).json({ ok: false, error: 'No tenés asignado este Torneo/División/Categoría' });
+      }
+    }
 
     if (ausenteLocal && ausenteVisitante) {
       // Ningún equipo se presentó: los dos pierden el partido, sin usar

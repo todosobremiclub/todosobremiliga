@@ -53,10 +53,17 @@ app.use('/admin/noticias', requireAuth, requireRole('super_admin'), require('./r
 // filtrado a la Liga correspondiente (ver middleware resolveLigaId).
 const resolveLigaId = require('./middleware/resolveLigaId');
 app.use('/liga/clubes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaClubesRoutes'));
+// ligaFixtureRoutes se monta ANTES que ligaTorneosRoutes a propósito, aunque
+// comparten el mismo prefijo '/liga/torneos': el rol "autoridad" solo tiene
+// permiso en ESTE archivo (y encima, dentro de él, solo en la carga de
+// resultado — ver el guard al principio de ligaFixtureRoutes.js). Si
+// ligaTorneosRoutes fuera primero, su requireRole (que NO incluye
+// "autoridad") rechazaría la request antes de que llegue nunca a
+// ligaFixtureRoutes. Para liga_admin/super_admin el orden no cambia nada:
+// cuando ninguna ruta de ligaFixtureRoutes matchea, Express sigue de largo
+// hacia ligaTorneosRoutes como siempre.
+app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin', 'autoridad'), resolveLigaId, require('./routes/ligaFixtureRoutes'));
 app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaTorneosRoutes'));
-// Se monta en el mismo prefijo que ligaTorneosRoutes: maneja las sub-rutas de
-// equipos inscriptos, fixture, resultados y tabla de posiciones.
-app.use('/liga/torneos', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFixtureRoutes'));
 // Datos de marca (nombre/logo/colores) de la propia Liga, solo lectura.
 app.use('/liga/perfil', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaPerfilRoutes'));
 // Postulaciones de Clubes recibidas por el formulario público (QR/link), a aceptar o rechazar.
@@ -96,6 +103,11 @@ app.use('/club/configuracion', requireAuth, requireRole('super_admin', 'club_adm
 // día de partido, filtrado automáticamente a SU liga.
 app.use('/liga/fichajes', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaFichajesRoutes'));
 app.use('/liga/carnets', requireAuth, requireRole('super_admin', 'liga_admin'), resolveLigaId, require('./routes/ligaCarnetsRoutes'));
+
+// Roles Autoridad y Árbitro: alta/gestión (solo liga_admin/super_admin) y
+// autoconsulta de "mis asignaciones" (autoridad/arbitro), todo dentro del
+// mismo router (cada endpoint chequea el rol puntual que necesita).
+app.use('/liga/roles', requireAuth, requireRole('super_admin', 'liga_admin', 'autoridad', 'arbitro'), resolveLigaId, require('./routes/ligaRolesRoutes'));
 
 // ===== MÓDULO NOTICIAS Y NOTIFICACIONES =====
 // Lado Liga: crear/publicar noticias y enviar notificaciones a uno o todos

@@ -7,7 +7,7 @@
 //
 // Debe usarse siempre DESPUÉS de requireAuth.
 module.exports = function resolveLigaId(req, res, next) {
-  if (req.usuario.rol === 'liga_admin') {
+  if (req.usuario.rol === 'liga_admin' || req.usuario.rol === 'autoridad' || req.usuario.rol === 'arbitro') {
     if (!req.usuario.liga_id) {
       return res.status(403).json({ ok: false, error: 'Tu usuario no tiene una Liga asociada' });
     }

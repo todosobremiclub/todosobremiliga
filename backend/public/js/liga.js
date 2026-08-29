@@ -109,7 +109,7 @@ function moverPopupsABody() {
     'modalCobrosClub', 'modalCanchasPredio', 'panelDocumentosTorneo',
     'panelGestionarEquipos', 'fondoModalGestionarEquipos',
     'panelCargarResultado', 'fondoModalResultado',
-    'panelBuscarClubExistente', 'panelCambiarFechaFixture'
+    'panelBuscarClubExistente', 'panelCambiarFechaFixture', 'panelAsignacionesAutoridad'
   ];
   ids.forEach((id) => {
     const el = document.getElementById(id);
@@ -242,6 +242,11 @@ function conectarEventos() {
   });
   document.getElementById('formUsuarioClub').addEventListener('submit', crearUsuarioClub);
 
+  document.getElementById('btnCerrarAsignacionesAutoridad').addEventListener('click', () => {
+    document.getElementById('panelAsignacionesAutoridad').classList.add('oculto');
+    ocultarFondoModal();
+  });
+
   document.getElementById('btnCerrarDocumentosClub').addEventListener('click', () => {
     document.getElementById('panelDocumentosClub').classList.add('oculto');
     ocultarFondoModal();
@@ -294,7 +299,7 @@ function conectarEventos() {
     // El fondo compartido cierra cualquier popup que esté abierto en ese momento.
     ['formClub', 'panelUsuariosClub', 'panelDocumentosClub', 'panelComentariosClub', 'panelCanchasClub',
      'modalParticipacionesClub', 'modalFichajesClub', 'formTorneo', 'modalEditarFichaje',
-     'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes', 'panelDocumentosTorneo'
+     'panelDeudasClub', 'modalCobrosClub', 'modalImpagosMes', 'panelDocumentosTorneo', 'panelAsignacionesAutoridad'
     ].forEach((id) => document.getElementById(id).classList.add('oculto'));
     ocultarFondoModal();
     torneoActualId = null;
@@ -712,6 +717,7 @@ function conectarEventos() {
   document.getElementById('tabBtnConfigTiposCancha').addEventListener('click', () => cambiarTabConfig('tiposCancha'));
   document.getElementById('tabBtnConfigPredios').addEventListener('click', () => cambiarTabConfig('predios'));
   document.getElementById('tabBtnConfigArbitros').addEventListener('click', () => cambiarTabConfig('arbitros'));
+  document.getElementById('tabBtnConfigAutoridades').addEventListener('click', () => cambiarTabConfig('autoridades'));
   document.getElementById('tabBtnConfigCobros').addEventListener('click', () => cambiarTabConfig('cobros'));
 
   document.getElementById('btnMostrarFormTipoGasto').addEventListener('click', () => {
@@ -783,6 +789,17 @@ function conectarEventos() {
     document.getElementById('formArbitro').classList.add('oculto');
   });
   document.getElementById('formArbitro').addEventListener('submit', guardarArbitro);
+
+  document.getElementById('btnMostrarFormAutoridad').addEventListener('click', () => {
+    document.getElementById('formAutoridad').reset();
+    document.getElementById('autoridadFormError').classList.add('oculto');
+    document.getElementById('autoridadFormOk').classList.add('oculto');
+    document.getElementById('formAutoridad').classList.remove('oculto');
+  });
+  document.getElementById('btnCancelarFormAutoridad').addEventListener('click', () => {
+    document.getElementById('formAutoridad').classList.add('oculto');
+  });
+  document.getElementById('formAutoridad').addEventListener('submit', crearAutoridad);
 
   // ---- Cobros ----
   document.getElementById('cobrosTorneoSelect').addEventListener('change', (e) => {
@@ -858,12 +875,14 @@ function cambiarTabConfig(nombre) {
     tiposGasto: 'subConfigTiposGasto',
     tiposIngreso: 'subConfigTiposIngreso', cuentas: 'subConfigCuentas',
     tiposCancha: 'subConfigTiposCancha', predios: 'subConfigPredios', arbitros: 'subConfigArbitros',
+    autoridades: 'subConfigAutoridades',
     cobros: 'subConfigCobros'
   };
   const botones = {
     tiposGasto: 'tabBtnConfigTiposGasto',
     tiposIngreso: 'tabBtnConfigTiposIngreso', cuentas: 'tabBtnConfigCuentas',
     tiposCancha: 'tabBtnConfigTiposCancha', predios: 'tabBtnConfigPredios', arbitros: 'tabBtnConfigArbitros',
+    autoridades: 'tabBtnConfigAutoridades',
     cobros: 'tabBtnConfigCobros'
   };
   Object.keys(secciones).forEach((key) => {
@@ -876,6 +895,7 @@ function cambiarTabConfig(nombre) {
   if (nombre === 'tiposCancha') cargarTiposCancha();
   if (nombre === 'predios') cargarPredios();
   if (nombre === 'arbitros') cargarArbitros();
+  if (nombre === 'autoridades') cargarAutoridades();
   if (nombre === 'cobros') cargarConfigCobros();
 }
 
@@ -1345,23 +1365,318 @@ const NOMBRES_TIPO_ARBITRO = { arbitro: 'Árbitro', juez_linea: 'Juez de línea'
 
 async function cargarArbitros() {
   const tbody = document.getElementById('tablaArbitros');
-  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
   try {
-    const data = await apiFetch('/liga/configuracion/arbitros');
+    const data = await apiFetch('/liga/roles/arbitros');
     arbitrosLigaCache = data.arbitros;
     tbody.innerHTML = arbitrosLigaCache.length ? arbitrosLigaCache.map((a) => `
       <tr>
         <td>${escapeHtml(a.apellido)}, ${escapeHtml(a.nombre)}</td>
         <td>${escapeHtml(a.telefono || '-')}</td>
         <td>${escapeHtml(NOMBRES_TIPO_ARBITRO[a.tipo] || a.tipo)}</td>
+        <td>${accesoArbitroHtml(a)}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarArbitro('${a.id}')">${ICONO_LAPIZ}</button>
           <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarArbitro('${a.id}', '${escapeHtml(a.apellido)}')">${ICONO_BASURA}</button>
         </td>
       </tr>
-    `).join('') : '<tr><td colspan="4">Todavía no cargaste árbitros.</td></tr>';
+    `).join('') : '<tr><td colspan="5">Todavía no cargaste árbitros.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+// Columna "Acceso a la app": si el árbitro todavía no tiene login, un botón
+// para dárselo; si ya tiene, su email + acciones (cambiar contraseña, activar
+// /desactivar, quitar acceso). Esto es lo que le va a permitir entrar a la
+// futura app y ver únicamente los partidos que se le asignen.
+function accesoArbitroHtml(a) {
+  if (!a.usuario_id) {
+    return `<button class="btn btn-secundario btn-pequeno" onclick="darAccesoArbitro('${a.id}')">Dar acceso a la app</button>`;
+  }
+  return `
+    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+      <span class="badge ${a.acceso_activo ? 'badge-activo' : 'badge-inactivo'}">${escapeHtml(a.email)}</span>
+      <div style="display:flex; gap:4px;">
+        <button class="btn btn-secundario btn-pequeno" onclick="cambiarPasswordArbitro('${a.id}')">Contraseña</button>
+        <button class="btn ${a.acceso_activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleAccesoArbitro('${a.id}', ${!a.acceso_activo})">${a.acceso_activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="btn btn-peligro btn-pequeno" onclick="quitarAccesoArbitro('${a.id}', '${escapeHtml(a.apellido)}')">Quitar acceso</button>
+      </div>
+    </div>
+  `;
+}
+
+async function darAccesoArbitro(arbitroLigaId) {
+  const email = prompt('Email para el login del árbitro:');
+  if (!email) return;
+  const password = prompt('Contraseña (mínimo 4 caracteres):');
+  if (!password) return;
+  try {
+    await apiFetch(`/liga/roles/arbitros/${arbitroLigaId}/acceso`, {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim(), password })
+    });
+    cargarArbitros();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function cambiarPasswordArbitro(arbitroLigaId) {
+  const password = prompt('Nueva contraseña (mínimo 4 caracteres):');
+  if (password === null) return;
+  try {
+    await apiFetch(`/liga/roles/arbitros/${arbitroLigaId}/acceso/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password })
+    });
+    alert('Contraseña actualizada.');
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function toggleAccesoArbitro(arbitroLigaId, nuevoValor) {
+  try {
+    await apiFetch(`/liga/roles/arbitros/${arbitroLigaId}/acceso/activo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo: nuevoValor })
+    });
+    cargarArbitros();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function quitarAccesoArbitro(arbitroLigaId, apellido) {
+  if (!confirm(`¿Quitar el acceso a la app de "${apellido}"? Sigue existiendo como árbitro, solo pierde el login.`)) return;
+  try {
+    await apiFetch(`/liga/roles/arbitros/${arbitroLigaId}/acceso`, { method: 'DELETE' });
+    cargarArbitros();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ----- Autoridades: usuarios con alcance de Torneo/División/Categoría -----
+
+let autoridadesCache = [];
+
+async function cargarAutoridades() {
+  const tbody = document.getElementById('tablaAutoridades');
+  tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch('/liga/roles/autoridades');
+    autoridadesCache = data.autoridades;
+    tbody.innerHTML = autoridadesCache.length ? autoridadesCache.map((u) => `
+      <tr>
+        <td>${escapeHtml(u.nombre)}</td>
+        <td>${escapeHtml(u.email)}</td>
+        <td><span class="badge ${u.activo ? 'badge-activo' : 'badge-inactivo'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+        <td>
+          <button class="btn btn-secundario btn-pequeno" onclick="abrirAsignacionesAutoridad('${u.id}', '${escapeHtml(u.nombre)}')">Torneos/Divisiones asignados</button>
+          <button class="btn btn-secundario btn-pequeno btn-icono" title="Editar" onclick="editarAutoridad('${u.id}')">${ICONO_LAPIZ}</button>
+          <button class="btn btn-secundario btn-pequeno" onclick="cambiarPasswordAutoridad('${u.id}')">Contraseña</button>
+          <button class="btn ${u.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoAutoridad('${u.id}', ${!u.activo})">${u.activo ? 'Desactivar' : 'Activar'}</button>
+          <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="eliminarAutoridad('${u.id}', '${escapeHtml(u.nombre)}')">${ICONO_BASURA}</button>
+        </td>
+      </tr>
+    `).join('') : '<tr><td colspan="4">Todavía no creaste ninguna autoridad.</td></tr>';
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="4">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function crearAutoridad(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('autoridadFormError');
+  const okEl = document.getElementById('autoridadFormOk');
+  errorEl.classList.add('oculto');
+  okEl.classList.add('oculto');
+  const cuerpo = {
+    nombre: document.getElementById('autoridadNombre').value.trim(),
+    email: document.getElementById('autoridadEmail').value.trim(),
+    password: document.getElementById('autoridadPassword').value
+  };
+  try {
+    await apiFetch('/liga/roles/autoridades', { method: 'POST', body: JSON.stringify(cuerpo) });
+    okEl.textContent = 'Autoridad creada correctamente. Ahora asignale sus Torneos/Divisiones desde "Torneos/Divisiones asignados".';
+    okEl.classList.remove('oculto');
+    document.getElementById('formAutoridad').reset();
+    cargarAutoridades();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function editarAutoridad(usuarioId) {
+  const a = autoridadesCache.find((x) => x.id === usuarioId);
+  if (!a) return;
+  const nombre = prompt('Nombre:', a.nombre);
+  if (nombre === null) return;
+  const email = prompt('Email:', a.email);
+  if (email === null) return;
+  try {
+    await apiFetch(`/liga/roles/autoridades/${usuarioId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ nombre: nombre.trim(), email: email.trim() })
+    });
+    cargarAutoridades();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function cambiarPasswordAutoridad(usuarioId) {
+  const password = prompt('Nueva contraseña (mínimo 4 caracteres):');
+  if (password === null) return;
+  try {
+    await apiFetch(`/liga/roles/autoridades/${usuarioId}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password })
+    });
+    alert('Contraseña actualizada.');
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function toggleActivoAutoridad(usuarioId, nuevoValor) {
+  try {
+    await apiFetch(`/liga/roles/autoridades/${usuarioId}/activo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo: nuevoValor })
+    });
+    cargarAutoridades();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function eliminarAutoridad(usuarioId, nombre) {
+  if (!confirm(`¿Eliminar definitivamente a la autoridad "${nombre}"?`)) return;
+  try {
+    await apiFetch(`/liga/roles/autoridades/${usuarioId}`, { method: 'DELETE' });
+    cargarAutoridades();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ----- Popup: Torneos/Divisiones/Categorías asignados a una Autoridad -----
+
+let autoridadAsignacionUsuarioId = null;
+
+async function abrirAsignacionesAutoridad(usuarioId, nombre) {
+  autoridadAsignacionUsuarioId = usuarioId;
+  document.getElementById('panelAsignacionesAutoridad').classList.remove('oculto');
+  mostrarFondoModal();
+  document.getElementById('tituloAsignacionesAutoridad').textContent = `Torneos/Divisiones de "${nombre}"`;
+  document.getElementById('asignacionAutoridadError').classList.add('oculto');
+  await poblarSelectTorneosAsignacionAutoridad();
+  document.getElementById('asignacionAutoridadCategoriaSelect').innerHTML = '<option value="">Toda la división (todo el Torneo si tampoco elegís Torneo)</option>';
+  document.getElementById('asignacionAutoridadSubcategoriaSelect').innerHTML = '<option value="">Toda la categoría</option>';
+  cargarAsignacionesAutoridad();
+}
+
+async function poblarSelectTorneosAsignacionAutoridad() {
+  const select = document.getElementById('asignacionAutoridadTorneoSelect');
+  select.innerHTML = '<option value="">Elegí un Torneo...</option>';
+  try {
+    if (!torneosCache.length) await cargarTorneos();
+    torneosCache.forEach((t) => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.nombre;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Error cargando torneos para asignación de autoridad:', err);
+  }
+}
+
+async function onCambioTorneoAsignacionAutoridad() {
+  const torneoId = document.getElementById('asignacionAutoridadTorneoSelect').value;
+  const catSelect = document.getElementById('asignacionAutoridadCategoriaSelect');
+  const subSelect = document.getElementById('asignacionAutoridadSubcategoriaSelect');
+  catSelect.innerHTML = '<option value="">Todo el Torneo</option>';
+  subSelect.innerHTML = '<option value="">Toda la división</option>';
+  if (!torneoId) return;
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
+    (data.categorias || []).forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nombre;
+      opt.dataset.subcategorias = JSON.stringify(c.subcategorias || []);
+      catSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Error cargando divisiones para asignación de autoridad:', err);
+  }
+}
+
+function onCambioCategoriaAsignacionAutoridad() {
+  const catSelect = document.getElementById('asignacionAutoridadCategoriaSelect');
+  const subSelect = document.getElementById('asignacionAutoridadSubcategoriaSelect');
+  subSelect.innerHTML = '<option value="">Toda la división</option>';
+  const opt = catSelect.selectedOptions[0];
+  if (!opt || !opt.dataset.subcategorias) return;
+  const subcategorias = JSON.parse(opt.dataset.subcategorias);
+  subcategorias.forEach((s) => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.nombre;
+    subSelect.appendChild(o);
+  });
+}
+
+async function cargarAsignacionesAutoridad() {
+  const tbody = document.getElementById('tablaAsignacionesAutoridad');
+  tbody.innerHTML = '<tr><td colspan="2">Cargando...</td></tr>';
+  try {
+    const data = await apiFetch(`/liga/roles/autoridades/${autoridadAsignacionUsuarioId}/asignaciones`);
+    tbody.innerHTML = data.asignaciones.length ? data.asignaciones.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.torneo_nombre)}${a.categoria_nombre ? ' → ' + escapeHtml(a.categoria_nombre) : ' (todo el torneo)'}${a.subcategoria_nombre ? ' → ' + escapeHtml(a.subcategoria_nombre) : ''}</td>
+        <td><button class="btn btn-peligro btn-pequeno btn-icono" title="Quitar" onclick="eliminarAsignacionAutoridad('${a.id}')">${ICONO_BASURA}</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="2">Todavía no tiene ningún alcance asignado.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="2">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function agregarAsignacionAutoridad() {
+  const errorEl = document.getElementById('asignacionAutoridadError');
+  errorEl.classList.add('oculto');
+  const torneo_id = document.getElementById('asignacionAutoridadTorneoSelect').value;
+  const categoria_id = document.getElementById('asignacionAutoridadCategoriaSelect').value || undefined;
+  const subcategoria_id = document.getElementById('asignacionAutoridadSubcategoriaSelect').value || undefined;
+  if (!torneo_id) {
+    errorEl.textContent = 'Elegí un Torneo';
+    errorEl.classList.remove('oculto');
+    return;
+  }
+  try {
+    await apiFetch(`/liga/roles/autoridades/${autoridadAsignacionUsuarioId}/asignaciones`, {
+      method: 'POST',
+      body: JSON.stringify({ torneo_id, categoria_id, subcategoria_id })
+    });
+    cargarAsignacionesAutoridad();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function eliminarAsignacionAutoridad(asignacionId) {
+  try {
+    await apiFetch(`/liga/roles/autoridades/${autoridadAsignacionUsuarioId}/asignaciones/${asignacionId}`, { method: 'DELETE' });
+    cargarAsignacionesAutoridad();
+  } catch (err) {
+    alert('Error: ' + err.message);
   }
 }
 

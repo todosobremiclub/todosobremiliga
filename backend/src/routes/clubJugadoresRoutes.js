@@ -184,4 +184,29 @@ router.patch('/:jugadorId/activo', async (req, res) => {
   }
 });
 
+// DELETE /club/jugadores/:jugadorId — borrado definitivo, SOLO si el jugador
+// nunca tuvo un fichaje (si ya jugó en algún torneo, borrarlo de verdad
+// rompería el historial de goleadores/tarjetas de esos partidos ya jugados;
+// en ese caso hay que usar "Desactivar" en vez de "Eliminar").
+router.delete('/:jugadorId', async (req, res) => {
+  try {
+    const jugador = await query('SELECT id FROM jugadores WHERE id = $1 AND club_id = $2', [req.params.jugadorId, req.clubId]);
+    if (!jugador.rows[0]) return res.status(404).json({ ok: false, error: 'Jugador no encontrado en tu club' });
+
+    const tieneFichajes = await query('SELECT 1 FROM fichajes WHERE jugador_id = $1 LIMIT 1', [req.params.jugadorId]);
+    if (tieneFichajes.rows[0]) {
+      return res.status(409).json({
+        ok: false,
+        error: 'Este jugador ya tuvo un fichaje (jugó en algún torneo) y no se puede eliminar sin perder ese historial. Usá "Desactivar" en su lugar.'
+      });
+    }
+
+    await query('DELETE FROM jugadores WHERE id = $1 AND club_id = $2', [req.params.jugadorId, req.clubId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE /club/jugadores/:jugadorId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 module.exports = router;

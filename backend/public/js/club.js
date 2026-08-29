@@ -729,6 +729,7 @@ function renderJugadores() {
         <button class="btn btn-secundario btn-pequeno" onclick="abrirSolicitarFichaje('${j.id}', '${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}')">Pedir fichaje</button>
         <button class="btn btn-secundario btn-pequeno" onclick="abrirEditarJugador('${j.id}')">Editar</button>
         <button class="btn ${j.activo ? 'btn-peligro' : ''} btn-pequeno" onclick="toggleActivoJugador('${j.id}', ${!j.activo})">${j.activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="btn btn-peligro btn-pequeno" onclick="eliminarJugador('${j.id}', '${escapeHtml(j.nombre)} ${escapeHtml(j.apellido)}')">Eliminar</button>
       </td>
     </tr>
   `).join('');
@@ -820,6 +821,16 @@ async function toggleActivoJugador(jugadorId, nuevoValor) {
       method: 'PATCH',
       body: JSON.stringify({ activo: nuevoValor })
     });
+    cargarJugadores();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function eliminarJugador(jugadorId, nombreCompleto) {
+  if (!confirm(`¿Eliminar definitivamente a "${nombreCompleto}"? Esta acción no se puede deshacer.`)) return;
+  try {
+    await apiFetch(`/club/jugadores/${jugadorId}`, { method: 'DELETE' });
     cargarJugadores();
   } catch (err) {
     alert('Error: ' + err.message);
