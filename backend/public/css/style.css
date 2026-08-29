@@ -393,6 +393,17 @@ th { color: var(--gris-600); font-weight: 600; }
 
 tr:hover td { background: var(--gris-100); }
 
+/* Envoltorio para tablas anchas (posiciones, con 9/10 columnas) -- permite
+   scroll horizontal por swipe en pantallas angostas en vez de que la tabla
+   se salga de la pantalla o se achique hasta ser ilegible. Ya existía una
+   copia de esta clase adentro de liga.html; se centraliza acá para que
+   también la puedan usar las páginas públicas (sitio/torneo.html,
+   sitio/categoria.html). */
+.tabla-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;
@@ -1225,4 +1236,88 @@ body.liga-fondo-cancha .separador-dia-fixture, body.club-fondo-cancha .separador
 }
 
 .footer-liga-red-boton:hover { background: var(--azul); color: var(--blanco); }
+
+/* ============================================================================
+   Responsive general -- pantallas angostas (celulares).
+   Se agrega al final del archivo a propósito: al tener la misma
+   especificidad que las reglas de arriba, el orden en el archivo es lo que
+   decide quién gana, así que puesto acá siempre pisa a las reglas base de
+   más arriba en el ancho donde aplica el @media. No compite con el bloque
+   "vidrio sobre cancha" (body.liga-fondo-cancha / body.club-fondo-cancha)
+   porque ese bloque sólo toca colores/fondos y este bloque sólo toca layout
+   (tamaños, wrap, scroll), así que ambos conviven sin pisarse. */
+@media (max-width: 700px) {
+  .contenido,
+  .sitio-contenido {
+    padding: 18px 14px;
+  }
+
+  .topbar {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar h1 { font-size: 15px; }
+
+  .topbar .usuario-info {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .panel { padding: 14px; }
+
+  /* Tablas: letra y relleno más chico para que entren más columnas antes de
+     necesitar scroll horizontal. */
+  table { font-size: 12px; }
+  th, td { padding: 6px 6px; }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sitio-header { padding: 18px 14px; }
+
+  /* El header centrado de una Liga pública usaba una grilla fija de 3
+     columnas (1fr auto 1fr) pensada para pantallas anchas; en celular se
+     apila todo en una columna y se centra. */
+  .sitio-header-inner.sitio-header-inner-centrado {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .sitio-logo-grande {
+    width: 56px;
+    height: 56px;
+  }
+
+  /* Pestañas (Tabla/Fixture/Goleadores/Tarjetas, en el panel de Liga y en
+     el sitio público): en vez de que se corten o se amontonen envolviendo
+     líneas, se deja una sola fila con scroll horizontal por swipe. */
+  .tabs,
+  .sitio-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .tabs .tab-btn,
+  .sitio-tabs .tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  table { font-size: 11px; }
+  th, td { padding: 5px 4px; }
+
+  .sitio-logo { width: 38px; height: 38px; }
+
+  .card-link { padding: 14px; }
+}
 

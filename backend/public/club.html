@@ -150,6 +150,7 @@
           <p class="mensaje-error oculto" id="jugadorFormError"></p>
         </form>
 
+        <div class="tabla-scroll">
         <table>
           <thead>
             <tr>
@@ -166,6 +167,7 @@
           </thead>
           <tbody id="tablaJugadores"><tr><td colspan="9">Cargando...</td></tr></tbody>
         </table>
+        </div>
         <div id="paginacionJugadores" style="display:flex; align-items:center; gap:12px; margin-top:14px;">
           <button class="btn btn-secundario btn-pequeno" id="btnJugadoresPaginaAnterior">← Anterior</button>
           <span id="paginacionJugadoresInfo" class="texto-ayuda"></span>
@@ -244,12 +246,14 @@
             <option value="">Todas las categorías</option>
           </select>
         </div>
+        <div class="tabla-scroll">
         <table>
           <thead>
             <tr><th>Foto</th><th>Jugador</th><th>Liga</th><th>Torneo</th><th>División</th><th>Categoría</th><th>Estado</th><th>Carnet</th></tr>
           </thead>
           <tbody id="tablaFichajes"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
+        </div>
       </div>
     </div>
 

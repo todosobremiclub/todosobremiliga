@@ -888,10 +888,12 @@
              tabla por club. -->
         <div id="bloqueTablaGeneralLiga" class="oculto">
           <p class="texto-ayuda">Suma los puntos de todas las divisiones y categorías marcadas con el tilde "Suma a la tabla general".</p>
-          <table>
-            <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
-            <tbody id="tablaGeneralTorneo"><tr><td colspan="9">Cargando...</td></tr></tbody>
-          </table>
+          <div class="tabla-scroll">
+            <table>
+              <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+              <tbody id="tablaGeneralTorneo"><tr><td colspan="9">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
 
         <!-- "General" DENTRO de una división: suma puntos de todas sus
@@ -910,10 +912,12 @@
           </div>
 
           <div id="subSeccionGeneralLigaTabla">
-            <table>
-              <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
-              <tbody id="tablaGeneralCategoria"><tr><td colspan="9">Cargando...</td></tr></tbody>
-            </table>
+            <div class="tabla-scroll">
+              <table>
+                <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th></tr></thead>
+                <tbody id="tablaGeneralCategoria"><tr><td colspan="9">Cargando...</td></tr></tbody>
+              </table>
+            </div>
           </div>
           <div id="subSeccionGeneralLigaFixture" class="oculto">
             <div id="navegadorJornadasGeneralLiga" class="oculto" style="display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px;">
@@ -1039,10 +1043,12 @@
 
           <!-- Tabla de posiciones -->
           <div id="subSeccionTabla" class="oculto">
-            <table>
-              <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
-              <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
-            </table>
+            <div class="tabla-scroll">
+              <table>
+                <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
+                <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Goleadores -->
@@ -1181,6 +1187,7 @@
           <button class="btn btn-peligro btn-pequeno" id="btnEliminarFichajesSeleccionados">Eliminar seleccionados</button>
           <button class="btn btn-secundario btn-pequeno" id="btnLimpiarSeleccionFichajes">Limpiar selección</button>
         </div>
+        <div class="tabla-scroll">
         <table>
           <thead>
             <tr>
@@ -1190,6 +1197,7 @@
           </thead>
           <tbody id="tablaFichajesLiga"><tr><td colspan="10">Cargando...</td></tr></tbody>
         </table>
+        </div>
         <div id="paginacionFichajesLiga" style="display:flex; align-items:center; gap:12px; margin-top:14px;">
           <button class="btn btn-secundario btn-pequeno" id="btnFichajesPaginaAnterior">← Anterior</button>
           <span id="paginacionFichajesLigaInfo" class="texto-ayuda"></span>
@@ -1431,10 +1439,12 @@
           <button type="button" class="btn btn-secundario" id="btnCancelarFormIngreso">Cancelar</button>
           <p class="mensaje-error oculto" id="ingresoFormError"></p>
         </form>
+        <div class="tabla-scroll">
         <table>
           <thead><tr><th>Concepto</th><th>Club</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Comentario</th><th>Acciones</th></tr></thead>
           <tbody id="tablaIngresos"><tr><td colspan="8">Cargando...</td></tr></tbody>
         </table>
+        </div>
       </div>
 
       <div class="panel">
@@ -1462,10 +1472,12 @@
           <button type="button" class="btn btn-secundario" id="btnCancelarFormGasto">Cancelar</button>
           <p class="mensaje-error oculto" id="gastoFormError"></p>
         </form>
+        <div class="tabla-scroll">
         <table>
           <thead><tr><th>Concepto</th><th>Tipo</th><th>Cuenta</th><th>Monto</th><th>Fecha</th><th>Comentario</th><th>Acciones</th></tr></thead>
           <tbody id="tablaGastos"><tr><td colspan="7">Cargando...</td></tr></tbody>
         </table>
+        </div>
       </div>
     </div>
 
@@ -1515,10 +1527,12 @@
         <h2 id="tituloDeudasClub">Deudas del club</h2>
         <button type="button" class="btn btn-secundario" id="btnCerrarDeudasClub">Cerrar</button>
       </div>
+      <div class="tabla-scroll">
       <table>
         <thead><tr><th>Concepto</th><th>Descripción</th><th>Monto</th><th>Pagado</th><th>Saldo</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody id="tablaDeudasClub"><tr><td colspan="7">Cargando...</td></tr></tbody>
       </table>
+      </div>
 
       <form id="formPagoCobro" class="oculto">
         <input type="hidden" id="pagoDeudaId">
