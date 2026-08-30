@@ -772,8 +772,8 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
                 RANK() OVER (
                   PARTITION BY et.torneo_id, et.categoria_id
                   ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC
-                ) AS puesto,
-                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id) AS total_equipos,
+                )::int AS puesto,
+                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id)::int AS total_equipos,
                 COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
                 COALESCE(tp.ganados, 0) AS ganados, COALESCE(tp.empatados, 0) AS empatados,
                 COALESCE(tp.perdidos, 0) AS perdidos, COALESCE(tp.diferencia, 0) AS diferencia
@@ -800,8 +800,8 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
                 RANK() OVER (
                   PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id
                   ORDER BY COALESCE(tp.puntos, 0) DESC, COALESCE(tp.diferencia, 0) DESC, COALESCE(tp.a_favor, 0) DESC
-                ) AS puesto,
-                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id) AS total_equipos,
+                )::int AS puesto,
+                COUNT(*) OVER (PARTITION BY et.torneo_id, et.categoria_id, et.subcategoria_id)::int AS total_equipos,
                 COALESCE(tp.puntos, 0) AS puntos, COALESCE(tp.partidos_jugados, 0) AS partidos_jugados,
                 COALESCE(tp.ganados, 0) AS ganados, COALESCE(tp.empatados, 0) AS empatados,
                 COALESCE(tp.perdidos, 0) AS perdidos, COALESCE(tp.diferencia, 0) AS diferencia
@@ -850,8 +850,8 @@ router.get('/ligas/:slug/clubes/:clubId', async (req, res) => {
        ),
        ranking_general AS (
          SELECT *,
-                RANK() OVER (PARTITION BY torneo_id, categoria_id ORDER BY puntos DESC, diferencia DESC, a_favor DESC) AS puesto,
-                COUNT(*) OVER (PARTITION BY torneo_id, categoria_id) AS total_equipos
+                RANK() OVER (PARTITION BY torneo_id, categoria_id ORDER BY puntos DESC, diferencia DESC, a_favor DESC)::int AS puesto,
+                COUNT(*) OVER (PARTITION BY torneo_id, categoria_id)::int AS total_equipos
          FROM stats_generales
        ),
        filas_generales AS (
