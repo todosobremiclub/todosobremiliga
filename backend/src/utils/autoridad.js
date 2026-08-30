@@ -29,4 +29,25 @@ async function autoridadTieneAlcance(usuarioId, torneoId, categoriaId, partidoId
   return rows.length > 0;
 }
 
-module.exports = { autoridadTieneAlcance };
+// Chequea si un usuario "autoridad" tiene alcance sobre una División
+// (Torneo + Categoría) y, si se pasa, una Subcategoría puntual -- para
+// LISTAR/CONSULTAR partidos de esa división, a diferencia de
+// `autoridadTieneAlcance` de arriba que chequea un partido puntual ya
+// identificado (para cargarle el resultado). `subcategoriaId` viene null
+// cuando la consulta no filtra por ninguna subcategoría puntual (pide
+// "todas") -- en ese caso solo pasa si la autoridad tiene alcance a nivel
+// Torneo o Categoría entera (no solo a una Subcategoría puntual).
+async function autoridadTieneAlcanceCategoria(usuarioId, torneoId, categoriaId, subcategoriaId) {
+  const { rows } = await query(
+    `SELECT 1 FROM liga_autoridad_asignaciones
+     WHERE usuario_id = $1
+       AND torneo_id = $2
+       AND (categoria_id IS NULL OR categoria_id = $3)
+       AND (subcategoria_id IS NULL OR subcategoria_id IS NOT DISTINCT FROM $4::uuid)
+     LIMIT 1`,
+    [usuarioId, torneoId, categoriaId, subcategoriaId]
+  );
+  return rows.length > 0;
+}
+
+module.exports = { autoridadTieneAlcance, autoridadTieneAlcanceCategoria };

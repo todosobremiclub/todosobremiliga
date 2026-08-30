@@ -5,18 +5,24 @@ const { query, getClient } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
 const { generarDeudaInscripcion, asegurarDeudaPorPartido, buscarConceptoActivo } = require('../utils/cobros');
-const { autoridadTieneAlcance } = require('../utils/autoridad');
+const { autoridadTieneAlcance, autoridadTieneAlcanceCategoria } = require('../utils/autoridad');
 
 // El rol "autoridad" comparte este router con liga_admin/super_admin (para
 // poder cargar resultados dentro de su alcance), pero NO debe poder tocar
-// nada más de este archivo (fixture, tabla, edición de partidos, etc). El
-// chequeo de alcance puntual (torneo/división/categoría asignados) se hace
-// además dentro del propio endpoint de resultado.
+// nada más de este archivo (fixture, tabla, edición de partidos, etc). Además
+// de cargar el resultado, necesita poder LISTAR los partidos de su
+// División (para saber cuál está pendiente) y consultar los jugadores de
+// un partido puntual (para cargar goleadores/tarjetas junto con el
+// resultado) -- por eso el allowlist tiene 3 combinaciones método+ruta en
+// vez de una sola. El chequeo de alcance puntual (torneo/división/categoría
+// asignados) se hace además dentro de cada uno de esos 3 endpoints.
 router.use((req, res, next) => {
   if (req.usuario.rol !== 'autoridad') return next();
   const esCargaDeResultado = req.method === 'PUT' && /\/partidos\/[^/]+\/resultado$/.test(req.path);
-  if (!esCargaDeResultado) {
-    return res.status(403).json({ ok: false, error: 'Tu rol solo puede cargar resultados de partidos dentro de lo que te asignaron' });
+  const esListaDePartidos = req.method === 'GET' && /^\/[^/]+\/categorias\/[^/]+\/partidos$/.test(req.path);
+  const esJugadoresDePartido = req.method === 'GET' && /\/partidos\/[^/]+\/jugadores$/.test(req.path);
+  if (!esCargaDeResultado && !esListaDePartidos && !esJugadoresDePartido) {
+    return res.status(403).json({ ok: false, error: 'Tu rol solo puede consultar y cargar resultados de partidos dentro de lo que te asignaron' });
   }
   next();
 });
@@ -206,6 +212,13 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
     // llega en la query string y filtra vía el equipo local (ambos equipos
     // de un partido son siempre de la misma categoría).
     const subcategoriaId = req.query.subcategoria_id || null;
+
+    if (req.usuario.rol === 'autoridad') {
+      const tieneAlcance = await autoridadTieneAlcanceCategoria(req.usuario.id, req.params.torneoId, req.params.categoriaId, subcategoriaId);
+      if (!tieneAlcance) {
+        return res.status(403).json({ ok: false, error: 'No tenés asignado este Torneo/División/Categoría' });
+      }
+    }
 
     const { rows } = await query(
       `SELECT p.*, cl.id AS club_local_id, cv.id AS club_visitante_id,
@@ -1394,6 +1407,13 @@ router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/jugadores', a
     );
     const partido = partidoResult.rows[0];
     if (!partido) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+
+    if (req.usuario.rol === 'autoridad') {
+      const tieneAlcance = await autoridadTieneAlcance(req.usuario.id, req.params.torneoId, req.params.categoriaId, req.params.partidoId);
+      if (!tieneAlcance) {
+        return res.status(403).json({ ok: false, error: 'No tenés asignado este Torneo/División/Categoría' });
+      }
+    }
 
     const jugadoresLocal = await query(
       'SELECT id, nombre, apellido, numero_camiseta FROM jugadores WHERE club_id = $1 AND activo = TRUE ORDER BY apellido ASC',
