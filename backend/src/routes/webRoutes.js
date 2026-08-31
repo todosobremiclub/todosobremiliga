@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { query } = require('../db');
+const { calcularDescansos } = require('../utils/fixtureLibre');
 
 // Todas las rutas de este archivo son PÚBLICAS (sin login) — son las que va
 // a consumir el sitio web público de cada Liga. Por eso siempre se filtra
@@ -425,7 +426,42 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/fixture', async (req, res
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
 
-    res.json({ ok: true, partidos: rows, cancha_juego: torneoResult.rows[0].cancha_juego, jornadas: jornadasResult.rows });
+    // Si la división tiene cantidad IMPAR de equipos, arma al vuelo una fila
+    // "LIBRE" por cada jornada que le tocó descansar a alguno (ver
+    // utils/fixtureLibre.js) -- no es un partido real, no cuenta para nada.
+    const equiposResult = await query(
+      'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    const partidosParaDescansos = rows.map((p) => ({ jornada: p.jornada, equipo_local_id: p.equipo_local_torneo_id, equipo_visitante_id: p.equipo_visitante_torneo_id }));
+    const descansos = calcularDescansos(equiposResult.rows.map((e) => e.id), partidosParaDescansos);
+    const partidos = [...rows];
+    for (const { jornada, equipoTorneoId } of descansos) {
+      const referencia = rows.find((p) => p.equipo_local_torneo_id === equipoTorneoId || p.equipo_visitante_torneo_id === equipoTorneoId);
+      if (!referencia) continue;
+      const esLocalEnReferencia = referencia.equipo_local_torneo_id === equipoTorneoId;
+      partidos.push({
+        id: `libre-${req.params.categoriaId}-${subcategoriaId || 'sc'}-${jornada}-${equipoTorneoId}`,
+        fecha: null,
+        hora: null,
+        sede: null,
+        jornada,
+        estado: 'libre',
+        resultado_local: null,
+        resultado_visitante: null,
+        detalle_resultado: {},
+        equipo_local_torneo_id: equipoTorneoId,
+        equipo_visitante_torneo_id: null,
+        club_local_nombre: esLocalEnReferencia ? referencia.club_local_nombre : referencia.club_visitante_nombre,
+        club_local_logo_url: esLocalEnReferencia ? referencia.club_local_logo_url : referencia.club_visitante_logo_url,
+        club_visitante_nombre: 'LIBRE',
+        club_visitante_logo_url: null,
+        club_local_direccion: null
+      });
+    }
+    partidos.sort((a, b) => (a.jornada ?? 999999) - (b.jornada ?? 999999));
+
+    res.json({ ok: true, partidos, cancha_juego: torneoResult.rows[0].cancha_juego, jornadas: jornadasResult.rows });
   } catch (err) {
     console.error('Error en GET fixture publico:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });

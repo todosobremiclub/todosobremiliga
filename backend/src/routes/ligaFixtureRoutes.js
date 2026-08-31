@@ -4,6 +4,7 @@ const router = express.Router();
 const { query, getClient } = require('../db');
 const { recalcularTablaPosiciones } = require('../utils/tablaPosiciones');
 const { generarRoundRobin } = require('../utils/fixtureGenerator');
+const { calcularDescansos } = require('../utils/fixtureLibre');
 const { generarDeudaInscripcion, asegurarDeudaPorPartido, buscarConceptoActivo } = require('../utils/cobros');
 const { autoridadTieneAlcance, autoridadTieneAlcanceCategoria } = require('../utils/autoridad');
 
@@ -291,6 +292,49 @@ router.get('/:torneoId/categorias/:categoriaId/partidos', async (req, res) => {
       pago_local: estadoPago(p.id, p.club_local_id),
       pago_visitante: estadoPago(p.id, p.club_visitante_id)
     }));
+
+    // Si la división tiene cantidad IMPAR de equipos, el método del círculo
+    // deja a uno sin partido cada jornada -- se arma una fila "LIBRE" al
+    // vuelo para esa jornada (ver utils/fixtureLibre.js), sin que exista un
+    // partido real en la base: no cuenta como jugado ni suma nada a nadie.
+    const equiposResult = await query(
+      'SELECT id, club_id FROM equipos_torneo WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    const descansos = calcularDescansos(equiposResult.rows.map((e) => e.id), rows);
+    for (const { jornada, equipoTorneoId } of descansos) {
+      // Busca los datos del club de ese equipo en cualquier otro partido
+      // suyo ya cargado (siempre hay al menos uno si hay un descanso que
+      // calcular) -- así no hace falta otro JOIN aparte solo para esto.
+      const referencia = rows.find((p) => p.equipo_local_id === equipoTorneoId || p.equipo_visitante_id === equipoTorneoId);
+      if (!referencia) continue;
+      const esLocalEnReferencia = referencia.equipo_local_id === equipoTorneoId;
+      partidos.push({
+        id: `libre-${req.params.categoriaId}-${subcategoriaId || 'sc'}-${jornada}-${equipoTorneoId}`,
+        torneo_id: req.params.torneoId,
+        categoria_id: req.params.categoriaId,
+        equipo_local_id: equipoTorneoId,
+        equipo_visitante_id: null,
+        jornada,
+        fecha: null,
+        hora: null,
+        sede: null,
+        estado: 'libre',
+        resultado_local: null,
+        resultado_visitante: null,
+        club_local_id: esLocalEnReferencia ? referencia.club_local_id : referencia.club_visitante_id,
+        club_visitante_id: null,
+        club_local_nombre: esLocalEnReferencia ? referencia.club_local_nombre : referencia.club_visitante_nombre,
+        club_visitante_nombre: 'LIBRE',
+        club_local_color: esLocalEnReferencia ? referencia.club_local_color : referencia.club_visitante_color,
+        club_local_logo_url: esLocalEnReferencia ? referencia.club_local_logo_url : referencia.club_visitante_logo_url,
+        club_visitante_logo_url: null,
+        arbitros: [],
+        pago_local: { deuda_id: null, pagado: false },
+        pago_visitante: { deuda_id: null, pagado: false }
+      });
+    }
+    partidos.sort((a, b) => (a.jornada ?? 999999) - (b.jornada ?? 999999));
 
     const jornadasResult = await query(
       'SELECT jornada, descripcion FROM fixture_jornadas WHERE torneo_id = $1 AND categoria_id = $2 AND subcategoria_id IS NOT DISTINCT FROM $3::uuid',
