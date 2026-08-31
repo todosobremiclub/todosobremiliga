@@ -282,11 +282,34 @@ router.get('/:torneoId/tabla-general', async (req, res) => {
               SUM(tp.en_contra)::int AS en_contra,
               SUM(tp.diferencia)::int AS diferencia,
               SUM(tp.puntos)::int AS puntos,
-              COUNT(DISTINCT tp.categoria_id)::int AS categorias_sumadas
+              COUNT(DISTINCT tp.categoria_id)::int AS categorias_sumadas,
+              MAX(u5.resultados) AS ultimos5
        FROM tabla_posiciones tp
        JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
        JOIN clubes cl ON cl.id = et.club_id
        JOIN unidades u ON u.categoria_id = tp.categoria_id AND u.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(array_agg(resultado ORDER BY orden_fecha DESC NULLS LAST, orden_jornada DESC NULLS LAST), ARRAY[]::text[]) AS resultados
+         FROM (
+           SELECT
+             CASE
+               WHEN (p.equipo_local_id = et2.id AND p.resultado_local > p.resultado_visitante)
+                 OR (p.equipo_visitante_id = et2.id AND p.resultado_visitante > p.resultado_local)
+               THEN 'V'
+               WHEN p.resultado_local = p.resultado_visitante THEN 'E'
+               ELSE 'P'
+             END AS resultado,
+             p.fecha AS orden_fecha,
+             p.jornada AS orden_jornada
+           FROM equipos_torneo et2
+           JOIN unidades u2 ON u2.categoria_id = et2.categoria_id AND u2.subcategoria_id IS NOT DISTINCT FROM et2.subcategoria_id
+           JOIN partidos p ON (p.equipo_local_id = et2.id OR p.equipo_visitante_id = et2.id)
+           WHERE et2.club_id = et.club_id AND et2.torneo_id = $1
+             AND p.resultado_local IS NOT NULL AND p.resultado_visitante IS NOT NULL
+           ORDER BY p.fecha DESC NULLS LAST, p.jornada DESC NULLS LAST
+           LIMIT 5
+         ) ultimos
+       ) u5 ON true
        WHERE tp.torneo_id = $1 AND tp.ronda = 'general'
        GROUP BY et.club_id, cl.nombre, cl.logo_url, cl.color_primario
        ORDER BY puntos DESC, diferencia DESC, club_nombre ASC`,
@@ -329,11 +352,34 @@ router.get('/:torneoId/categorias/:categoriaId/tabla-general', async (req, res) 
               SUM(tp.en_contra)::int AS en_contra,
               SUM(tp.diferencia)::int AS diferencia,
               SUM(tp.puntos)::int AS puntos,
-              COUNT(*)::int AS categorias_sumadas
+              COUNT(*)::int AS categorias_sumadas,
+              MAX(u5.resultados) AS ultimos5
        FROM tabla_posiciones tp
        JOIN equipos_torneo et ON et.id = tp.equipo_torneo_id
        JOIN clubes cl ON cl.id = et.club_id
        JOIN unidades u ON u.categoria_id = tp.categoria_id AND u.subcategoria_id IS NOT DISTINCT FROM et.subcategoria_id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(array_agg(resultado ORDER BY orden_fecha DESC NULLS LAST, orden_jornada DESC NULLS LAST), ARRAY[]::text[]) AS resultados
+         FROM (
+           SELECT
+             CASE
+               WHEN (p.equipo_local_id = et2.id AND p.resultado_local > p.resultado_visitante)
+                 OR (p.equipo_visitante_id = et2.id AND p.resultado_visitante > p.resultado_local)
+               THEN 'V'
+               WHEN p.resultado_local = p.resultado_visitante THEN 'E'
+               ELSE 'P'
+             END AS resultado,
+             p.fecha AS orden_fecha,
+             p.jornada AS orden_jornada
+           FROM equipos_torneo et2
+           JOIN unidades u2 ON u2.categoria_id = et2.categoria_id AND u2.subcategoria_id IS NOT DISTINCT FROM et2.subcategoria_id
+           JOIN partidos p ON (p.equipo_local_id = et2.id OR p.equipo_visitante_id = et2.id)
+           WHERE et2.club_id = et.club_id AND et2.torneo_id = $1
+             AND p.resultado_local IS NOT NULL AND p.resultado_visitante IS NOT NULL
+           ORDER BY p.fecha DESC NULLS LAST, p.jornada DESC NULLS LAST
+           LIMIT 5
+         ) ultimos
+       ) u5 ON true
        WHERE tp.torneo_id = $1 AND tp.categoria_id = $2 AND tp.ronda = 'general'
        GROUP BY et.club_id, cl.nombre, cl.logo_url, cl.color_primario
        ORDER BY puntos DESC, diferencia DESC, club_nombre ASC`,
