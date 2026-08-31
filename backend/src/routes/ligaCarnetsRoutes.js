@@ -46,6 +46,7 @@ router.get('/validar/:codigoQr', async (req, res) => {
       `SELECT car.id, car.activo, car.vigente_hasta,
               f.estado AS fichaje_estado, f.torneo_id AS fichaje_torneo_id,
               f.categoria_id AS fichaje_categoria_id, f.subcategoria_id AS fichaje_subcategoria_id,
+              f.sancionado AS fichaje_sancionado, f.sancionado_motivo AS fichaje_sancionado_motivo,
               j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.foto_url AS jugador_foto_url,
               c.nombre AS club_nombre, t.liga_id, t.nombre AS torneo_nombre,
               cat.nombre AS categoria_nombre, sc.nombre AS subcategoria_nombre
@@ -71,18 +72,20 @@ router.get('/validar/:codigoQr', async (req, res) => {
     const coincideSubcategoria = !subcategoria_id || carnet.fichaje_subcategoria_id === subcategoria_id;
 
     let motivo = null;
-    if (!vigente) motivo = 'El carnet no está vigente (vencido o desactivado)';
+    if (carnet.fichaje_sancionado) motivo = carnet.fichaje_sancionado_motivo ? `Jugador sancionado: ${carnet.fichaje_sancionado_motivo}` : 'Jugador sancionado';
+    else if (!vigente) motivo = 'El carnet no está vigente (vencido o desactivado)';
     else if (!fichajeAprobado) motivo = 'El fichaje del jugador no está aprobado';
     else if (!coincideTorneo || !coincideCategoria || !coincideSubcategoria) {
       motivo = 'El jugador está fichado en otro Torneo/División/Categoría, no en el seleccionado';
     }
 
-    const habilitado = vigente && fichajeAprobado && coincideTorneo && coincideCategoria && coincideSubcategoria;
+    const habilitado = !carnet.fichaje_sancionado && vigente && fichajeAprobado && coincideTorneo && coincideCategoria && coincideSubcategoria;
 
     res.json({
       ok: true,
       habilitado,
       motivo,
+      sancionado: !!carnet.fichaje_sancionado,
       jugador: { nombre: carnet.jugador_nombre, apellido: carnet.jugador_apellido, foto_url: carnet.jugador_foto_url },
       club_nombre: carnet.club_nombre,
       torneo_nombre: carnet.torneo_nombre,

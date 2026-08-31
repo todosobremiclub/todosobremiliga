@@ -269,6 +269,32 @@ router.patch('/:fichajeId/rechazar', async (req, res) => {
   }
 });
 
+// PATCH /liga/fichajes/:fichajeId/sancion — marca (o desmarca) al jugador
+// como sancionado EN ESTE fichaje puntual (o sea, en ESTA Liga/Torneo/
+// División -- no lo afecta en otra Liga donde participe con el mismo club,
+// ver migración 0039). Es un simple on/off manual: el propio administrador
+// lo desmarca cuando corresponda, no hay fecha ni conteo de partidos.
+// Body: { sancionado: boolean, motivo?: string }
+router.patch('/:fichajeId/sancion', async (req, res) => {
+  const { sancionado, motivo } = req.body;
+  if (typeof sancionado !== 'boolean') {
+    return res.status(400).json({ ok: false, error: 'Falta indicar sancionado (true/false)' });
+  }
+  try {
+    const { rows } = await query(
+      `UPDATE fichajes SET sancionado = $1, sancionado_motivo = $2
+       WHERE id = $3 AND liga_id = $4
+       RETURNING *`,
+      [sancionado, sancionado ? (motivo || null) : null, req.params.fichajeId, req.ligaId]
+    );
+    if (!rows[0]) return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu Liga' });
+    res.json({ ok: true, fichaje: rows[0] });
+  } catch (err) {
+    console.error('Error en PATCH sancion fichaje:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // PUT /liga/fichajes/:fichajeId — la Liga corrige a qué torneo/división
 // quedó fichado un jugador (por ejemplo, si el club se equivocó al pedirlo).
 router.put('/:fichajeId', async (req, res) => {
