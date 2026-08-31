@@ -99,6 +99,7 @@ router.get('/', async (req, res) => {
     const baseSelect = `
       SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
              j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento, j.activo AS jugador_activo,
+             j.dni_frente_url AS jugador_dni_frente_url, j.dni_dorso_url AS jugador_dni_dorso_url,
              c.nombre AS club_nombre, c.logo_url AS club_logo_url, c.color_primario AS club_color_primario,
              t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre, sub.nombre AS subcategoria_nombre,
              car.codigo_qr AS carnet_codigo_qr, car.vigente_desde AS carnet_vigente_desde,
@@ -275,6 +276,27 @@ router.patch('/:fichajeId/rechazar', async (req, res) => {
 // ver migración 0039). Es un simple on/off manual: el propio administrador
 // lo desmarca cuando corresponda, no hay fecha ni conteo de partidos.
 // Body: { sancionado: boolean, motivo?: string }
+// GET /liga/fichajes/bajas — avisos de fichajes que algún Club dio de baja
+// directamente por su cuenta (ver DELETE /club/fichajes/:fichajeId), sin
+// pasar por aprobación de la Liga. Es sólo informativo: el fichaje ya no
+// existe, esto es el registro de que existió y por qué se dio de baja.
+router.get('/bajas', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT b.*, c.nombre AS club_nombre
+       FROM fichajes_bajas b
+       JOIN clubes c ON c.id = b.club_id
+       WHERE b.liga_id = $1
+       ORDER BY b.creado_at DESC`,
+      [req.ligaId]
+    );
+    res.json({ ok: true, bajas: rows });
+  } catch (err) {
+    console.error('Error en GET /liga/fichajes/bajas:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 router.patch('/:fichajeId/sancion', async (req, res) => {
   const { sancionado, motivo } = req.body;
   if (typeof sancionado !== 'boolean') {

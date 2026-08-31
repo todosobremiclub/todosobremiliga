@@ -7,6 +7,23 @@ const { generarRoundRobin } = require('../utils/fixtureGenerator');
 const { calcularDescansos } = require('../utils/fixtureLibre');
 const { generarDeudaInscripcion, asegurarDeudaPorPartido, buscarConceptoActivo } = require('../utils/cobros');
 const { autoridadTieneAlcance, autoridadTieneAlcanceCategoria } = require('../utils/autoridad');
+const { generarPlanillaPdf } = require('../utils/planillaPdf');
+
+// Los logos (Liga, Club) se guardan como "data:image/png;base64,..." (ver
+// decisión #2 del roadmap) -- esto decodifica ESE caso puntual a un Buffer
+// que pdfkit pueda dibujar. Si algún día se admite subir un logo como URL
+// http(s) real, esto lo ignora (no hace un fetch adicional acá) y la
+// planilla sale sin logo en vez de romperse.
+function bufferDesdeImagenBase64(url) {
+  if (!url || !url.startsWith('data:')) return null;
+  const indiceComa = url.indexOf(',');
+  if (indiceComa === -1) return null;
+  try {
+    return Buffer.from(url.slice(indiceComa + 1).trim(), 'base64');
+  } catch (_) {
+    return null;
+  }
+}
 
 // El rol "autoridad" comparte este router con liga_admin/super_admin (para
 // poder cargar resultados dentro de su alcance), pero NO debe poder tocar
@@ -1482,6 +1499,91 @@ router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/jugadores', a
     });
   } catch (err) {
     console.error('Error en GET jugadores de partido:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/partidos/:partidoId/planilla
+// Descarga la planilla del partido en PDF (formato de cancha, para
+// imprimir): logo de la Liga, datos del partido, y los jugadores fichados
+// y APROBADOS de cada club en este Torneo/División/Categoría puntual (no
+// alcanza con estar fichado en OTRA división) -- si un jugador de esa lista
+// está sancionado (ver migración 0039), sale marcado en rojo. Sólo para
+// liga_admin/super_admin -- el guard del principio de este archivo ya deja
+// afuera a "autoridad" al no estar en su allowlist.
+router.get('/:torneoId/categorias/:categoriaId/partidos/:partidoId/planilla', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const partidoResult = await query(
+      `SELECT p.fecha, p.hora, p.sede,
+              el.subcategoria_id AS subcategoria_id,
+              cl.id AS club_local_id, cl.nombre AS club_local_nombre,
+              cv.id AS club_visitante_id, cv.nombre AS club_visitante_nombre,
+              t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre, sc.nombre AS subcategoria_nombre,
+              l.nombre AS liga_nombre, l.logo_url AS liga_logo_url
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN categorias cat ON cat.id = p.categoria_id
+       LEFT JOIN categoria_subcategorias sc ON sc.id = el.subcategoria_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE p.id = $1 AND p.torneo_id = $2 AND p.categoria_id = $3`,
+      [req.params.partidoId, req.params.torneoId, req.params.categoriaId]
+    );
+    const partido = partidoResult.rows[0];
+    if (!partido) return res.status(404).json({ ok: false, error: 'Partido no encontrado' });
+
+    const fichajesDeClub = async (clubId) => {
+      const { rows } = await query(
+        `SELECT j.nombre, j.apellido, j.numero_camiseta, f.sancionado
+         FROM fichajes f
+         JOIN jugadores j ON j.id = f.jugador_id
+         WHERE f.club_id = $1 AND f.torneo_id = $2 AND f.categoria_id = $3
+           AND f.subcategoria_id IS NOT DISTINCT FROM $4::uuid
+           AND f.estado = 'aprobado'
+         ORDER BY j.numero_camiseta ASC NULLS LAST, j.apellido ASC`,
+        [clubId, req.params.torneoId, req.params.categoriaId, partido.subcategoria_id]
+      );
+      return rows.map((r) => ({
+        numero: r.numero_camiseta,
+        nombreCompleto: `${r.apellido}, ${r.nombre}`,
+        sancionado: r.sancionado === true,
+      }));
+    };
+
+    const [jugadoresLocal, jugadoresVisitante] = await Promise.all([
+      fichajesDeClub(partido.club_local_id),
+      fichajesDeClub(partido.club_visitante_id),
+    ]);
+
+    const doc = generarPlanillaPdf({
+      ligaNombre: partido.liga_nombre,
+      logoBuffer: bufferDesdeImagenBase64(partido.liga_logo_url),
+      torneoNombre: partido.torneo_nombre,
+      categoriaNombre: partido.categoria_nombre,
+      subcategoriaNombre: partido.subcategoria_nombre,
+      fecha: partido.fecha ? new Date(partido.fecha).toLocaleDateString('es-AR') : null,
+      hora: partido.hora,
+      sede: partido.sede,
+      clubLocalNombre: partido.club_local_nombre,
+      clubVisitanteNombre: partido.club_visitante_nombre,
+      jugadoresLocal,
+      jugadoresVisitante,
+    });
+
+    const nombreArchivo = `planilla-${partido.club_local_nombre}-vs-${partido.club_visitante_nombre}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}.pdf"`);
+    doc.pipe(res);
+  } catch (err) {
+    console.error('Error en GET planilla de partido:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });

@@ -98,6 +98,10 @@ app.use('/club/documentos', requireAuth, requireRole('super_admin', 'club_admin'
 // después aparecen como desplegable al cargar un jugador y en el
 // formulario público de autorregistro de socios (QR/link).
 app.use('/club/configuracion', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubConfiguracionRoutes'));
+// Escaneo de carnets desde el lado Club el día de partido (ver
+// clubCarnetsRoutes.js): elegir Club rival/Torneo/División/Categoría a
+// mano y escanear -- no depende de un partido puntual del fixture.
+app.use('/club/carnets', requireAuth, requireRole('super_admin', 'club_admin'), resolveClubId, require('./routes/clubCarnetsRoutes'));
 
 // Lado Liga (liga_admin): aprobar/rechazar fichajes y verificar carnets el
 // día de partido, filtrado automáticamente a SU liga.

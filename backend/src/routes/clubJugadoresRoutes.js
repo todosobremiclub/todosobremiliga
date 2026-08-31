@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     nombre, apellido, dni, fecha_nacimiento, foto_url, posicion, numero_camiseta,
-    telefono, email, actividad_id, categoria_socio_id
+    telefono, email, actividad_id, categoria_socio_id, dni_frente_url, dni_dorso_url
   } = req.body;
 
   if (!nombre || !nombre.trim() || !apellido || !apellido.trim() || !dni || !dni.trim()) {
@@ -33,12 +33,13 @@ router.post('/', async (req, res) => {
   try {
     const { rows } = await query(
       `INSERT INTO jugadores (club_id, nombre, apellido, dni, fecha_nacimiento, foto_url, posicion, numero_camiseta,
-                               telefono, email, actividad_id, categoria_socio_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                               telefono, email, actividad_id, categoria_socio_id, dni_frente_url, dni_dorso_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [req.clubId, nombre.trim(), apellido.trim(), dni.trim(), fecha_nacimiento || null,
        foto_url || null, posicion || null, numero_camiseta || null,
-       telefono || null, email || null, actividad_id || null, categoria_socio_id || null]
+       telefono || null, email || null, actividad_id || null, categoria_socio_id || null,
+       dni_frente_url || null, dni_dorso_url || null]
     );
     res.status(201).json({ ok: true, jugador: rows[0] });
   } catch (err) {
@@ -133,7 +134,7 @@ router.post('/solicitudes/:id/rechazar', async (req, res) => {
 router.put('/:jugadorId', async (req, res) => {
   const {
     nombre, apellido, dni, fecha_nacimiento, foto_url, posicion, numero_camiseta,
-    telefono, email, actividad_id, categoria_socio_id
+    telefono, email, actividad_id, categoria_socio_id, dni_frente_url, dni_dorso_url
   } = req.body;
 
   try {
@@ -149,12 +150,15 @@ router.put('/:jugadorId', async (req, res) => {
          telefono = COALESCE($8, telefono),
          email = COALESCE($9, email),
          actividad_id = COALESCE($10, actividad_id),
-         categoria_socio_id = COALESCE($11, categoria_socio_id)
-       WHERE id = $12 AND club_id = $13
+         categoria_socio_id = COALESCE($11, categoria_socio_id),
+         dni_frente_url = COALESCE($12, dni_frente_url),
+         dni_dorso_url = COALESCE($13, dni_dorso_url)
+       WHERE id = $14 AND club_id = $15
        RETURNING *`,
       [nombre || null, apellido || null, dni || null, fecha_nacimiento || null,
        foto_url || null, posicion || null, numero_camiseta || null,
        telefono || null, email || null, actividad_id || null, categoria_socio_id || null,
+       dni_frente_url || null, dni_dorso_url || null,
        req.params.jugadorId, req.clubId]
     );
     if (!rows[0]) return res.status(404).json({ ok: false, error: 'Jugador no encontrado en tu club' });

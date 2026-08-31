@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { query } = require('../db');
+const { query, getClient } = require('../db');
 
 // Todas las rutas usan req.clubId (calculado por resolveClubId en app.js).
 
@@ -32,6 +32,7 @@ router.get('/', async (req, res) => {
     const { rows } = await query(
       `SELECT f.*, j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
               j.foto_url AS jugador_foto_url, j.fecha_nacimiento AS jugador_fecha_nacimiento,
+              j.dni_frente_url AS jugador_dni_frente_url, j.dni_dorso_url AS jugador_dni_dorso_url,
               cl.nombre AS club_nombre, cl.logo_url AS club_logo_url, cl.color_primario AS club_color_primario,
               l.nombre AS liga_nombre, t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre,
               sub.nombre AS subcategoria_nombre,
@@ -62,7 +63,7 @@ router.get('/', async (req, res) => {
 // con Sub 8, Sub 10, Sub 12 — y hay que fichar para la división exacta en
 // la que va a jugar), porque de ahí sale el carnet una vez aprobado.
 router.post('/:jugadorId/fichajes', async (req, res) => {
-  const { liga_id, torneo_id, categoria_id, subcategoria_id, documentos } = req.body;
+  const { liga_id, torneo_id, categoria_id, subcategoria_id, documentos, dni_frente_url, dni_dorso_url } = req.body;
 
   if (!liga_id || !torneo_id || !categoria_id) {
     return res.status(400).json({ ok: false, error: 'Faltan liga_id, torneo_id y/o categoria_id' });
@@ -145,6 +146,22 @@ router.post('/:jugadorId/fichajes', async (req, res) => {
       [req.params.jugadorId, liga_id]
     );
 
+    // El DNI (frente/dorso) se guarda en el JUGADOR, no en el fichaje: es el
+    // mismo documento en todos los fichajes que tenga a lo largo del tiempo,
+    // así que si el club lo sube/actualiza acá de paso queda disponible para
+    // cualquier otro fichaje futuro también (ver migración 0041). Sólo se
+    // pisa lo que vino en este pedido -- si no mandaron una foto nueva, se
+    // deja la que ya tenía cargada.
+    if (dni_frente_url || dni_dorso_url) {
+      await query(
+        `UPDATE jugadores SET
+           dni_frente_url = COALESCE($1, dni_frente_url),
+           dni_dorso_url = COALESCE($2, dni_dorso_url)
+         WHERE id = $3 AND club_id = $4`,
+        [dni_frente_url || null, dni_dorso_url || null, req.params.jugadorId, req.clubId]
+      );
+    }
+
     const { rows } = await query(
       `INSERT INTO fichajes (jugador_id, club_id, liga_id, torneo_id, categoria_id, subcategoria_id, documentos)
        VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, '[]'::jsonb))
@@ -160,6 +177,72 @@ router.post('/:jugadorId/fichajes', async (req, res) => {
   } catch (err) {
     console.error('Error en POST fichajes:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /club/fichajes/:fichajeId — el Club da de baja un fichado por su
+// cuenta ("Baja directa con aviso", decisión del roadmap): NO pasa por
+// aprobación de la Liga, se borra directo. Antes de borrarlo se guarda un
+// registro en fichajes_bajas (nombre, torneo, división, motivo) para que la
+// Liga vea el aviso -- después de la baja no queda ningún otro rastro del
+// fichaje (el carnet, si tenía, queda con fichaje_id en NULL por el
+// ON DELETE SET NULL de la FK, y a partir de ahí no vuelve a validar
+// habilitado porque GET /liga/carnets/validar hace INNER JOIN con fichajes).
+router.delete('/:fichajeId', async (req, res) => {
+  const { motivo } = req.body || {};
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT f.id, f.liga_id, f.club_id, f.estado,
+              j.nombre AS jugador_nombre, j.apellido AS jugador_apellido, j.dni AS jugador_dni,
+              t.nombre AS torneo_nombre, cat.nombre AS categoria_nombre, sub.nombre AS subcategoria_nombre
+       FROM fichajes f
+       JOIN jugadores j ON j.id = f.jugador_id
+       LEFT JOIN torneos t ON t.id = f.torneo_id
+       LEFT JOIN categorias cat ON cat.id = f.categoria_id
+       LEFT JOIN categoria_subcategorias sub ON sub.id = f.subcategoria_id
+       WHERE f.id = $1 AND f.club_id = $2
+       FOR UPDATE OF f`,
+      [req.params.fichajeId, req.clubId]
+    );
+    const fichaje = rows[0];
+    if (!fichaje) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Fichaje no encontrado en tu club' });
+    }
+
+    await client.query(
+      `INSERT INTO fichajes_bajas
+         (liga_id, club_id, jugador_nombre, jugador_apellido, jugador_dni,
+          torneo_nombre, categoria_nombre, subcategoria_nombre, estado_al_momento, motivo, dado_de_baja_por)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        fichaje.liga_id,
+        fichaje.club_id,
+        fichaje.jugador_nombre,
+        fichaje.jugador_apellido,
+        fichaje.jugador_dni,
+        fichaje.torneo_nombre,
+        fichaje.categoria_nombre,
+        fichaje.subcategoria_nombre,
+        fichaje.estado,
+        motivo && motivo.trim() ? motivo.trim() : null,
+        req.usuario.id,
+      ]
+    );
+
+    await client.query('DELETE FROM fichajes WHERE id = $1', [fichaje.id]);
+
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /club/fichajes/:fichajeId:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
   }
 });
 
