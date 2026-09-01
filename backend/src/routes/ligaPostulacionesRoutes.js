@@ -60,6 +60,23 @@ router.patch('/:id/aceptar', async (req, res) => {
       });
     }
 
+    // Aceptar una postulación también suma un club a la Liga -- respeta el
+    // mismo máximo que el alta manual o la carga masiva (ver decisión del
+    // roadmap). La postulación queda pendiente: el Super Admin/Liga puede
+    // subir el límite y aceptarla después.
+    const ligaResult = await client.query('SELECT max_clubes FROM ligas WHERE id = $1', [req.ligaId]);
+    const maxClubes = ligaResult.rows[0]?.max_clubes;
+    if (maxClubes !== null && maxClubes !== undefined) {
+      const cantidadResult = await client.query('SELECT COUNT(*)::int AS cantidad FROM club_liga WHERE liga_id = $1', [req.ligaId]);
+      if (cantidadResult.rows[0].cantidad >= maxClubes) {
+        client.release();
+        return res.status(409).json({
+          ok: false,
+          error: 'Tu Liga ya llegó al máximo de clubes permitido -- no se puede aceptar esta postulación hasta que subas el límite o des de baja algún club.'
+        });
+      }
+    }
+
     await client.query('BEGIN');
     const clubResult = await client.query(
       `INSERT INTO clubes (nombre, logo_url, direccion, telefono, email_contacto, color_primario, color_secundario, cuit, ciudad, provincia)

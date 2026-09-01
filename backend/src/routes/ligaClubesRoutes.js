@@ -26,6 +26,19 @@ async function nombreYaExisteEnLiga(nombre, ligaId, excluirClubId) {
   return !!rows[0];
 }
 
+// Si la Liga tiene un máximo de clubes cargado (ver decisión del roadmap
+// "no permitir más clubes que los indicados"), chequea que agregar UNO más
+// no se pase. NULL en max_clubes significa "sin límite". Los clubes que ya
+// estaban cargados antes de bajar el límite no se tocan -- esto sólo
+// bloquea sumar clubes nuevos a partir de ahora.
+async function limiteClubesAlcanzado(ligaId) {
+  const { rows } = await query('SELECT max_clubes FROM ligas WHERE id = $1', [ligaId]);
+  const maxClubes = rows[0]?.max_clubes;
+  if (maxClubes === null || maxClubes === undefined) return false;
+  const { rows: cantRows } = await query('SELECT COUNT(*)::int AS cantidad FROM club_liga WHERE liga_id = $1', [ligaId]);
+  return cantRows[0].cantidad >= maxClubes;
+}
+
 // GET /liga/clubes — clubes que participan en MI liga, con búsqueda y
 // paginación (50 por página por defecto).
 const COLUMNAS_ORDEN_CLUBES = {
@@ -297,6 +310,13 @@ router.post('/carga-masiva', upload.single('archivo'), async (req, res) => {
         omitidos.push({ fila: i + 2, motivo: 'Falta el nombre' });
         continue;
       }
+      // Chequeo el límite en cada vuelta -- así, si la carga tiene 30 filas
+      // y el límite se alcanza en la fila 12, las siguientes 18 quedan
+      // todas omitidas con el motivo, en vez de fallar sin explicación.
+      if (await limiteClubesAlcanzado(req.ligaId)) {
+        omitidos.push({ fila: i + 2, nombre, motivo: 'Tu Liga ya llegó al máximo de clubes permitido' });
+        continue;
+      }
       const yaExiste = await nombreYaExisteEnLiga(nombre, req.ligaId);
       if (yaExiste) {
         omitidos.push({ fila: i + 2, nombre, motivo: 'Ya existe un club con ese nombre en tu Liga' });
@@ -390,6 +410,9 @@ router.post('/:clubId/vincular', async (req, res) => {
     if (await nombreYaExisteEnLiga(club.nombre, req.ligaId, null)) {
       return res.status(409).json({ ok: false, error: `Ya existe un club llamado "${club.nombre}" en tu Liga` });
     }
+    if (await limiteClubesAlcanzado(req.ligaId)) {
+      return res.status(409).json({ ok: false, error: 'Tu Liga ya llegó al máximo de clubes permitido' });
+    }
 
     await query(
       `INSERT INTO club_liga (liga_id, club_id) VALUES ($1, $2)
@@ -420,6 +443,9 @@ router.post('/', async (req, res) => {
 
   if (await nombreYaExisteEnLiga(nombre, req.ligaId)) {
     return res.status(409).json({ ok: false, error: `Ya existe un club llamado "${nombre.trim()}" en tu Liga` });
+  }
+  if (await limiteClubesAlcanzado(req.ligaId)) {
+    return res.status(409).json({ ok: false, error: 'Tu Liga ya llegó al máximo de clubes permitido' });
   }
 
   const client = await getClient();
@@ -1062,6 +1088,15 @@ router.post('/:clubId/usuarios', async (req, res) => {
   }
 
   try {
+    // Chequeo por las dudas a nivel backend, aunque el Panel ya oculte/
+    // deshabilite esto en pantalla si la Liga tiene esta opción desactivada
+    // (ver decisión del roadmap "no permitir crear usuarios para los
+    // clubes") -- así no se puede saltear entrando directo por la API.
+    const ligaResult = await query('SELECT permite_usuarios_club FROM ligas WHERE id = $1', [req.ligaId]);
+    if (ligaResult.rows[0] && ligaResult.rows[0].permite_usuarios_club === false) {
+      return res.status(403).json({ ok: false, error: 'Tu Liga no tiene permitido crear usuarios de acceso para los clubes' });
+    }
+
     const pertenece = await query(
       'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
       [req.params.clubId, req.ligaId]

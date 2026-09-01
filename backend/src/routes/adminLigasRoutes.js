@@ -34,6 +34,7 @@ router.get('/', async (req, res) => {
       `SELECT l.id, l.nombre, l.slug, l.logo_url, l.direccion, l.ciudad, l.provincia, l.telefono, l.email_contacto,
               l.color_primario, l.color_secundario, l.color_acento, l.activo, l.tipo, l.estado_demo,
               l.facebook_url, l.instagram_url, l.youtube_url,
+              l.max_clubes, l.permite_usuarios_club,
               l.creado_at,
               COUNT(cl.club_id) AS cantidad_clubes
        FROM ligas l
@@ -78,7 +79,7 @@ router.post('/', async (req, res) => {
   const {
     nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
     color_primario, color_secundario, color_acento, tipo, estado_demo,
-    facebook_url, instagram_url, youtube_url
+    facebook_url, instagram_url, youtube_url, max_clubes, permite_usuarios_club
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -89,6 +90,9 @@ router.post('/', async (req, res) => {
   }
   if (estado_demo && !ESTADOS_DEMO_VALIDOS.includes(estado_demo)) {
     return res.status(400).json({ ok: false, error: `Estado DEMO inválido. Válidos: ${ESTADOS_DEMO_VALIDOS.join(', ')}` });
+  }
+  if (max_clubes !== undefined && max_clubes !== null && max_clubes !== '' && (!Number.isInteger(max_clubes) || max_clubes < 0)) {
+    return res.status(400).json({ ok: false, error: 'El máximo de clubes tiene que ser un número entero de 0 o más (dejalo vacío para "sin límite")' });
   }
 
   const slugBase = slugify(nombre);
@@ -107,13 +111,15 @@ router.post('/', async (req, res) => {
     const { rows } = await query(
       `INSERT INTO ligas (nombre, slug, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
                            color_primario, color_secundario, color_acento, tipo, estado_demo,
-                           facebook_url, instagram_url, youtube_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'productiva'), $13, $14, $15, $16)
+                           facebook_url, instagram_url, youtube_url, max_clubes, permite_usuarios_club)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'productiva'), $13, $14, $15, $16, $17, COALESCE($18, TRUE))
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
        telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
        color_acento || null, tipo || null, estado_demo || null,
-       facebook_url || null, instagram_url || null, youtube_url || null]
+       facebook_url || null, instagram_url || null, youtube_url || null,
+       (max_clubes === '' || max_clubes === undefined) ? null : max_clubes,
+       permite_usuarios_club === undefined ? null : permite_usuarios_club]
     );
     res.status(201).json({ ok: true, liga: rows[0] });
   } catch (err) {
@@ -128,7 +134,7 @@ router.put('/:id', async (req, res) => {
   const {
     nombre, logo_url, direccion, ciudad, provincia, telefono, email_contacto,
     color_primario, color_secundario, color_acento, tipo, estado_demo,
-    facebook_url, instagram_url, youtube_url
+    facebook_url, instagram_url, youtube_url, max_clubes, permite_usuarios_club
   } = req.body;
 
   if (!nombre || !nombre.trim()) {
@@ -139,6 +145,9 @@ router.put('/:id', async (req, res) => {
   }
   if (estado_demo && !ESTADOS_DEMO_VALIDOS.includes(estado_demo)) {
     return res.status(400).json({ ok: false, error: `Estado DEMO inválido. Válidos: ${ESTADOS_DEMO_VALIDOS.join(', ')}` });
+  }
+  if (max_clubes !== undefined && max_clubes !== null && max_clubes !== '' && (!Number.isInteger(max_clubes) || max_clubes < 0)) {
+    return res.status(400).json({ ok: false, error: 'El máximo de clubes tiene que ser un número entero de 0 o más (dejalo vacío para "sin límite")' });
   }
 
   try {
@@ -164,13 +173,16 @@ router.put('/:id', async (req, res) => {
          email_contacto = $8, color_primario = $9, color_secundario = $10, color_acento = $11,
          tipo = COALESCE($12, tipo), estado_demo = $13,
          facebook_url = $14, instagram_url = $15, youtube_url = $16,
+         max_clubes = $17, permite_usuarios_club = COALESCE($18, permite_usuarios_club),
          actualizado_at = NOW()
-       WHERE id = $17
+       WHERE id = $19
        RETURNING *`,
       [nombre.trim(), slugFinal, logo_url || null, direccion || null, ciudad || null, provincia || null,
        telefono || null, email_contacto || null, color_primario || null, color_secundario || null,
        color_acento || null, tipo || null, estado_demo || null,
-       facebook_url || null, instagram_url || null, youtube_url || null, req.params.id]
+       facebook_url || null, instagram_url || null, youtube_url || null,
+       (max_clubes === '' || max_clubes === undefined) ? null : max_clubes,
+       permite_usuarios_club === undefined ? null : permite_usuarios_club, req.params.id]
     );
     res.json({ ok: true, liga: rows[0] });
   } catch (err) {

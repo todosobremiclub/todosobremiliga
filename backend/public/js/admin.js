@@ -234,6 +234,8 @@ function limpiarFormLiga() {
   document.getElementById('ligaProvincia').value = '';
   document.getElementById('ligaTelefono').value = '';
   document.getElementById('ligaEmail').value = '';
+  document.getElementById('ligaMaxClubes').value = '';
+  document.getElementById('ligaPermiteUsuariosClub').checked = true;
   document.getElementById('ligaLogoUrl').value = '';
   document.getElementById('ligaLogoArchivo').value = '';
   document.getElementById('logoPreview').classList.add('oculto');
@@ -282,7 +284,7 @@ async function cargarLigas() {
       <tr>
         <td>${liga.logo_url ? `<img class="logo-miniatura" src="${liga.logo_url}" alt="">` : '<span class="logo-miniatura"></span>'}</td>
         <td>${escapeHtml(liga.nombre)}</td>
-        <td>${liga.cantidad_clubes}</td>
+        <td>${liga.cantidad_clubes}${liga.max_clubes !== null && liga.max_clubes !== undefined ? ` / ${liga.max_clubes}` : ''}</td>
         <td>${renderEstadoLiga(liga)}</td>
         <td>
           <button class="btn btn-secundario btn-pequeno" onclick="verLiga('${liga.id}')">Ver</button>
@@ -333,6 +335,8 @@ function editarLiga(ligaId) {
   document.getElementById('ligaProvincia').value = liga.provincia || '';
   document.getElementById('ligaTelefono').value = liga.telefono || '';
   document.getElementById('ligaEmail').value = liga.email_contacto || '';
+  document.getElementById('ligaMaxClubes').value = (liga.max_clubes === null || liga.max_clubes === undefined) ? '' : liga.max_clubes;
+  document.getElementById('ligaPermiteUsuariosClub').checked = liga.permite_usuarios_club !== false;
   document.getElementById('ligaLogoUrl').value = liga.logo_url || '';
   logoBase64Actual = liga.logo_url || '';
   const preview = document.getElementById('logoPreview');
@@ -373,6 +377,8 @@ async function guardarLiga(e) {
     provincia: document.getElementById('ligaProvincia').value.trim() || undefined,
     telefono: document.getElementById('ligaTelefono').value.trim() || undefined,
     email_contacto: document.getElementById('ligaEmail').value.trim() || undefined,
+    max_clubes: document.getElementById('ligaMaxClubes').value.trim() === '' ? null : parseInt(document.getElementById('ligaMaxClubes').value, 10),
+    permite_usuarios_club: document.getElementById('ligaPermiteUsuariosClub').checked,
     logo_url: document.getElementById('ligaLogoUrl').value || undefined,
     color_primario: document.getElementById('ligaColorPrimario').value,
     color_secundario: document.getElementById('ligaColorSecundario').value,
@@ -440,7 +446,8 @@ async function verLiga(ligaId) {
       <div class="form-grid">
         <div><strong>Tipo:</strong> ${liga.tipo === 'demo' ? 'DEMO' : 'Productiva'}</div>
         <div><strong>Estado:</strong> ${liga.tipo === 'demo' ? (ESTADOS_DEMO_LABELS[liga.estado_demo] || 'Pendiente') : (liga.activo ? 'Activa' : 'Inactiva')}</div>
-        <div><strong>Clubes cargados:</strong> ${liga.cantidad_clubes}</div>
+        <div><strong>Clubes cargados:</strong> ${liga.cantidad_clubes}${liga.max_clubes !== null && liga.max_clubes !== undefined ? ` / ${liga.max_clubes}` : ' (sin límite)'}</div>
+        <div><strong>Usuarios de club:</strong> ${liga.permite_usuarios_club === false ? 'No permitido' : 'Permitido'}</div>
         <div><strong>Dirección:</strong> ${escapeHtml(liga.direccion || '-')}</div>
         <div><strong>Ciudad:</strong> ${escapeHtml(liga.ciudad || '-')}</div>
         <div><strong>Provincia:</strong> ${escapeHtml(liga.provincia || '-')}</div>
