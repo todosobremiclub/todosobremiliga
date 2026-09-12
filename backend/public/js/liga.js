@@ -77,18 +77,24 @@ function torneoActualEsAperturaClausura() {
   return !!(t && t.formato_juego === 'apertura_clausura');
 }
 
-// "Eliminación directa": el torneo ES la llave, no hay fixture de temporada
-// regular (se arma directo con "Generar llave"). "Grupos + Playoffs": el
-// fixture de la fase de grupos se genera como siempre, pero además existe
-// una llave de eliminación aparte para los playoffs.
+// "Eliminación directa" y "Eliminación directa con reenganche": el torneo
+// ES la llave, no hay fixture de temporada regular (se arma directo con
+// "Generar llave"). "Grupos + Playoffs": el fixture de la fase de grupos se
+// genera como siempre, pero además existe una llave de eliminación aparte
+// para los playoffs.
 function torneoActualUsaLlave() {
   const t = torneosCache.find((x) => x.id === torneoActualId);
-  return !!(t && ['eliminacion_directa', 'grupos_playoffs'].includes(t.formato_juego));
+  return !!(t && ['eliminacion_directa', 'grupos_playoffs', 'eliminacion_reenganche'].includes(t.formato_juego));
 }
 
 function torneoActualEsEliminacionDirecta() {
   const t = torneosCache.find((x) => x.id === torneoActualId);
-  return !!(t && t.formato_juego === 'eliminacion_directa');
+  return !!(t && ['eliminacion_directa', 'eliminacion_reenganche'].includes(t.formato_juego));
+}
+
+function torneoActualEsReenganche() {
+  const t = torneosCache.find((x) => x.id === torneoActualId);
+  return !!(t && t.formato_juego === 'eliminacion_reenganche');
 }
 
 function torneoActualObj() {
@@ -3917,7 +3923,8 @@ const NOMBRES_FORMATO_TORNEO = {
   grupos_playoffs: 'Grupos + playoffs',
   liguilla_ida_vuelta: 'Liguilla ida y vuelta',
   eliminacion_directa: 'Eliminación directa',
-  apertura_clausura: 'Apertura y Clausura'
+  apertura_clausura: 'Apertura y Clausura',
+  eliminacion_reenganche: 'Eliminación directa con reenganche'
 };
 
 async function cargarTorneos() {
@@ -4526,7 +4533,7 @@ function cambiarTabDetalle(nombre) {
     cambiarRondaTabla('apertura');
     return;
   }
-  if (nombre === 'fixture') cargarPartidos();
+  if (nombre === 'fixture') { cargarPartidos(); actualizarBotonReenganchar(); }
   if (nombre === 'tabla') cargarTabla();
   if (nombre === 'goleadores') cargarGoleadores();
   if (nombre === 'tarjetas') cargarTarjetas();
@@ -5056,6 +5063,23 @@ function opcionesCanchasPredio(canchaPredioIdSeleccionada) {
   return html;
 }
 
+// Mismo criterio que determinarGanador() del backend (ligaFixtureRoutes.js)
+// pero sólo para decidir si mostrar el botón "Reenganchar" -- si el partido
+// está empatado y todavía no tiene penales cargados, devuelve null (no se
+// ofrece el botón hasta que se sepa quién perdió).
+function determinarGanadorCliente(p) {
+  if (p.resultado_local == null || p.resultado_visitante == null) return null;
+  if (p.resultado_local > p.resultado_visitante) return p.equipo_local_id;
+  if (p.resultado_visitante > p.resultado_local) return p.equipo_visitante_id;
+  const detalle = p.detalle_resultado || {};
+  const penLocal = detalle.penales_local;
+  const penVisitante = detalle.penales_visitante;
+  if (penLocal != null && penVisitante != null && penLocal !== penVisitante) {
+    return penLocal > penVisitante ? p.equipo_local_id : p.equipo_visitante_id;
+  }
+  return null;
+}
+
 function renderJornadaFixture(jornadasDisponibles) {
   const contenedor = document.getElementById('contenedorPartidosJornada');
   const esAperturaClausura = torneoActualEsAperturaClausura();
@@ -5187,6 +5211,26 @@ function renderJornadaFixture(jornadasDisponibles) {
         </div>`;
     }
 
+    // "Eliminación directa con reenganche": sólo en la Fecha 1 y sólo
+    // mientras no se generó la Fase 2, se ofrece reenganchar al equipo que
+    // perdió este partido para que igual avance.
+    let bloqueReenganche = '';
+    if (torneoActualEsReenganche() && p.jornada === 1 && p.estado === 'jugado' && !partidosCache.some((x) => x.jornada >= 2)) {
+      const ganadorId = determinarGanadorCliente(p);
+      if (ganadorId) {
+        const perdedorId = ganadorId === p.equipo_local_id ? p.equipo_visitante_id : p.equipo_local_id;
+        const perdedorNombre = ganadorId === p.equipo_local_id ? p.club_visitante_nombre : p.club_local_nombre;
+        const yaReenganchado = equiposReenganchadosCache.includes(perdedorId);
+        bloqueReenganche = `
+          <div style="margin-top:8px;">
+            ${yaReenganchado
+              ? `<span class="badge badge-activo">Reenganchado: ${escapeHtml(perdedorNombre)}</span>
+                 <button class="btn btn-secundario btn-pequeno" style="margin-left:6px;" onclick="deshacerReenganche('${perdedorId}', '${escapeHtml(perdedorNombre)}')">Deshacer reenganche</button>`
+              : `<button class="btn btn-secundario btn-pequeno" onclick="reengancharEquipo('${perdedorId}', '${escapeHtml(perdedorNombre)}')">Reenganchar a ${escapeHtml(perdedorNombre)}</button>`}
+          </div>`;
+      }
+    }
+
     return `
       <div class="panel" style="margin-bottom:12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
@@ -5203,6 +5247,7 @@ function renderJornadaFixture(jornadasDisponibles) {
           ${(p.no_presento_local || p.no_presento_visitante) ? `<span class="badge badge-pendiente" title="${p.no_presento_local ? escapeHtml(p.club_local_nombre) : ''}${p.no_presento_local && p.no_presento_visitante ? ' y ' : ''}${p.no_presento_visitante ? escapeHtml(p.club_visitante_nombre) : ''} no se presentó">W.O.</span>` : ''}
           <button class="btn btn-secundario btn-pequeno" onclick="abrirModalResultado('${p.id}')">Cargar resultado</button>
         </div>
+        ${bloqueReenganche}
         <div class="form-grid" style="margin-top:10px;">
           <div>
             <label style="font-size:12px;">Día</label>
@@ -5397,6 +5442,13 @@ const NOMBRES_FASE_LLAVE = {
   octavos: 'Octavos de final', dieciseisavos: 'Dieciseisavos de final', treintaidosavos: 'Treintaidosavos de final'
 };
 
+// En "Eliminación directa con reenganche" las rondas no tienen nombre fijo
+// (la cantidad de equipos es libre) -- se identifican por número de fecha.
+function nombreRondaLlave(data) {
+  if (data.fase && data.fase !== 'reenganche') return NOMBRES_FASE_LLAVE[data.fase] || data.fase;
+  return `la Fecha ${data.jornada}`;
+}
+
 async function generarLlave() {
   const errorEl = document.getElementById('fixtureAccionError');
   errorEl.classList.add('oculto');
@@ -5408,9 +5460,11 @@ async function generarLlave() {
       method: 'POST',
       body: JSON.stringify({ subcategoria_id: subcategoriaActualId || undefined })
     });
-    alert(`Se generó ${NOMBRES_FASE_LLAVE[data.fase] || data.fase} con ${data.partidos_creados} partido(s).`);
+    const detalleLibre = data.libre ? ' (1 equipo pasó libre, sin jugar, por quedar impar)' : '';
+    alert(`Se generó ${nombreRondaLlave(data)} con ${data.partidos_creados} partido(s)${detalleLibre}.`);
     jornadaFixtureActual = 1;
     cargarPartidos();
+    actualizarBotonReenganchar();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -5428,9 +5482,11 @@ async function avanzarRondaLlave() {
     if (data.finalizado) {
       alert(data.mensaje);
     } else {
-      alert(`Se armó ${NOMBRES_FASE_LLAVE[data.fase] || data.fase} con ${data.partidos_creados} partido(s).`);
+      const detalleLibre = data.libre ? ' (1 equipo pasó libre, sin jugar, por quedar impar)' : '';
+      alert(`Se armó ${nombreRondaLlave(data)} con ${data.partidos_creados} partido(s)${detalleLibre}.`);
       cargarPartidos();
     }
+    actualizarBotonReenganchar();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('oculto');
@@ -5446,6 +5502,56 @@ async function vaciarLlave() {
     const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave${qs}`, { method: 'DELETE' });
     alert(`Se borraron ${data.borrados} partidos.`);
     cargarPartidos();
+    actualizarBotonReenganchar();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// ----- Reenganche (sólo "Eliminación directa con reenganche", sólo Fase 1) -----
+//
+// Después de jugada la Fase 1, la Liga puede reenganchar a mano a un equipo
+// que perdió para que igual pase a la Fase 2. Se muestra un botón por cada
+// partido de la Fecha 1 ya jugado, junto al equipo que perdió -- se cachean
+// los ya reenganchados para no ofrecer el botón dos veces.
+let equiposReenganchadosCache = [];
+
+async function actualizarBotonReenganchar() {
+  if (!torneoActualEsReenganche() || !torneoActualId || !categoriaActualId) {
+    equiposReenganchadosCache = [];
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/reenganchados`);
+    equiposReenganchadosCache = data.equipo_torneo_ids || [];
+  } catch (err) {
+    equiposReenganchadosCache = [];
+  }
+  renderJornadaFixture(jornadasDisponiblesSegunRonda());
+}
+
+async function reengancharEquipo(equipoTorneoId, nombreEquipo) {
+  if (!confirm(`¿Reenganchar a "${nombreEquipo}" a la Fase 2 aunque haya perdido su partido de la Fecha 1?`)) {
+    return;
+  }
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/reenganchar`, {
+      method: 'POST',
+      body: JSON.stringify({ equipo_torneo_id: equipoTorneoId, subcategoria_id: subcategoriaActualId || undefined })
+    });
+    await actualizarBotonReenganchar();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+async function deshacerReenganche(equipoTorneoId, nombreEquipo) {
+  if (!confirm(`¿Deshacer el reenganche de "${nombreEquipo}"?`)) {
+    return;
+  }
+  try {
+    await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/reenganchar/${equipoTorneoId}`, { method: 'DELETE' });
+    await actualizarBotonReenganchar();
   } catch (err) {
     alert('Error: ' + err.message);
   }

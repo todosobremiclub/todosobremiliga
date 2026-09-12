@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
   } = req.body;
 
   const deportesValidos = ['futbol', 'voley', 'handball', 'basquet', 'futsal', 'otro'];
-  const formatosValidos = ['todos_contra_todos', 'grupos_playoffs', 'liguilla_ida_vuelta', 'eliminacion_directa', 'apertura_clausura'];
+  const formatosValidos = ['todos_contra_todos', 'grupos_playoffs', 'liguilla_ida_vuelta', 'eliminacion_directa', 'apertura_clausura', 'eliminacion_reenganche'];
   const canchasJuegoValidas = ['propias_liga', 'clubes'];
 
   if (!nombre || !nombre.trim()) {

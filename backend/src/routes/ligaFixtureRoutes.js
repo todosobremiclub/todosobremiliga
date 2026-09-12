@@ -1141,6 +1141,46 @@ function armarCrucesEvitandoMismoGrupo(clasificados) {
   return mejorIntento;
 }
 
+// ===== "Eliminación directa con reenganche" =====
+//
+// A diferencia de "Eliminación directa"/"Grupos + Playoffs", acá la
+// cantidad de equipos puede ser cualquiera (no hace falta que dé una
+// potencia de 2): todas sus rondas quedan guardadas con fase = 'reenganche'
+// fija y el número de ronda vive en `jornada` (1, 2, 3...), no en el nombre
+// de la fase. Ver migración 0043 para el detalle completo del diseño.
+
+function barajar(arr) {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+// Arma los cruces evitando repetir, en esta ronda, el mismo cruce que ya se
+// dio en la ronda anterior (rivalPrevio: Map equipoId -> el rival que
+// enfrentó). Sólo se usa al armar la Fase 2 a partir de la Fase 1 -- de ahí
+// en más el cruce es puramente al azar. Si la cantidad de equipos es impar,
+// el último del sorteo queda sin par (pasa libre, se resuelve afuera de
+// esta función).
+function armarCrucesEvitandoRivalPrevio(equipos, rivalPrevio) {
+  let mejorIntento = null;
+  let mejorCantidadRepetidos = Infinity;
+  for (let intento = 0; intento < 500; intento++) {
+    const barajado = barajar(equipos);
+    const pares = [];
+    let repetidos = 0;
+    for (let i = 0; i < barajado.length - 1; i += 2) {
+      const a = barajado[i];
+      const b = barajado[i + 1];
+      if (rivalPrevio.get(a) === b) repetidos += 1;
+      pares.push([a, b]);
+    }
+    if (repetidos === 0) return pares;
+    if (repetidos < mejorCantidadRepetidos) {
+      mejorCantidadRepetidos = repetidos;
+      mejorIntento = pares;
+    }
+  }
+  return mejorIntento;
+}
+
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/generar
 // Toma los mejores equipos de cada grupo (según la config del torneo:
 // config_extra.clasificados_por_grupo y config_extra.mejor_tercero) y arma
@@ -1150,8 +1190,8 @@ router.post('/:torneoId/categorias/:categoriaId/llave/generar', async (req, res)
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
-    if (!['grupos_playoffs', 'eliminacion_directa'].includes(contexto.formato_juego)) {
-      return res.status(400).json({ ok: false, error: 'Este torneo no usa el formato "Grupos + Playoffs" ni "Eliminación directa"' });
+    if (!['grupos_playoffs', 'eliminacion_directa', 'eliminacion_reenganche'].includes(contexto.formato_juego)) {
+      return res.status(400).json({ ok: false, error: 'Este torneo no usa un formato con llave de eliminación' });
     }
 
     const yaExiste = await query(
@@ -1163,6 +1203,45 @@ router.post('/:torneoId/categorias/:categoriaId/llave/generar', async (req, res)
     );
     if (yaExiste.rows[0].cantidad > 0) {
       return res.status(409).json({ ok: false, error: 'Ya hay una llave generada para esta división/categoría. Usá "Vaciar llave" si querés rehacerla.' });
+    }
+
+    // "Eliminación directa con reenganche": admite CUALQUIER cantidad de
+    // equipos (no hace falta que dé una potencia de 2). Se sortean de a
+    // pares; si sobra uno (cantidad impar), pasa libre a la Fase 2 sin
+    // jugar (queda anotado en llave_avances, no como partido).
+    if (contexto.formato_juego === 'eliminacion_reenganche') {
+      const equiposResult = await query(
+        `SELECT id AS equipo_torneo_id FROM equipos_torneo
+         WHERE torneo_id = $1 AND categoria_id = $2 AND activo = TRUE AND subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+        [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+      );
+      const equipos = equiposResult.rows.map((e) => e.equipo_torneo_id);
+      if (equipos.length < 2) {
+        return res.status(400).json({ ok: false, error: 'Necesitás al menos 2 equipos inscriptos y activos para generar la llave' });
+      }
+      const barajados = barajar(equipos);
+      const libre = barajados.length % 2 === 1 ? barajados.pop() : null;
+
+      let creados = 0;
+      for (let i = 0; i < barajados.length; i += 2) {
+        await query(
+          `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase, orden_llave)
+           VALUES ($1, $2, $3, $4, 1, 'reenganche', $5)`,
+          [req.params.torneoId, req.params.categoriaId, barajados[i], barajados[i + 1], i / 2]
+        );
+        creados += 1;
+      }
+      if (libre) {
+        await query(
+          `INSERT INTO llave_avances (torneo_id, categoria_id, subcategoria_id, equipo_torneo_id, jornada, motivo)
+           VALUES ($1, $2, $3, $4, 2, 'libre')`,
+          [req.params.torneoId, req.params.categoriaId, subcategoriaId, libre]
+        );
+      }
+      return res.status(201).json({
+        ok: true, fase: 'reenganche', jornada: 1, partidos_creados: creados,
+        libre: libre ? 1 : 0, total_equipos: equipos.length
+      });
     }
 
     // "Eliminación directa": no hay fase de grupos previa — se arma la
@@ -1302,6 +1381,116 @@ function determinarGanador(partido) {
   };
 }
 
+// POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/reenganchar
+// Solo para "Eliminación directa con reenganche": la Liga marca a mano que
+// un equipo que PERDIÓ su partido de la Fase 1 (jornada 1) igual avanza a
+// la Fase 2, como si hubiera ganado. Sólo se puede hacer mientras la Fase 2
+// todavía no se generó (una vez armada, el cupo queda cerrado).
+router.post('/:torneoId/categorias/:categoriaId/llave/reenganchar', async (req, res) => {
+  const subcategoriaId = req.body.subcategoria_id || null;
+  const equipoTorneoId = req.body.equipo_torneo_id;
+  try {
+    if (!equipoTorneoId) {
+      return res.status(400).json({ ok: false, error: 'Falta indicar el equipo a reenganchar' });
+    }
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+    if (contexto.formato_juego !== 'eliminacion_reenganche') {
+      return res.status(400).json({ ok: false, error: 'El reenganche solo existe en el formato "Eliminación directa con reenganche"' });
+    }
+
+    const yaHayFase2 = await query(
+      `SELECT COUNT(*)::int AS cantidad FROM partidos
+       WHERE torneo_id = $1 AND categoria_id = $2 AND fase = 'reenganche' AND jornada >= 2`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    if (yaHayFase2.rows[0].cantidad > 0) {
+      return res.status(409).json({ ok: false, error: 'Ya se generó la Fase 2 -- el reenganche solo se puede hacer antes de armar esa fase.' });
+    }
+
+    const partidoResult = await query(
+      `SELECT p.* FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase = 'reenganche' AND p.jornada = 1
+         AND (p.equipo_local_id = $3 OR p.equipo_visitante_id = $3)
+         AND el.subcategoria_id IS NOT DISTINCT FROM $4::uuid`,
+      [req.params.torneoId, req.params.categoriaId, equipoTorneoId, subcategoriaId]
+    );
+    const partido = partidoResult.rows[0];
+    if (!partido) {
+      return res.status(404).json({ ok: false, error: 'Ese equipo no jugó un partido de Fase 1 en esta división/categoría' });
+    }
+    if (partido.estado !== 'jugado') {
+      return res.status(400).json({ ok: false, error: 'Ese partido todavía no tiene resultado cargado' });
+    }
+    const ganador = determinarGanador(partido);
+    if (!ganador.ok) return res.status(400).json({ ok: false, error: ganador.error });
+    if (ganador.equipoId === equipoTorneoId) {
+      return res.status(400).json({ ok: false, error: 'Ese equipo ganó su partido de Fase 1 -- ya avanza solo, no necesita reenganche' });
+    }
+
+    const yaReenganchado = await query(
+      `SELECT id FROM llave_avances
+       WHERE torneo_id = $1 AND categoria_id = $2 AND equipo_torneo_id = $3 AND jornada = 2 AND motivo = 'reenganche'`,
+      [req.params.torneoId, req.params.categoriaId, equipoTorneoId]
+    );
+    if (yaReenganchado.rows[0]) {
+      return res.status(409).json({ ok: false, error: 'Ese equipo ya fue reenganchado' });
+    }
+
+    await query(
+      `INSERT INTO llave_avances (torneo_id, categoria_id, subcategoria_id, equipo_torneo_id, jornada, motivo, partido_origen_id)
+       VALUES ($1, $2, $3, $4, 2, 'reenganche', $5)`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId, equipoTorneoId, partido.id]
+    );
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('Error en POST llave/reenganchar:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// DELETE /liga/torneos/:torneoId/categorias/:categoriaId/llave/reenganchar/:equipoTorneoId
+// Deshace un reenganche (por si la Liga se equivocó), mientras la Fase 2
+// todavía no se generó.
+router.delete('/:torneoId/categorias/:categoriaId/llave/reenganchar/:equipoTorneoId', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    const { rows } = await query(
+      `DELETE FROM llave_avances
+       WHERE torneo_id = $1 AND categoria_id = $2 AND equipo_torneo_id = $3 AND jornada = 2 AND motivo = 'reenganche'
+       RETURNING id`,
+      [req.params.torneoId, req.params.categoriaId, req.params.equipoTorneoId]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, error: 'Ese equipo no estaba reenganchado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error en DELETE llave/reenganchar:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/llave/reenganchados
+// Lista los equipos ya reenganchados a la Fase 2 (para pintar el botón
+// "Reenganchar" como ya usado en el frontend).
+router.get('/:torneoId/categorias/:categoriaId/llave/reenganchados', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+    const { rows } = await query(
+      `SELECT equipo_torneo_id FROM llave_avances
+       WHERE torneo_id = $1 AND categoria_id = $2 AND jornada = 2 AND motivo = 'reenganche'`,
+      [req.params.torneoId, req.params.categoriaId]
+    );
+    res.json({ ok: true, equipo_torneo_ids: rows.map((r) => r.equipo_torneo_id) });
+  } catch (err) {
+    console.error('Error en GET llave/reenganchados:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/siguiente-ronda
 // Una vez jugados todos los partidos de la ronda actual de la llave, arma la
 // próxima ronda (cuartos -> semifinal -> final) con los ganadores. Si el
@@ -1312,6 +1501,110 @@ router.post('/:torneoId/categorias/:categoriaId/llave/siguiente-ronda', async (r
   try {
     const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
     if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+
+    // "Eliminación directa con reenganche" tiene su propia lógica de avance
+    // (cantidades arbitrarias, sin nombres de fase por ronda, reenganchados
+    // y pases libres al azar) -- se resuelve completa acá y no sigue a la
+    // lógica de abajo (pensada para cantidades en potencia de 2).
+    if (contexto.formato_juego === 'eliminacion_reenganche') {
+      const rondaActualResult = await query(
+        `SELECT MAX(p.jornada) AS jornada FROM partidos p
+         JOIN equipos_torneo el ON el.id = p.equipo_local_id
+         WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase = 'reenganche'
+           AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid`,
+        [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+      );
+      const jornadaActual = rondaActualResult.rows[0] && rondaActualResult.rows[0].jornada;
+      if (!jornadaActual) {
+        return res.status(400).json({ ok: false, error: 'Todavía no generaste la llave de este torneo (botón "Generar llave").' });
+      }
+
+      const partidosRonda = await query(
+        `SELECT p.* FROM partidos p
+         JOIN equipos_torneo el ON el.id = p.equipo_local_id
+         WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase = 'reenganche' AND p.jornada = $3
+           AND el.subcategoria_id IS NOT DISTINCT FROM $4::uuid
+         ORDER BY p.orden_llave ASC NULLS LAST`,
+        [req.params.torneoId, req.params.categoriaId, jornadaActual, subcategoriaId]
+      );
+      const sinJugar = partidosRonda.rows.filter((p) => p.estado !== 'jugado');
+      if (sinJugar.length) {
+        return res.status(400).json({ ok: false, error: `Todavía faltan ${sinJugar.length} partido(s) de esta ronda por jugar.` });
+      }
+
+      const ganadores = [];
+      // Sólo hace falta si jornadaActual === 1 (para no repetir cruce en la
+      // Fase 2); en rondas posteriores queda vacío y no se usa.
+      const rivalDeRonda1 = new Map();
+      for (const p of partidosRonda.rows) {
+        const resultado = determinarGanador(p);
+        if (!resultado.ok) return res.status(400).json({ ok: false, error: resultado.error });
+        ganadores.push(resultado.equipoId);
+        if (jornadaActual === 1) {
+          rivalDeRonda1.set(p.equipo_local_id, p.equipo_visitante_id);
+          rivalDeRonda1.set(p.equipo_visitante_id, p.equipo_local_id);
+        }
+      }
+
+      const proximaJornada = jornadaActual + 1;
+      // Reenganchados (sólo pueden existir si jornadaActual === 1) y
+      // cualquier pase libre por cantidad impar que haya quedado pendiente
+      // para esta próxima ronda: se suman al pool de participantes.
+      const avancesResult = await query(
+        `SELECT equipo_torneo_id FROM llave_avances
+         WHERE torneo_id = $1 AND categoria_id = $2 AND jornada = $3
+           AND subcategoria_id IS NOT DISTINCT FROM $4::uuid`,
+        [req.params.torneoId, req.params.categoriaId, proximaJornada, subcategoriaId]
+      );
+      const participantes = [...ganadores, ...avancesResult.rows.map((r) => r.equipo_torneo_id)];
+
+      if (participantes.length <= 1) {
+        if (!participantes.length) {
+          return res.status(400).json({ ok: false, error: 'No quedan equipos para armar la próxima ronda.' });
+        }
+        const nombreResult = await query(
+          `SELECT cl.nombre AS nombre FROM equipos_torneo et JOIN clubes cl ON cl.id = et.club_id WHERE et.id = $1`,
+          [participantes[0]]
+        );
+        const nombreCampeon = nombreResult.rows[0] ? nombreResult.rows[0].nombre : null;
+        return res.json({
+          ok: true, finalizado: true, campeon_equipo_torneo_id: participantes[0], campeon_nombre: nombreCampeon,
+          mensaje: nombreCampeon ? `La llave ya tiene campeón: ${nombreCampeon}.` : 'La llave ya tiene campeón.'
+        });
+      }
+
+      // Sólo al armar la Fase 2 (a partir de la Fase 1) se evita repetir el
+      // cruce anterior. De la Fase 3 en más el cruce es puramente al azar.
+      let pares;
+      if (jornadaActual === 1) {
+        pares = armarCrucesEvitandoRivalPrevio(participantes, rivalDeRonda1);
+      } else {
+        const barajados = barajar(participantes);
+        pares = [];
+        for (let i = 0; i < barajados.length - 1; i += 2) pares.push([barajados[i], barajados[i + 1]]);
+      }
+      const emparejados = new Set(pares.flat());
+      const libre = participantes.length % 2 === 1 ? participantes.find((id) => !emparejados.has(id)) : null;
+
+      let creados = 0;
+      for (let i = 0; i < pares.length; i++) {
+        const [a, b] = pares[i];
+        await query(
+          `INSERT INTO partidos (torneo_id, categoria_id, equipo_local_id, equipo_visitante_id, jornada, fase, orden_llave)
+           VALUES ($1, $2, $3, $4, $5, 'reenganche', $6)`,
+          [req.params.torneoId, req.params.categoriaId, a, b, proximaJornada, i]
+        );
+        creados += 1;
+      }
+      if (libre) {
+        await query(
+          `INSERT INTO llave_avances (torneo_id, categoria_id, subcategoria_id, equipo_torneo_id, jornada, motivo)
+           VALUES ($1, $2, $3, $4, $5, 'libre')`,
+          [req.params.torneoId, req.params.categoriaId, subcategoriaId, libre, proximaJornada + 1]
+        );
+      }
+      return res.status(201).json({ ok: true, fase: 'reenganche', jornada: proximaJornada, partidos_creados: creados, libre: libre ? 1 : 0 });
+    }
 
     const faseActualResult = await query(
       `SELECT p.fase, MAX(p.jornada) AS jornada
@@ -1409,6 +1702,23 @@ router.delete('/:torneoId/categorias/:categoriaId/llave', async (req, res) => {
        RETURNING p.id`,
       [req.params.torneoId, req.params.categoriaId, subcategoriaId]
     );
+
+    // Sólo aplica a "Eliminación directa con reenganche": limpia los
+    // pases libres/reenganches que apuntaban a una ronda que se acaba de
+    // vaciar (no tiene ningún partido jugado) -- los de una ronda que ya se
+    // jugó quedan intactos, igual que los partidos jugados de arriba.
+    await query(
+      `DELETE FROM llave_avances la
+       WHERE la.torneo_id = $1 AND la.categoria_id = $2
+         AND la.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND NOT EXISTS (
+           SELECT 1 FROM partidos p
+           WHERE p.torneo_id = la.torneo_id AND p.categoria_id = la.categoria_id
+             AND p.fase = 'reenganche' AND p.jornada = la.jornada AND p.estado = 'jugado'
+         )`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+
     res.json({ ok: true, borrados: rows.length });
   } catch (err) {
     console.error('Error en DELETE llave:', err);
