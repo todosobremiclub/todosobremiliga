@@ -12,6 +12,7 @@ function getParamsDeUrl() {
 let torneoIdActual = null;
 let categoriaIdActual = null;
 let nombreCategoriaActual = '';
+let torneoFormatoActual = null;
 let tablaCache = [];
 // Fixture agrupado por fecha (jornada), igual que el Panel de Liga.
 let partidosFixtureCache = [];
@@ -19,7 +20,7 @@ let canchaJuegoFixtureActual = 'clubes';
 let jornadasDescripcionFixtureCache = {};
 let jornadaFixtureActual = 1;
 
-function init() {
+async function init() {
   const { torneoId, categoriaId, nombre } = getParamsDeUrl();
   torneoIdActual = torneoId;
   categoriaIdActual = categoriaId;
@@ -42,18 +43,36 @@ function init() {
   document.getElementById('btnJornadaAnteriorPublico').addEventListener('click', () => cambiarJornadaFixturePublico(-1));
   document.getElementById('btnJornadaSiguientePublico').addEventListener('click', () => cambiarJornadaFixturePublico(1));
 
-  cargarLigaDelTorneo();
-  cargarTabla();
+  // Hace falta saber el formato del torneo ANTES de decidir si la primera
+  // pestaña muestra la tabla de posiciones o el cuadro de la llave -- por
+  // eso se espera este fetch antes de cargar el contenido de la pestaña.
+  await cargarLigaDelTorneo();
+  actualizarEtiquetaTablaLlave();
+  if (esFormatoLlave()) cargarLlaveBracketPublico(); else cargarTabla();
+}
+
+// "Eliminación directa" y "Eliminación directa con reenganche": el torneo
+// ES la llave, no tiene tabla de posiciones (ver mismo criterio en el
+// Panel de Liga, liga.js).
+function esFormatoLlave() {
+  return ['eliminacion_directa', 'eliminacion_reenganche'].includes(torneoFormatoActual);
+}
+
+function actualizarEtiquetaTablaLlave() {
+  document.getElementById('tabBtnTabla').textContent = esFormatoLlave() ? 'Llave' : 'Tabla de posiciones';
 }
 
 // Trae la Liga dueña de este Torneo para pintar el header/fondo con sus
 // colores (igual que hace el Panel de Liga) y para que el breadcrumb
-// vuelva a la Liga real en vez de siempre al listado general.
+// vuelva a la Liga real en vez de siempre al listado general. También trae
+// el formato del torneo, que decide si esta división muestra tabla de
+// posiciones o el cuadro de la llave.
 async function cargarLigaDelTorneo() {
   try {
     const res = await fetch(`/web/torneos/${torneoIdActual}`);
     const data = await res.json();
     if (!data.ok) return;
+    torneoFormatoActual = data.torneo.formato_juego;
     aplicarTemaLiga(data.torneo.color_primario, data.torneo.color_secundario);
     if (data.torneo.liga_slug) {
       const link = document.getElementById('linkVolverLiga');
@@ -79,9 +98,121 @@ function cambiarTab(nombre) {
     document.getElementById(secciones[key]).classList.toggle('oculto', key !== nombre);
     document.getElementById(botones[key]).classList.toggle('activo', key === nombre);
   });
+  if (nombre === 'tabla') {
+    const esLlave = esFormatoLlave();
+    document.getElementById('wrapTablaPosicionesPublico').classList.toggle('oculto', esLlave);
+    document.getElementById('wrapLlaveBracketPublico').classList.toggle('oculto', !esLlave);
+    if (esLlave) cargarLlaveBracketPublico(); else cargarTabla();
+  }
   if (nombre === 'fixture') cargarFixture();
   if (nombre === 'goleadores') cargarGoleadoresPublico();
   if (nombre === 'tarjetas') cargarTarjetasPublico();
+}
+
+const NOMBRES_FASE_LLAVE_PUBLICO = {
+  final: 'la Final', semifinal: 'Semifinales', cuartos: 'Cuartos de final',
+  octavos: 'Octavos de final', dieciseisavos: 'Dieciseisavos de final', treintaidosavos: 'Treintaidosavos de final'
+};
+
+// Mismo criterio que determinarGanador() del backend, sólo para decidir a
+// quién resaltar en negrita -- si está empatado sin penales cargados,
+// devuelve null (no se resalta a nadie todavía).
+function determinarGanadorClientePublico(p) {
+  if (p.resultado_local == null || p.resultado_visitante == null) return null;
+  if (p.resultado_local > p.resultado_visitante) return p.equipo_local_torneo_id;
+  if (p.resultado_visitante > p.resultado_local) return p.equipo_visitante_torneo_id;
+  const detalle = p.detalle_resultado || {};
+  const penLocal = detalle.penales_local;
+  const penVisitante = detalle.penales_visitante;
+  if (penLocal != null && penVisitante != null && penLocal !== penVisitante) {
+    return penLocal > penVisitante ? p.equipo_local_torneo_id : p.equipo_visitante_torneo_id;
+  }
+  return null;
+}
+
+async function cargarLlaveBracketPublico() {
+  const contenedor = document.getElementById('contenedorLlaveBracketPublico');
+  contenedor.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
+  try {
+    const res = await fetch(`/web/torneos/${torneoIdActual}/categorias/${categoriaIdActual}/llave`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error al cargar la llave');
+    renderLlaveBracketPublico(data.partidos || [], data.avances || []);
+  } catch (err) {
+    contenedor.innerHTML = `<p class="sitio-vacio">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderLlaveBracketPublico(partidos, avances) {
+  const contenedor = document.getElementById('contenedorLlaveBracketPublico');
+  if (!partidos.length) {
+    contenedor.innerHTML = '<p class="sitio-vacio">Todavía no se generó la llave de esta división.</p>';
+    return;
+  }
+
+  const porJornada = new Map();
+  partidos.forEach((p) => {
+    const j = p.jornada || 1;
+    if (!porJornada.has(j)) porJornada.set(j, []);
+    porJornada.get(j).push(p);
+  });
+  const jornadas = [...porJornada.keys()].sort((a, b) => a - b);
+  jornadas.forEach((j) => porJornada.get(j).sort((a, b) => (a.orden_llave ?? 0) - (b.orden_llave ?? 0)));
+
+  const avancesPorRondaAnterior = new Map();
+  avances.forEach((a) => {
+    const rondaAnterior = a.jornada - 1;
+    if (!avancesPorRondaAnterior.has(rondaAnterior)) avancesPorRondaAnterior.set(rondaAnterior, []);
+    avancesPorRondaAnterior.get(rondaAnterior).push(a);
+  });
+
+  const columnas = jornadas.map((j) => {
+    const partidosRonda = porJornada.get(j);
+    const faseNombrada = partidosRonda[0].fase && partidosRonda[0].fase !== 'reenganche'
+      ? (NOMBRES_FASE_LLAVE_PUBLICO[partidosRonda[0].fase] || partidosRonda[0].fase)
+      : `Fecha ${j}`;
+
+    const tarjetas = partidosRonda.map((p) => {
+      const jugado = p.estado === 'jugado';
+      const ganadorId = jugado ? determinarGanadorClientePublico(p) : null;
+      return `
+        <div class="panel" style="padding:10px 12px; margin-bottom:10px; min-width:200px;">
+          <div style="display:flex; justify-content:space-between; gap:8px;">
+            <span style="font-weight:${ganadorId === p.equipo_local_torneo_id ? '700' : '400'};">${escapeHtml(p.club_local_nombre)}</span>
+            <span style="white-space:nowrap;">${jugado ? p.resultado_local : '-'}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
+            <span style="font-weight:${ganadorId === p.equipo_visitante_torneo_id ? '700' : '400'};">${escapeHtml(p.club_visitante_nombre)}</span>
+            <span style="white-space:nowrap;">${jugado ? p.resultado_visitante : '-'}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    const avancesRonda = avancesPorRondaAnterior.get(j) || [];
+    const notasAvances = avancesRonda.map((a) => {
+      const etiqueta = a.motivo === 'reenganche' ? 'Reenganchado' : 'Pasa libre';
+      return `<p class="sitio-vacio" style="margin:4px 0; font-size:13px;">↳ ${escapeHtml(a.club_nombre)} — ${etiqueta} a la próxima ronda</p>`;
+    }).join('');
+
+    let banderaCampeon = '';
+    if (j === jornadas[jornadas.length - 1] && partidosRonda.length === 1 && partidosRonda[0].estado === 'jugado') {
+      const ganadorId = determinarGanadorClientePublico(partidosRonda[0]);
+      if (ganadorId) {
+        const nombreCampeon = ganadorId === partidosRonda[0].equipo_local_torneo_id ? partidosRonda[0].club_local_nombre : partidosRonda[0].club_visitante_nombre;
+        banderaCampeon = `<p style="margin-top:10px; font-weight:700;">🏆 Campeón: ${escapeHtml(nombreCampeon)}</p>`;
+      }
+    }
+
+    return `
+      <div style="min-width:220px; flex:0 0 auto;">
+        <h4 style="margin:0 0 10px;">${escapeHtml(faseNombrada)}</h4>
+        ${tarjetas}
+        ${notasAvances}
+        ${banderaCampeon}
+      </div>`;
+  }).join('');
+
+  contenedor.innerHTML = `<div style="display:flex; gap:24px; align-items:flex-start;">${columnas}</div>`;
 }
 
 async function cargarGoleadoresPublico() {

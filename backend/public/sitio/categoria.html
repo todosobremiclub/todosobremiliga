@@ -45,11 +45,19 @@
     </div>
 
     <div class="panel" id="seccionTabla">
-      <div class="tabla-scroll">
-      <table>
-        <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
-        <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
-      </table>
+      <div id="wrapTablaPosicionesPublico">
+        <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
+          <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
+        </table>
+        </div>
+      </div>
+      <!-- "Eliminación directa" y "Eliminación directa con reenganche" no
+           tienen tabla de posiciones -- acá se dibuja cómo va quedando
+           conformada la llave. -->
+      <div id="wrapLlaveBracketPublico" class="oculto">
+        <div id="contenedorLlaveBracketPublico" style="overflow-x:auto;"></div>
       </div>
     </div>
 

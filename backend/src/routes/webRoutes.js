@@ -60,7 +60,7 @@ router.get('/ligas/:slug', async (req, res) => {
 router.get('/torneos/:torneoId', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.formato_juego, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
               l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
               l.facebook_url, l.instagram_url, l.youtube_url,
@@ -92,7 +92,7 @@ router.get('/torneos/:torneoId', async (req, res) => {
 router.get('/ligas/:slug/torneos/:torneoSlug', async (req, res) => {
   try {
     const { rows } = await query(
-      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.estado, t.logo_url, t.cancha_juego,
+      `SELECT t.id, t.nombre, t.slug, t.deporte, t.temporada, t.formato_juego, t.estado, t.logo_url, t.cancha_juego,
               l.id AS liga_id, l.nombre AS liga_nombre, l.slug AS liga_slug,
               l.color_primario, l.color_secundario, l.logo_url AS liga_logo_url,
               l.facebook_url, l.instagram_url, l.youtube_url,
@@ -369,6 +369,55 @@ router.get('/torneos/:torneoId/categorias/:categoriaId/tabla', async (req, res) 
     res.json({ ok: true, tabla: rows });
   } catch (err) {
     console.error('Error en GET tabla publica:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
+// GET /web/torneos/:torneoId/categorias/:categoriaId/llave — versión pública
+// del cuadro de la llave (para "Eliminación directa" y "Eliminación directa
+// con reenganche", que no tienen tabla de posiciones): partidos de todas
+// las rondas ya jugadas/pendientes, más los pases libres/reenganches sin
+// partido real (llave_avances) para poder dibujar el cuadro completo.
+router.get('/torneos/:torneoId/categorias/:categoriaId/llave', async (req, res) => {
+  try {
+    const subcategoriaId = req.query.subcategoria_id || null;
+    const { rows } = await query(
+      `SELECT p.id, p.jornada, p.fase, p.orden_llave, p.estado,
+              p.resultado_local, p.resultado_visitante, p.detalle_resultado,
+              el.id AS equipo_local_torneo_id, ev.id AS equipo_visitante_torneo_id,
+              cl.nombre AS club_local_nombre, cl.logo_url AS club_local_logo_url, cl.color_primario AS club_local_color,
+              cv.nombre AS club_visitante_nombre, cv.logo_url AS club_visitante_logo_url, cv.color_primario AS club_visitante_color
+       FROM partidos p
+       JOIN equipos_torneo el ON el.id = p.equipo_local_id
+       JOIN equipos_torneo ev ON ev.id = p.equipo_visitante_id
+       JOIN clubes cl ON cl.id = el.club_id
+       JOIN clubes cv ON cv.id = ev.club_id
+       JOIN torneos t ON t.id = p.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE p.torneo_id = $1 AND p.categoria_id = $2 AND p.fase IS NOT NULL AND p.fase != 'grupos'
+         AND el.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND l.activo = TRUE AND l.tipo = 'productiva'
+       ORDER BY p.jornada ASC, p.orden_llave ASC NULLS LAST`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+
+    const avancesResult = await query(
+      `SELECT la.jornada, la.motivo, cl.nombre AS club_nombre
+       FROM llave_avances la
+       JOIN equipos_torneo et ON et.id = la.equipo_torneo_id
+       JOIN clubes cl ON cl.id = et.club_id
+       JOIN torneos t ON t.id = la.torneo_id
+       JOIN ligas l ON l.id = t.liga_id
+       WHERE la.torneo_id = $1 AND la.categoria_id = $2
+         AND la.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+         AND l.activo = TRUE AND l.tipo = 'productiva'
+       ORDER BY la.jornada ASC`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+
+    res.json({ ok: true, partidos: rows, avances: avancesResult.rows });
+  } catch (err) {
+    console.error('Error en GET llave publica:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
 });
