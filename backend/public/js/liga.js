@@ -77,6 +77,20 @@ function torneoActualEsAperturaClausura() {
   return !!(t && t.formato_juego === 'apertura_clausura');
 }
 
+// "Eliminación directa": el torneo ES la llave, no hay fixture de temporada
+// regular (se arma directo con "Generar llave"). "Grupos + Playoffs": el
+// fixture de la fase de grupos se genera como siempre, pero además existe
+// una llave de eliminación aparte para los playoffs.
+function torneoActualUsaLlave() {
+  const t = torneosCache.find((x) => x.id === torneoActualId);
+  return !!(t && ['eliminacion_directa', 'grupos_playoffs'].includes(t.formato_juego));
+}
+
+function torneoActualEsEliminacionDirecta() {
+  const t = torneosCache.find((x) => x.id === torneoActualId);
+  return !!(t && t.formato_juego === 'eliminacion_directa');
+}
+
 function torneoActualObj() {
   return torneosCache.find((x) => x.id === torneoActualId) || null;
 }
@@ -551,6 +565,9 @@ function conectarEventos() {
   });
   document.getElementById('formGenerarFixture').addEventListener('submit', generarFixtureAutomatico);
   document.getElementById('btnVaciarFixture').addEventListener('click', vaciarFixture);
+  document.getElementById('btnGenerarLlave').addEventListener('click', generarLlave);
+  document.getElementById('btnSiguienteRondaLlave').addEventListener('click', avanzarRondaLlave);
+  document.getElementById('btnVaciarLlave').addEventListener('click', vaciarLlave);
 
   document.getElementById('btnCerrarCargarResultado').addEventListener('click', cerrarModalResultado);
   document.getElementById('btnCancelarResultado').addEventListener('click', cerrarModalResultado);
@@ -4498,6 +4515,9 @@ function cambiarTabDetalle(nombre) {
   // El selector de ronda es compartido por las cuatro pestañas: se muestra
   // en todas ellas (no sólo en Tabla) cuando el torneo es Apertura/Clausura.
   document.getElementById('tabsRondaTabla').classList.toggle('oculto', !torneoActualEsAperturaClausura());
+  // Qué botones de generación de partidos mostrar (fixture "todos contra
+  // todos" y/o llave de eliminación) depende del formato del torneo.
+  actualizarControlesFixture();
   // En Fixture no tiene sentido "General" (el fixture es siempre de una
   // ronda puntual): se oculta esa opción y, si estaba elegida, se pasa a
   // Apertura por defecto.
@@ -5366,6 +5386,81 @@ async function vaciarFixture() {
   } catch (err) {
     alert('Error: ' + err.message);
   }
+}
+
+// ----- Llave de eliminación (torneos "Eliminación directa" y "Grupos +
+// Playoffs") -- arma/avanza/vacía la llave usando los mismos endpoints que
+// ya existen en el backend (ligaFixtureRoutes.js). -----
+
+const NOMBRES_FASE_LLAVE = {
+  final: 'la Final', semifinal: 'Semifinales', cuartos: 'Cuartos de final',
+  octavos: 'Octavos de final', dieciseisavos: 'Dieciseisavos de final', treintaidosavos: 'Treintaidosavos de final'
+};
+
+async function generarLlave() {
+  const errorEl = document.getElementById('fixtureAccionError');
+  errorEl.classList.add('oculto');
+  if (!confirm('¿Generar la primera ronda de la llave con los equipos inscriptos y activos en esta división?')) {
+    return;
+  }
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/generar`, {
+      method: 'POST',
+      body: JSON.stringify({ subcategoria_id: subcategoriaActualId || undefined })
+    });
+    alert(`Se generó ${NOMBRES_FASE_LLAVE[data.fase] || data.fase} con ${data.partidos_creados} partido(s).`);
+    jornadaFixtureActual = 1;
+    cargarPartidos();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function avanzarRondaLlave() {
+  const errorEl = document.getElementById('fixtureAccionError');
+  errorEl.classList.add('oculto');
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/siguiente-ronda`, {
+      method: 'POST',
+      body: JSON.stringify({ subcategoria_id: subcategoriaActualId || undefined })
+    });
+    if (data.finalizado) {
+      alert(data.mensaje);
+    } else {
+      alert(`Se armó ${NOMBRES_FASE_LLAVE[data.fase] || data.fase} con ${data.partidos_creados} partido(s).`);
+      cargarPartidos();
+    }
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('oculto');
+  }
+}
+
+async function vaciarLlave() {
+  if (!confirm('¿Vaciar toda la llave de eliminación de esta división? Se borran todos los partidos de playoffs (no toca la fase de grupos, si la hay).')) {
+    return;
+  }
+  try {
+    const qs = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
+    const data = await apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave${qs}`, { method: 'DELETE' });
+    alert(`Se borraron ${data.borrados} partidos.`);
+    cargarPartidos();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+// Muestra los botones de fixture "todos contra todos" o los de la llave de
+// eliminación según el formato del torneo actual: en "Eliminación directa"
+// sólo tiene sentido la llave; en "Grupos + Playoffs" conviven los dos
+// (fixture de grupos + llave de playoffs); en el resto de los formatos,
+// sólo el fixture de siempre.
+function actualizarControlesFixture() {
+  const usaLlave = torneoActualUsaLlave();
+  const esEliminacionDirecta = torneoActualEsEliminacionDirecta();
+  document.getElementById('grupoBotonesFixtureRegular').classList.toggle('oculto', esEliminacionDirecta);
+  document.getElementById('grupoBotonesLlave').classList.toggle('oculto', !usaLlave);
 }
 
 // ----- Modal de carga de resultado + goles/tarjetas por jugador -----
