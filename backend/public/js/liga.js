@@ -5939,57 +5939,10 @@ function renderLlaveBracket(partidos, avances) {
     }
   }
 
-  // Camino proyectado hasta la final: una vez que ya no puede haber más
-  // reenganche (en "con reenganche", desde la Fecha 2 en adelante; en
-  // "Eliminación directa" clásica, siempre, porque la cantidad de equipos
-  // que sigue en carrera ya es fija) se puede calcular cuántas rondas más
-  // faltan y de cuántos partidos cada una, aunque todavía no se sepa qué
-  // equipo específico juega en cada cruce -- se muestran como columnas "a
-  // definir" punteadas, sólo para ver la forma completa del camino.
-  let columnasProyectadas = '';
-  if (!columnaCampeon) {
-    const puedeProyectar = torneoActualEsReenganche() ? ultimaJornada >= 2 : torneoActualEsEliminacionDirecta();
-    if (puedeProyectar) {
-      const avancesYaAsignados = avances.filter((a) => a.jornada === ultimaJornada + 1).length;
-      let entrantes = partidosUltima.length + avancesYaAsignados;
-      const rondas = [];
-      while (entrantes > 1) {
-        const partidosRonda = Math.floor(entrantes / 2);
-        const bye = entrantes % 2 === 1 ? 1 : 0;
-        rondas.push({ partidos: partidosRonda, bye });
-        entrantes = partidosRonda + bye;
-      }
-      columnasProyectadas = rondas.map((ronda, idx) => {
-        const esUltima = idx === rondas.length - 1;
-        const etiqueta = esUltima ? 'FINAL (estimada)' : `Fecha ${ultimaJornada + 1 + idx} (estimada)`;
-        const tarjetas = Array.from({ length: ronda.partidos }).map(() => `
-          <div style="padding:5px 8px; margin-bottom:8px; font-size:11.5px; border-radius:6px; border:1px dashed rgba(148,163,184,0.4); color:#94a3b8;">
-            <div style="display:flex; justify-content:space-between; gap:6px;"><span>A definir</span><span>-</span></div>
-            <div style="height:1px; background:rgba(148,163,184,0.2); margin:4px 0;"></div>
-            <div style="display:flex; justify-content:space-between; gap:6px;"><span>A definir</span><span>-</span></div>
-          </div>`).join('');
-        const notaBye = ronda.bye ? `<p class="texto-ayuda" style="margin:3px 0; font-size:11px;">↳ 1 equipo pasa libre a la próxima ronda</p>` : '';
-        return `
-          <div class="col-llave" style="min-width:178px; flex:0 0 auto;">
-            <h4 style="margin:0 0 8px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; text-align:center; background:rgba(148,163,184,0.08); border-radius:4px; padding:4px 0; color:#94a3b8;">${etiqueta}</h4>
-            ${tarjetas}
-            ${notaBye}
-          </div>`;
-      }).join('');
-      if (rondas.length) {
-        columnasProyectadas += `
-          <div class="col-llave" style="min-width:150px; flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 10px; border-radius:8px; border:1px dashed rgba(250,204,21,0.35);">
-            <div style="font-size:30px; line-height:1; opacity:0.5;">🏆</div>
-            <p style="margin:6px 0 0; font-weight:700; text-align:center; font-size:12px; color:#94a3b8;">Campeón a definir</p>
-          </div>`;
-      }
-    }
-  }
-
   contenedor.innerHTML = `
     <div id="llaveBracketScroll" style="position:relative;">
       <svg id="llaveBracketSvg" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:visible;"></svg>
-      <div style="display:flex; gap:14px; align-items:flex-start; position:relative;">${columnas}${columnaCampeon}${columnasProyectadas}</div>
+      <div style="display:flex; gap:14px; align-items:flex-start; position:relative;">${columnas}${columnaCampeon}</div>
     </div>`;
 
   ultimoDibujoLlave = { origenPorEquipoYJornada, jornadas, porJornada };
