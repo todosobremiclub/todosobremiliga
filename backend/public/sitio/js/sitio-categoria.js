@@ -130,6 +130,20 @@ function determinarGanadorClientePublico(p) {
   return null;
 }
 
+// Devuelve el marcador chiquito que va al lado del nombre de un equipo
+// cuando llegó a ESTE partido sin jugar la ronda anterior (pase libre o
+// reenganche) -- así se ve el cruce "libre" directamente en el lugar del
+// cuadro donde ocurre, sin depender de una nota aparte.
+function marcaOrigenLlavePublico(motivo) {
+  return motivo === 'reenganche'
+    ? ' <span title="Reenganchado a esta ronda" style="font-size:10px; font-weight:400; color:#60a5fa;">(reenganchado)</span>'
+    : ' <span title="Pasó libre a esta ronda" style="font-size:10px; font-weight:400; color:#94a3b8;">(libre)</span>';
+}
+
+// Último dibujo de conectores hecho (para poder volver a trazarlos si la
+// ventana cambia de tamaño y las tarjetas se corren de lugar).
+let ultimoDibujoLlavePublico = null;
+
 async function cargarLlaveBracketPublico() {
   const contenedor = document.getElementById('contenedorLlaveBracketPublico');
   contenedor.innerHTML = '<p class="sitio-vacio">Cargando...</p>';
@@ -159,11 +173,33 @@ function renderLlaveBracketPublico(partidos, avances) {
   const jornadas = [...porJornada.keys()].sort((a, b) => a - b);
   jornadas.forEach((j) => porJornada.get(j).sort((a, b) => (a.orden_llave ?? 0) - (b.orden_llave ?? 0)));
 
-  const avancesPorRondaAnterior = new Map();
+  // De dónde viene cada equipo al llegar a la jornada J: o bien de un
+  // partido real (ganó en la ronda anterior), o bien de un pase libre /
+  // reenganche (llave_avances, sin partido). Con esto se puede dibujar el
+  // cruce real entre rondas sin asumir ningún orden fijo -- funciona igual
+  // para "Eliminación directa" (cruces fijos) que para "con reenganche"
+  // (cruces al azar en cada ronda).
+  const origenPorEquipoYJornada = new Map();
   avances.forEach((a) => {
+    origenPorEquipoYJornada.set(`${a.equipo_torneo_id}|${a.jornada}`, { tipo: 'avance', motivo: a.motivo });
+  });
+  jornadas.forEach((j) => {
+    porJornada.get(j).forEach((p) => {
+      const jugado = p.estado === 'jugado';
+      const ganadorId = jugado ? determinarGanadorClientePublico(p) : null;
+      if (ganadorId) origenPorEquipoYJornada.set(`${ganadorId}|${j + 1}`, { tipo: 'partido', partidoId: p.id });
+    });
+  });
+
+  // Pases libres/reenganches cuya ronda de destino TODAVÍA no se generó
+  // (no hay partido donde mostrar el marcador inline): esos sí se listan
+  // aparte, debajo de la ronda anterior, como antes.
+  const avancesPendientesPorRonda = new Map();
+  avances.forEach((a) => {
+    if (porJornada.has(a.jornada)) return;
     const rondaAnterior = a.jornada - 1;
-    if (!avancesPorRondaAnterior.has(rondaAnterior)) avancesPorRondaAnterior.set(rondaAnterior, []);
-    avancesPorRondaAnterior.get(rondaAnterior).push(a);
+    if (!avancesPendientesPorRonda.has(rondaAnterior)) avancesPendientesPorRonda.set(rondaAnterior, []);
+    avancesPendientesPorRonda.get(rondaAnterior).push(a);
   });
 
   const columnas = jornadas.map((j) => {
@@ -175,44 +211,116 @@ function renderLlaveBracketPublico(partidos, avances) {
     const tarjetas = partidosRonda.map((p) => {
       const jugado = p.estado === 'jugado';
       const ganadorId = jugado ? determinarGanadorClientePublico(p) : null;
+      const origenLocal = origenPorEquipoYJornada.get(`${p.equipo_local_torneo_id}|${j}`);
+      const origenVisitante = origenPorEquipoYJornada.get(`${p.equipo_visitante_torneo_id}|${j}`);
+      const marcaLocal = origenLocal && origenLocal.tipo === 'avance' ? marcaOrigenLlavePublico(origenLocal.motivo) : '';
+      const marcaVisitante = origenVisitante && origenVisitante.tipo === 'avance' ? marcaOrigenLlavePublico(origenVisitante.motivo) : '';
       return `
-        <div class="panel" style="padding:10px 12px; margin-bottom:10px; min-width:200px;">
-          <div style="display:flex; justify-content:space-between; gap:8px;">
-            <span style="font-weight:${ganadorId === p.equipo_local_torneo_id ? '700' : '400'};">${escapeHtml(p.club_local_nombre)}</span>
-            <span style="white-space:nowrap;">${jugado ? p.resultado_local : '-'}</span>
+        <div class="panel" data-match-id="${p.id}" style="padding:5px 8px; margin-bottom:8px; min-width:168px; font-size:11.5px; border-radius:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+            <span style="display:flex; align-items:center; gap:5px; overflow:hidden; font-weight:${ganadorId === p.equipo_local_torneo_id ? '700' : '400'};">${escudoClub(p.club_local_logo_url, p.club_local_color)}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.club_local_nombre)}</span>${marcaLocal}</span>
+            <span style="white-space:nowrap; font-weight:700;">${jugado ? p.resultado_local : '-'}</span>
           </div>
-          <div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
-            <span style="font-weight:${ganadorId === p.equipo_visitante_torneo_id ? '700' : '400'};">${escapeHtml(p.club_visitante_nombre)}</span>
-            <span style="white-space:nowrap;">${jugado ? p.resultado_visitante : '-'}</span>
+          <div style="height:1px; background:rgba(148,163,184,0.25); margin:4px 0;"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+            <span style="display:flex; align-items:center; gap:5px; overflow:hidden; font-weight:${ganadorId === p.equipo_visitante_torneo_id ? '700' : '400'};">${escudoClub(p.club_visitante_logo_url, p.club_visitante_color)}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.club_visitante_nombre)}</span>${marcaVisitante}</span>
+            <span style="white-space:nowrap; font-weight:700;">${jugado ? p.resultado_visitante : '-'}</span>
           </div>
         </div>`;
     }).join('');
 
-    const avancesRonda = avancesPorRondaAnterior.get(j) || [];
-    const notasAvances = avancesRonda.map((a) => {
+    const avancesPendientes = avancesPendientesPorRonda.get(j) || [];
+    const notasAvances = avancesPendientes.map((a) => {
       const etiqueta = a.motivo === 'reenganche' ? 'Reenganchado' : 'Pasa libre';
-      return `<p class="sitio-vacio" style="margin:4px 0; font-size:13px;">↳ ${escapeHtml(a.club_nombre)} — ${etiqueta} a la próxima ronda</p>`;
+      return `<p class="sitio-vacio" style="margin:3px 0; font-size:11px;">↳ ${escapeHtml(a.club_nombre)} — ${etiqueta} a la próxima ronda</p>`;
     }).join('');
 
-    let banderaCampeon = '';
-    if (j === jornadas[jornadas.length - 1] && partidosRonda.length === 1 && partidosRonda[0].estado === 'jugado') {
-      const ganadorId = determinarGanadorClientePublico(partidosRonda[0]);
-      if (ganadorId) {
-        const nombreCampeon = ganadorId === partidosRonda[0].equipo_local_torneo_id ? partidosRonda[0].club_local_nombre : partidosRonda[0].club_visitante_nombre;
-        banderaCampeon = `<p style="margin-top:10px; font-weight:700;">🏆 Campeón: ${escapeHtml(nombreCampeon)}</p>`;
-      }
-    }
-
     return `
-      <div style="min-width:220px; flex:0 0 auto;">
-        <h4 style="margin:0 0 10px;">${escapeHtml(faseNombrada)}</h4>
+      <div class="col-llave" style="min-width:178px; flex:0 0 auto;">
+        <h4 style="margin:0 0 8px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; text-align:center; background:rgba(148,163,184,0.15); border-radius:4px; padding:4px 0;">${escapeHtml(faseNombrada)}</h4>
         ${tarjetas}
         ${notasAvances}
-        ${banderaCampeon}
       </div>`;
   }).join('');
 
-  contenedor.innerHTML = `<div style="display:flex; gap:24px; align-items:flex-start;">${columnas}</div>`;
+  // Campeón: la última ronda, con un solo partido, ya jugado -- se muestra
+  // como un bloque propio al final, destacado con la copa, en vez de un
+  // simple texto.
+  let columnaCampeon = '';
+  const ultimaJornada = jornadas[jornadas.length - 1];
+  const partidosUltima = porJornada.get(ultimaJornada);
+  if (partidosUltima.length === 1 && partidosUltima[0].estado === 'jugado') {
+    const ganadorId = determinarGanadorClientePublico(partidosUltima[0]);
+    if (ganadorId) {
+      const esLocal = ganadorId === partidosUltima[0].equipo_local_torneo_id;
+      const nombreCampeon = esLocal ? partidosUltima[0].club_local_nombre : partidosUltima[0].club_visitante_nombre;
+      const logoCampeon = esLocal ? partidosUltima[0].club_local_logo_url : partidosUltima[0].club_visitante_logo_url;
+      const colorCampeon = esLocal ? partidosUltima[0].club_local_color : partidosUltima[0].club_visitante_color;
+      columnaCampeon = `
+        <div class="col-llave" style="min-width:150px; flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 10px; border-radius:8px; background:linear-gradient(180deg, rgba(250,204,21,0.16), rgba(250,204,21,0.04)); border:1px solid rgba(250,204,21,0.35);">
+          <div style="font-size:36px; line-height:1;">🏆</div>
+          <div style="margin-top:8px;">${escudoClub(logoCampeon, colorCampeon)}</div>
+          <p style="margin:6px 0 0; font-weight:700; text-align:center; font-size:13px;">${escapeHtml(nombreCampeon)}</p>
+          <p class="sitio-vacio" style="margin:2px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.4px;">Campeón</p>
+        </div>`;
+    }
+  }
+
+  contenedor.innerHTML = `
+    <div id="llaveBracketScrollPublico" style="position:relative;">
+      <svg id="llaveBracketSvgPublico" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:visible;"></svg>
+      <div style="display:flex; gap:14px; align-items:flex-start; position:relative;">${columnas}${columnaCampeon}</div>
+    </div>`;
+
+  ultimoDibujoLlavePublico = { origenPorEquipoYJornada, jornadas, porJornada };
+  dibujarConectoresLlavePublico();
+}
+
+// Dibuja, sobre el SVG superpuesto al cuadro, una línea desde cada partido
+// "padre" (de donde salió un equipo ganador) hasta el partido donde ese
+// equipo juega la ronda siguiente. No asume ningún orden fijo entre rondas
+// -- funciona igual para cruces fijos (Eliminación directa) que para
+// cruces al azar (con reenganche), porque se arma a partir de quién ganó
+// cada partido realmente, no de una posición esperada.
+function dibujarConectoresLlavePublico() {
+  if (!ultimoDibujoLlavePublico) return;
+  const { origenPorEquipoYJornada, jornadas, porJornada } = ultimoDibujoLlavePublico;
+  const svg = document.getElementById('llaveBracketSvgPublico');
+  const cont = document.getElementById('llaveBracketScrollPublico');
+  if (!svg || !cont) return;
+  const contRect = cont.getBoundingClientRect();
+
+  const cruces = [];
+  jornadas.forEach((j) => {
+    porJornada.get(j).forEach((p) => {
+      [p.equipo_local_torneo_id, p.equipo_visitante_torneo_id].forEach((equipoId) => {
+        const origen = origenPorEquipoYJornada.get(`${equipoId}|${j}`);
+        if (origen && origen.tipo === 'partido') cruces.push({ desdePartidoId: origen.partidoId, haciaPartidoId: p.id });
+      });
+    });
+  });
+
+  const paths = cruces.map(({ desdePartidoId, haciaPartidoId }) => {
+    const elDesde = cont.querySelector(`[data-match-id="${desdePartidoId}"]`);
+    const elHacia = cont.querySelector(`[data-match-id="${haciaPartidoId}"]`);
+    if (!elDesde || !elHacia) return '';
+    const r1 = elDesde.getBoundingClientRect();
+    const r2 = elHacia.getBoundingClientRect();
+    const x1 = r1.right - contRect.left;
+    const y1 = r1.top + r1.height / 2 - contRect.top;
+    const x2 = r2.left - contRect.left;
+    const y2 = r2.top + r2.height / 2 - contRect.top;
+    const xMedio = (x1 + x2) / 2;
+    // Línea en "codo" (horizontal-vertical-horizontal), el clásico trazo de
+    // llave de torneo, en vez de una curva.
+    return `<path d="M ${x1} ${y1} H ${xMedio} V ${y2} H ${x2}" fill="none" stroke="#94a3b8" stroke-width="1.6" opacity="0.6" />`;
+  }).join('');
+
+  svg.innerHTML = paths;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => dibujarConectoresLlavePublico());
 }
 
 async function cargarGoleadoresPublico() {
