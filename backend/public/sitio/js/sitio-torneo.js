@@ -465,6 +465,32 @@ function renderLlaveBracketPublico(partidos, avances) {
     avancesPendientesPorRonda.get(rondaAnterior).push(a);
   });
 
+  // Posición vertical (centro, en px) de cada partido: la primera ronda se
+  // apila en orden; de ahí en más, cada partido se centra en el promedio de
+  // sus partidos "padre" (de donde salieron sus dos equipos) -- así el
+  // cuadro va convergiendo hacia el medio como una llave de torneo de
+  // verdad, en vez de quedar todo pegado arriba.
+  const ALTO_TARJETA = 58;
+  const ESPACIO = 10;
+  const yCentroPorPartido = new Map();
+  jornadas.forEach((j) => {
+    const partidosRonda = porJornada.get(j);
+    let bordeAnterior = -ESPACIO;
+    partidosRonda.forEach((p) => {
+      const centrosPadres = [p.equipo_local_torneo_id, p.equipo_visitante_torneo_id]
+        .map((eq) => origenPorEquipoYJornada.get(`${eq}|${j}`))
+        .filter((o) => o && o.tipo === 'partido')
+        .map((o) => yCentroPorPartido.get(o.partidoId))
+        .filter((y) => y != null);
+      const minimo = bordeAnterior + ESPACIO + ALTO_TARJETA / 2;
+      const ideal = centrosPadres.length ? centrosPadres.reduce((a, b) => a + b, 0) / centrosPadres.length : minimo;
+      const y = Math.max(ideal, minimo);
+      yCentroPorPartido.set(p.id, y);
+      bordeAnterior = y + ALTO_TARJETA / 2;
+    });
+  });
+  const alturaTotal = Math.max(...[...yCentroPorPartido.values()]) + ALTO_TARJETA / 2 + 6;
+
   const columnas = jornadas.map((j) => {
     const partidosRonda = porJornada.get(j);
     const faseNombrada = partidosRonda[0].fase && partidosRonda[0].fase !== 'reenganche'
@@ -478,8 +504,9 @@ function renderLlaveBracketPublico(partidos, avances) {
       const origenVisitante = origenPorEquipoYJornada.get(`${p.equipo_visitante_torneo_id}|${j}`);
       const marcaLocal = origenLocal && origenLocal.tipo === 'avance' ? marcaOrigenLlavePublico(origenLocal.motivo) : '';
       const marcaVisitante = origenVisitante && origenVisitante.tipo === 'avance' ? marcaOrigenLlavePublico(origenVisitante.motivo) : '';
+      const top = yCentroPorPartido.get(p.id) - ALTO_TARJETA / 2;
       return `
-        <div class="panel" data-match-id="${p.id}" style="padding:5px 8px; margin-bottom:8px; min-width:168px; font-size:11.5px; border-radius:6px;">
+        <div class="panel" data-match-id="${p.id}" style="position:absolute; top:${top}px; left:0; right:0; padding:5px 8px; font-size:11.5px; border-radius:6px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
             <span style="display:flex; align-items:center; gap:5px; overflow:hidden; font-weight:${ganadorId === p.equipo_local_torneo_id ? '700' : '400'};">${escudoClub(p.club_local_logo_url, p.club_local_color)}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.club_local_nombre)}</span>${marcaLocal}</span>
             <span style="white-space:nowrap; font-weight:700;">${jugado ? p.resultado_local : '-'}</span>
@@ -501,14 +528,14 @@ function renderLlaveBracketPublico(partidos, avances) {
     return `
       <div class="col-llave" style="min-width:178px; flex:0 0 auto;">
         <h4 style="margin:0 0 8px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; text-align:center; background:rgba(148,163,184,0.15); border-radius:4px; padding:4px 0;">${escapeHtml(faseNombrada)}</h4>
-        ${tarjetas}
+        <div style="position:relative; height:${alturaTotal}px;">${tarjetas}</div>
         ${notasAvances}
       </div>`;
   }).join('');
 
   // Campeón: la última ronda, con un solo partido, ya jugado -- se muestra
-  // como un bloque propio al final, destacado con la copa, en vez de un
-  // simple texto.
+  // como un bloque propio al final, destacado con la copa, centrado a la
+  // misma altura que la final, en vez de un simple texto.
   let columnaCampeon = '';
   const ultimaJornada = jornadas[jornadas.length - 1];
   const partidosUltima = porJornada.get(ultimaJornada);
@@ -519,12 +546,16 @@ function renderLlaveBracketPublico(partidos, avances) {
       const nombreCampeon = esLocal ? partidosUltima[0].club_local_nombre : partidosUltima[0].club_visitante_nombre;
       const logoCampeon = esLocal ? partidosUltima[0].club_local_logo_url : partidosUltima[0].club_visitante_logo_url;
       const colorCampeon = esLocal ? partidosUltima[0].club_local_color : partidosUltima[0].club_visitante_color;
+      const ALTO_CAMPEON = 150;
+      const topCampeon = Math.max(0, yCentroPorPartido.get(partidosUltima[0].id) - ALTO_CAMPEON / 2);
       columnaCampeon = `
-        <div class="col-llave" style="min-width:150px; flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 10px; border-radius:8px; background:linear-gradient(180deg, rgba(250,204,21,0.16), rgba(250,204,21,0.04)); border:1px solid rgba(250,204,21,0.35);">
-          <div style="font-size:36px; line-height:1;">🏆</div>
-          <div style="margin-top:8px;">${escudoClub(logoCampeon, colorCampeon)}</div>
-          <p style="margin:6px 0 0; font-weight:700; text-align:center; font-size:13px;">${escapeHtml(nombreCampeon)}</p>
-          <p class="sitio-vacio" style="margin:2px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.4px;">Campeón</p>
+        <div class="col-llave" style="min-width:150px; flex:0 0 auto; position:relative; height:${alturaTotal}px;">
+          <div style="position:absolute; top:${topCampeon}px; left:0; right:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 10px; border-radius:8px; background:linear-gradient(180deg, rgba(250,204,21,0.16), rgba(250,204,21,0.04)); border:1px solid rgba(250,204,21,0.35);">
+            <div style="font-size:36px; line-height:1;">🏆</div>
+            <div style="margin-top:8px;">${escudoClub(logoCampeon, colorCampeon)}</div>
+            <p style="margin:6px 0 0; font-weight:700; text-align:center; font-size:13px;">${escapeHtml(nombreCampeon)}</p>
+            <p class="sitio-vacio" style="margin:2px 0 0; font-size:11px; text-transform:uppercase; letter-spacing:0.4px;">Campeón</p>
+          </div>
         </div>`;
     }
   }
