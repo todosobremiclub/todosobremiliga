@@ -1491,6 +1491,32 @@ router.get('/:torneoId/categorias/:categoriaId/llave/reenganchados', async (req,
   }
 });
 
+// GET /liga/torneos/:torneoId/categorias/:categoriaId/llave/avances
+// Lista los "pases libres" (cantidad impar) y reenganches guardados en
+// llave_avances -- lo usa el frontend para dibujar el cuadro de la llave
+// completo, incluyendo a los equipos que avanzan de ronda sin jugar.
+router.get('/:torneoId/categorias/:categoriaId/llave/avances', async (req, res) => {
+  try {
+    const contexto = await buscarCategoriaDeMiLiga(req.params.torneoId, req.params.categoriaId, req.ligaId);
+    if (!contexto) return res.status(404).json({ ok: false, error: 'División no encontrada en tu Liga' });
+    const subcategoriaId = req.query.subcategoria_id || null;
+    const { rows } = await query(
+      `SELECT la.equipo_torneo_id, la.jornada, la.motivo, cl.nombre AS club_nombre
+       FROM llave_avances la
+       JOIN equipos_torneo et ON et.id = la.equipo_torneo_id
+       JOIN clubes cl ON cl.id = et.club_id
+       WHERE la.torneo_id = $1 AND la.categoria_id = $2
+         AND la.subcategoria_id IS NOT DISTINCT FROM $3::uuid
+       ORDER BY la.jornada ASC`,
+      [req.params.torneoId, req.params.categoriaId, subcategoriaId]
+    );
+    res.json({ ok: true, avances: rows });
+  } catch (err) {
+    console.error('Error en GET llave/avances:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  }
+});
+
 // POST /liga/torneos/:torneoId/categorias/:categoriaId/llave/siguiente-ronda
 // Una vez jugados todos los partidos de la ronda actual de la llave, arma la
 // próxima ronda (cuartos -> semifinal -> final) con los ganadores. Si el

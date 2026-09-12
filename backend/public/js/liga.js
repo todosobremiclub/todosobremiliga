@@ -4534,7 +4534,12 @@ function cambiarTabDetalle(nombre) {
     return;
   }
   if (nombre === 'fixture') { cargarPartidos(); actualizarBotonReenganchar(); }
-  if (nombre === 'tabla') cargarTabla();
+  if (nombre === 'tabla') {
+    const esLlave = torneoActualEsEliminacionDirecta();
+    document.getElementById('wrapTablaPosiciones').classList.toggle('oculto', esLlave);
+    document.getElementById('wrapLlaveBracket').classList.toggle('oculto', !esLlave);
+    if (esLlave) cargarLlaveBracket(); else cargarTabla();
+  }
   if (nombre === 'goleadores') cargarGoleadores();
   if (nombre === 'tarjetas') cargarTarjetas();
 }
@@ -5567,6 +5572,10 @@ function actualizarControlesFixture() {
   const esEliminacionDirecta = torneoActualEsEliminacionDirecta();
   document.getElementById('grupoBotonesFixtureRegular').classList.toggle('oculto', esEliminacionDirecta);
   document.getElementById('grupoBotonesLlave').classList.toggle('oculto', !usaLlave);
+  // En "Eliminación directa"/"Eliminación directa con reenganche" no hay
+  // tabla de puntos -- la pestaña pasa a llamarse "Llave" y muestra el
+  // cuadro en vez de la tabla (ver cambiarTabDetalle).
+  document.getElementById('tabBtnTabla').textContent = esEliminacionDirecta ? 'Llave' : 'Tabla de posiciones';
 }
 
 // ----- Modal de carga de resultado + goles/tarjetas por jugador -----
@@ -5751,6 +5760,108 @@ async function cargarTarjetas() {
 // Cache de la última tabla de posiciones cargada (para poder mostrar la
 // posición actual de cada equipo junto al fixture, sin pedirla de nuevo).
 let tablaActualCache = [];
+
+// ----- Cuadro de la llave ("Eliminación directa" / "Eliminación directa
+// con reenganche"): reemplaza a la tabla de posiciones, que no tiene
+// sentido en un formato de eliminación -- acá se ve cómo va quedando
+// conformada la llave, ronda por ronda. -----
+
+async function cargarLlaveBracket() {
+  const contenedor = document.getElementById('contenedorLlaveBracket');
+  contenedor.innerHTML = '<p class="texto-ayuda">Cargando...</p>';
+  try {
+    const qs = subcategoriaActualId ? `?subcategoria_id=${subcategoriaActualId}` : '';
+    const [dataPartidos, dataAvances] = await Promise.all([
+      apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/partidos${qs}`),
+      apiFetch(`/liga/torneos/${torneoActualId}/categorias/${categoriaActualId}/llave/avances${qs}`)
+    ]);
+    renderLlaveBracket(dataPartidos.partidos || [], dataAvances.avances || []);
+  } catch (err) {
+    contenedor.innerHTML = `<p class="texto-ayuda">Error: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderLlaveBracket(partidos, avances) {
+  const contenedor = document.getElementById('contenedorLlaveBracket');
+  if (!partidos.length) {
+    contenedor.innerHTML = '<p class="texto-ayuda">Todavía no se generó la llave. Andá a la pestaña "Fixture" y usá el botón "Generar llave".</p>';
+    return;
+  }
+
+  const porJornada = new Map();
+  partidos.forEach((p) => {
+    const j = p.jornada || 1;
+    if (!porJornada.has(j)) porJornada.set(j, []);
+    porJornada.get(j).push(p);
+  });
+  const jornadas = [...porJornada.keys()].sort((a, b) => a - b);
+  jornadas.forEach((j) => porJornada.get(j).sort((a, b) => (a.orden_llave ?? 0) - (b.orden_llave ?? 0)));
+
+  // Los pases libres/reenganches guardados en llave_avances no tienen
+  // partido: se muestran como una nota debajo de la ronda ANTERIOR a la que
+  // avanzan (esa es la ronda que no jugaron).
+  const avancesPorRondaAnterior = new Map();
+  avances.forEach((a) => {
+    const rondaAnterior = a.jornada - 1;
+    if (!avancesPorRondaAnterior.has(rondaAnterior)) avancesPorRondaAnterior.set(rondaAnterior, []);
+    avancesPorRondaAnterior.get(rondaAnterior).push(a);
+  });
+
+  const columnas = jornadas.map((j) => {
+    const partidosRonda = porJornada.get(j);
+    // Nombre de la ronda: si el partido ya trae un nombre de fase clásico
+    // (cuartos/semifinal/final, de "Eliminación directa"), se usa ese; si
+    // no (fase='reenganche', cantidad libre de equipos), se identifica por
+    // número de fecha.
+    const faseNombrada = partidosRonda[0].fase && partidosRonda[0].fase !== 'reenganche'
+      ? (NOMBRES_FASE_LLAVE[partidosRonda[0].fase] || partidosRonda[0].fase)
+      : `Fecha ${j}`;
+
+    const tarjetas = partidosRonda.map((p) => {
+      const jugado = p.estado === 'jugado';
+      const ganadorId = jugado ? determinarGanadorCliente(p) : null;
+      const claseLocal = ganadorId && ganadorId !== p.equipo_local_id ? 'texto-ayuda' : '';
+      const claseVisitante = ganadorId && ganadorId !== p.equipo_visitante_id ? 'texto-ayuda' : '';
+      return `
+        <div class="panel" style="padding:10px 12px; margin-bottom:10px; min-width:200px;">
+          <div style="display:flex; justify-content:space-between; gap:8px;">
+            <span class="${claseLocal}" style="font-weight:${ganadorId === p.equipo_local_id ? '700' : '400'};">${escapeHtml(p.club_local_nombre)}</span>
+            <span style="white-space:nowrap;">${jugado ? p.resultado_local : '-'}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:8px; margin-top:4px;">
+            <span class="${claseVisitante}" style="font-weight:${ganadorId === p.equipo_visitante_id ? '700' : '400'};">${escapeHtml(p.club_visitante_nombre)}</span>
+            <span style="white-space:nowrap;">${jugado ? p.resultado_visitante : '-'}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    const avancesRonda = avancesPorRondaAnterior.get(j) || [];
+    const notasAvances = avancesRonda.map((a) => {
+      const etiqueta = a.motivo === 'reenganche' ? 'Reenganchado' : 'Pasa libre';
+      return `<p class="texto-ayuda" style="margin:4px 0;">↳ ${escapeHtml(a.club_nombre)} — ${etiqueta} a la próxima ronda</p>`;
+    }).join('');
+
+    // Campeón: la última ronda, con un solo partido, ya jugado.
+    let banderaCampeon = '';
+    if (j === jornadas[jornadas.length - 1] && partidosRonda.length === 1 && partidosRonda[0].estado === 'jugado') {
+      const ganadorId = determinarGanadorCliente(partidosRonda[0]);
+      if (ganadorId) {
+        const nombreCampeon = ganadorId === partidosRonda[0].equipo_local_id ? partidosRonda[0].club_local_nombre : partidosRonda[0].club_visitante_nombre;
+        banderaCampeon = `<p style="margin-top:10px; font-weight:700;">🏆 Campeón: ${escapeHtml(nombreCampeon)}</p>`;
+      }
+    }
+
+    return `
+      <div style="min-width:220px; flex:0 0 auto;">
+        <h4 style="margin:0 0 10px;">${escapeHtml(faseNombrada)}</h4>
+        ${tarjetas}
+        ${notasAvances}
+        ${banderaCampeon}
+      </div>`;
+  }).join('');
+
+  contenedor.innerHTML = `<div style="display:flex; gap:24px; align-items:flex-start;">${columnas}</div>`;
+}
 
 // Arma los cuadraditos V/E/P de los últimos partidos jugados (el más
 // reciente a la izquierda), a partir del array ['V','E','P',...] que manda

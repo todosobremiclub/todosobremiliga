@@ -1051,11 +1051,19 @@
 
           <!-- Tabla de posiciones -->
           <div id="subSeccionTabla" class="oculto">
-            <div class="tabla-scroll">
-              <table>
-                <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
-                <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
-              </table>
+            <div id="wrapTablaPosiciones">
+              <div class="tabla-scroll">
+                <table>
+                  <thead><tr><th>Club</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>Dif</th><th>Pts</th><th>Últimas</th></tr></thead>
+                  <tbody id="tablaPosiciones"><tr><td colspan="10">Cargando...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- En "Eliminación directa" y "Eliminación directa con
+                 reenganche" no existe una tabla de puntos -- en su lugar se
+                 dibuja acá cómo va quedando conformada la llave. -->
+            <div id="wrapLlaveBracket" class="oculto">
+              <div id="contenedorLlaveBracket" style="overflow-x:auto;"></div>
             </div>
           </div>
 
