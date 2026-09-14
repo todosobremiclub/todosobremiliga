@@ -216,7 +216,7 @@ function renderLlaveBracketPublico(partidos, avances) {
       const marcaLocal = origenLocal && origenLocal.tipo === 'avance' ? marcaOrigenLlavePublico(origenLocal.motivo) : '';
       const marcaVisitante = origenVisitante && origenVisitante.tipo === 'avance' ? marcaOrigenLlavePublico(origenVisitante.motivo) : '';
       return `
-        <div class="panel" data-match-id="${p.id}" style="padding:5px 8px; margin-bottom:8px; min-width:168px; font-size:11.5px; border-radius:6px;">
+        <div class="panel" data-match-id="${p.id}" style="padding:5px 8px; min-width:168px; font-size:11.5px; border-radius:6px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
             <span style="display:flex; align-items:center; gap:5px; overflow:hidden; font-weight:${ganadorId === p.equipo_local_torneo_id ? '700' : '400'};">${escudoClub(p.club_local_logo_url, p.club_local_color)}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.club_local_nombre)}</span>${marcaLocal}</span>
             <span style="white-space:nowrap; font-weight:700;">${jugado ? p.resultado_local : '-'}</span>
@@ -238,7 +238,7 @@ function renderLlaveBracketPublico(partidos, avances) {
     return `
       <div class="col-llave" style="min-width:178px; flex:0 0 auto;">
         <h4 style="margin:0 0 8px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.4px; text-align:center; background:rgba(148,163,184,0.15); border-radius:4px; padding:4px 0;">${escapeHtml(faseNombrada)}</h4>
-        ${tarjetas}
+        <div style="display:flex; flex-direction:column; flex-wrap:wrap; align-content:flex-start; gap:8px; max-height:640px;">${tarjetas}</div>
         ${notasAvances}
       </div>`;
   }).join('');
