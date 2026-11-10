@@ -382,6 +382,124 @@ router.delete('/:fichajeId', async (req, res) => {
   }
 });
 
+// POST /liga/fichajes/manual — alta manual de un jugador desde el panel de la
+// Liga (sin que el Club lo solicite desde su app). Sirve para cargar
+// planteles existentes o casos puntuales. En una sola transacción:
+//   1. busca el jugador en el club por DNI (si ya existe lo reutiliza, sin
+//      pisarle los datos) o lo crea;
+//   2. crea el fichaje para el torneo/división/categoría indicados;
+//   3. si aprobar=true (por defecto), lo deja aprobado y genera el carnet,
+//      igual que PATCH /:fichajeId/aprobar.
+router.post('/manual', async (req, res) => {
+  const {
+    club_id, nombre, apellido, dni, fecha_nacimiento, posicion, numero_camiseta,
+    torneo_id, categoria_id, subcategoria_id
+  } = req.body;
+  const aprobar = req.body.aprobar !== false;
+
+  if (!club_id || !nombre || !String(nombre).trim() || !apellido || !String(apellido).trim() || !dni || !String(dni).trim()) {
+    return res.status(400).json({ ok: false, error: 'Faltan datos obligatorios (club, nombre, apellido y DNI)' });
+  }
+  if (!torneo_id || !categoria_id) {
+    return res.status(400).json({ ok: false, error: 'Elegí torneo y división' });
+  }
+  const dniLimpio = String(dni).replace(/[.\s]/g, '').trim();
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const clubEnLiga = await client.query(
+      'SELECT 1 FROM club_liga WHERE club_id = $1 AND liga_id = $2',
+      [club_id, req.ligaId]
+    );
+    if (!clubEnLiga.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Ese club no participa en tu Liga' });
+    }
+
+    const torneo = await client.query('SELECT 1 FROM torneos WHERE id = $1 AND liga_id = $2', [torneo_id, req.ligaId]);
+    if (!torneo.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Ese torneo no pertenece a tu Liga' });
+    }
+    const categoria = await client.query('SELECT 1 FROM categorias WHERE id = $1 AND torneo_id = $2', [categoria_id, torneo_id]);
+    if (!categoria.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Esa división no pertenece al torneo elegido' });
+    }
+    const { rows: subsDivision } = await client.query(
+      'SELECT id FROM categoria_subcategorias WHERE categoria_id = $1', [categoria_id]
+    );
+    if (subsDivision.length && !subcategoria_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ ok: false, error: 'Elegí la categoría dentro de la división' });
+    }
+    if (subcategoria_id && !subsDivision.some((s) => s.id === subcategoria_id)) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, error: 'Esa categoría no pertenece a la división elegida' });
+    }
+
+    // Jugador: si el club ya lo tiene cargado con ese DNI, se reutiliza.
+    let jugadorCreado = false;
+    let { rows: [jugador] } = await client.query(
+      'SELECT * FROM jugadores WHERE club_id = $1 AND dni = $2',
+      [club_id, dniLimpio]
+    );
+    if (!jugador) {
+      ({ rows: [jugador] } = await client.query(
+        `INSERT INTO jugadores (club_id, nombre, apellido, dni, fecha_nacimiento, posicion, numero_camiseta)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [club_id, String(nombre).trim(), String(apellido).trim(), dniLimpio,
+         fecha_nacimiento || null, posicion || null, numero_camiseta ? parseInt(numero_camiseta, 10) : null]
+      ));
+      jugadorCreado = true;
+    }
+
+    const yaFichado = await client.query(
+      `SELECT 1 FROM fichajes
+       WHERE jugador_id = $1 AND torneo_id = $2 AND estado IN ('pendiente', 'aprobado')`,
+      [jugador.id, torneo_id]
+    );
+    if (yaFichado.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        ok: false,
+        error: `${jugador.apellido}, ${jugador.nombre} (DNI ${jugador.dni}) ya tiene un fichaje pendiente o aprobado en ese torneo`,
+      });
+    }
+
+    const { rows: [fichaje] } = await client.query(
+      `INSERT INTO fichajes (jugador_id, club_id, liga_id, torneo_id, categoria_id, subcategoria_id,
+                             estado, aprobado_por, fecha_resolucion)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [jugador.id, club_id, req.ligaId, torneo_id, categoria_id, subcategoria_id || null,
+       aprobar ? 'aprobado' : 'pendiente', aprobar ? req.usuario.id : null, aprobar ? new Date() : null]
+    );
+
+    let carnet = null;
+    if (aprobar) {
+      ({ rows: [carnet] } = await client.query(
+        `INSERT INTO carnets (jugador_id, torneo_id, fichaje_id, codigo_qr)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [jugador.id, torneo_id, fichaje.id, crypto.randomUUID()]
+      ));
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ ok: true, jugador, jugador_creado: jugadorCreado, fichaje, carnet });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (e) { /* noop */ }
+    console.error('Error en POST /liga/fichajes/manual:', err);
+    res.status(500).json({ ok: false, error: 'Error interno' });
+  } finally {
+    client.release();
+  }
+});
+
 // POST /liga/fichajes/eliminar-multiple — borrado masivo de fichajes (y sus
 // carnets asociados), pensado para el checkbox de selección múltiple en el
 // listado de fichajes del panel de Liga.

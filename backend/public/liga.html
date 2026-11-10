@@ -1179,6 +1179,7 @@
       <div class="panel">
         <div class="panel-header">
           <h2>Solicitudes de fichaje</h2>
+          <button class="btn" id="btnAbrirAltaManualFichaje">+ Alta manual de jugador</button>
         </div>
         <div class="barra-filtros" style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
           <select id="filtroEstadoFichaje" style="padding:8px 12px; border:1px solid var(--gris-300); border-radius:8px; font-size:13px;">
@@ -1246,6 +1247,72 @@
       </div>
       <p class="mensaje-error oculto" id="editarFichajeError"></p>
       <button class="btn" id="btnGuardarEdicionFichaje" style="margin-top:12px;">Guardar</button>
+    </div>
+
+    <!-- Popup: alta manual de un jugador fichado (desde la Liga) -->
+    <div class="popup-modal oculto" id="modalAltaManualFichaje">
+      <div class="panel-header">
+        <h2>Alta manual de jugador</h2>
+        <button class="btn btn-secundario btn-pequeno" id="btnCerrarAltaManualFichaje">Cerrar</button>
+      </div>
+      <p class="texto-ayuda" style="margin-bottom:12px;">Si el club ya tiene un jugador con ese DNI, se usa ese jugador y se le crea el fichaje.</p>
+      <div class="form-grid">
+        <div>
+          <label for="altaManualClub">Club *</label>
+          <select id="altaManualClub"></select>
+        </div>
+        <div>
+          <label for="altaManualDni">DNI *</label>
+          <input type="text" id="altaManualDni" inputmode="numeric" autocomplete="off">
+        </div>
+        <div>
+          <label for="altaManualNombre">Nombre *</label>
+          <input type="text" id="altaManualNombre" autocomplete="off">
+        </div>
+        <div>
+          <label for="altaManualApellido">Apellido *</label>
+          <input type="text" id="altaManualApellido" autocomplete="off">
+        </div>
+        <div>
+          <label for="altaManualFechaNacimiento">Fecha de nacimiento</label>
+          <input type="date" id="altaManualFechaNacimiento">
+        </div>
+        <div>
+          <label for="altaManualPosicion">Posición</label>
+          <select id="altaManualPosicion">
+            <option value="">-</option>
+            <option>Arquero</option>
+            <option>Defensor</option>
+            <option>Mediocampista</option>
+            <option>Delantero</option>
+          </select>
+        </div>
+        <div>
+          <label for="altaManualCamiseta">N.º de camiseta</label>
+          <input type="number" id="altaManualCamiseta" min="1" max="99">
+        </div>
+        <div>
+          <label for="altaManualTorneo">Torneo *</label>
+          <select id="altaManualTorneo"></select>
+        </div>
+        <div>
+          <label for="altaManualCategoria">División *</label>
+          <select id="altaManualCategoria"></select>
+        </div>
+        <div>
+          <label for="altaManualSubcategoria">Categoría</label>
+          <select id="altaManualSubcategoria"></select>
+        </div>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+        <input type="checkbox" id="altaManualAprobar" checked> Aprobar directamente y generar el carnet
+      </label>
+      <p class="mensaje-error oculto" id="altaManualError"></p>
+      <p class="oculto" id="altaManualOk" style="color:var(--verde, #16a34a); margin-top:8px;"></p>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+        <button class="btn" id="btnGuardarAltaManual">Guardar</button>
+        <button class="btn btn-secundario" id="btnGuardarAltaManualOtro">Guardar y cargar otro</button>
+      </div>
     </div>
 
     <!-- Carnet: tarjeta con todos los datos del socio (vista Liga). -->

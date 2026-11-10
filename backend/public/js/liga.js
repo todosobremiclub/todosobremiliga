@@ -657,6 +657,12 @@ function conectarEventos() {
   document.getElementById('editarFichajeTorneo').addEventListener('change', () => poblarCategoriasEditarFichaje(null));
   document.getElementById('editarFichajeCategoria').addEventListener('change', () => poblarSubcategoriasEditarFichaje(null));
   document.getElementById('btnGuardarEdicionFichaje').addEventListener('click', guardarEdicionFichaje);
+  document.getElementById('btnAbrirAltaManualFichaje').addEventListener('click', abrirAltaManualFichaje);
+  document.getElementById('btnCerrarAltaManualFichaje').addEventListener('click', cerrarAltaManualFichaje);
+  document.getElementById('altaManualTorneo').addEventListener('change', () => poblarCategoriasAltaManual());
+  document.getElementById('altaManualCategoria').addEventListener('change', () => poblarSubcategoriasAltaManual());
+  document.getElementById('btnGuardarAltaManual').addEventListener('click', () => guardarAltaManualFichaje(false));
+  document.getElementById('btnGuardarAltaManualOtro').addEventListener('click', () => guardarAltaManualFichaje(true));
   document.getElementById('btnCerrarVerCarnetLiga').addEventListener('click', cerrarCarnetLiga);
 
   // ---- Noticias ----
@@ -2059,6 +2065,148 @@ function poblarSubcategoriasEditarFichaje(subcategoriaIdSeleccionada) {
   selectSubcategoria.innerHTML = subcategorias
     .map((s) => `<option value="${s.id}" ${s.id === subcategoriaIdSeleccionada ? 'selected' : ''}>${escapeHtml(s.nombre)}</option>`)
     .join('');
+}
+
+// ---------------------------------------------------------------------------
+// Alta manual de jugador (desde la Liga): crea jugador + fichaje (+ carnet si
+// se aprueba directo) en un solo paso. Ver POST /liga/fichajes/manual.
+// ---------------------------------------------------------------------------
+let categoriasAltaManualCache = [];
+
+async function abrirAltaManualFichaje() {
+  document.getElementById('altaManualError').classList.add('oculto');
+  document.getElementById('altaManualOk').classList.add('oculto');
+  limpiarDatosJugadorAltaManual();
+  document.getElementById('modalAltaManualFichaje').classList.remove('oculto');
+  mostrarFondoModal();
+
+  const selectClub = document.getElementById('altaManualClub');
+  const selectTorneo = document.getElementById('altaManualTorneo');
+  selectClub.innerHTML = '<option value="">Cargando...</option>';
+  selectTorneo.innerHTML = '<option value="">Cargando...</option>';
+  document.getElementById('altaManualCategoria').innerHTML = '';
+  document.getElementById('altaManualSubcategoria').innerHTML = '';
+  try {
+    const [dataClubes, dataTorneos] = await Promise.all([
+      apiFetch('/liga/clubes?todos=true'),
+      apiFetch('/liga/torneos')
+    ]);
+    selectClub.innerHTML = '<option value="">Elegí un club...</option>' +
+      (dataClubes.clubes || []).map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('');
+    const torneos = dataTorneos.torneos || [];
+    selectTorneo.innerHTML = torneos.length
+      ? torneos.map((t) => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('')
+      : '<option value="">(no hay torneos)</option>';
+    await poblarCategoriasAltaManual();
+  } catch (err) {
+    selectClub.innerHTML = `<option value="">Error: ${escapeHtml(err.message)}</option>`;
+  }
+}
+
+function cerrarAltaManualFichaje() {
+  document.getElementById('modalAltaManualFichaje').classList.add('oculto');
+  ocultarFondoModal();
+}
+
+function limpiarDatosJugadorAltaManual() {
+  ['altaManualDni', 'altaManualNombre', 'altaManualApellido', 'altaManualFechaNacimiento', 'altaManualCamiseta']
+    .forEach((id) => { document.getElementById(id).value = ''; });
+  document.getElementById('altaManualPosicion').value = '';
+}
+
+async function poblarCategoriasAltaManual() {
+  const torneoId = document.getElementById('altaManualTorneo').value;
+  const selectCategoria = document.getElementById('altaManualCategoria');
+  categoriasAltaManualCache = [];
+  if (!torneoId) {
+    selectCategoria.innerHTML = '';
+    poblarSubcategoriasAltaManual();
+    return;
+  }
+  selectCategoria.innerHTML = '<option value="">Cargando...</option>';
+  try {
+    const data = await apiFetch(`/liga/torneos/${torneoId}/categorias`);
+    categoriasAltaManualCache = data.categorias || [];
+    selectCategoria.innerHTML = categoriasAltaManualCache.length
+      ? categoriasAltaManualCache.map((c) => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('')
+      : '<option value="">(el torneo no tiene divisiones)</option>';
+  } catch (err) {
+    selectCategoria.innerHTML = `<option value="">Error: ${escapeHtml(err.message)}</option>`;
+  }
+  poblarSubcategoriasAltaManual();
+}
+
+function poblarSubcategoriasAltaManual() {
+  const categoriaId = document.getElementById('altaManualCategoria').value;
+  const selectSubcategoria = document.getElementById('altaManualSubcategoria');
+  const categoria = categoriasAltaManualCache.find((c) => c.id === categoriaId);
+  const subcategorias = categoria ? (categoria.subcategorias || []) : [];
+  if (!subcategorias.length) {
+    selectSubcategoria.innerHTML = '<option value="">(sin categorías)</option>';
+    selectSubcategoria.required = false;
+    return;
+  }
+  selectSubcategoria.required = true;
+  selectSubcategoria.innerHTML = subcategorias
+    .map((s) => `<option value="${s.id}">${escapeHtml(s.nombre)}</option>`).join('');
+}
+
+async function guardarAltaManualFichaje(cargarOtro) {
+  const errorEl = document.getElementById('altaManualError');
+  const okEl = document.getElementById('altaManualOk');
+  errorEl.classList.add('oculto');
+  okEl.classList.add('oculto');
+
+  const valor = (id) => document.getElementById(id).value.trim();
+  const selectSubcategoria = document.getElementById('altaManualSubcategoria');
+  const body = {
+    club_id: valor('altaManualClub'),
+    dni: valor('altaManualDni'),
+    nombre: valor('altaManualNombre'),
+    apellido: valor('altaManualApellido'),
+    fecha_nacimiento: valor('altaManualFechaNacimiento') || null,
+    posicion: valor('altaManualPosicion') || null,
+    numero_camiseta: valor('altaManualCamiseta') || null,
+    torneo_id: valor('altaManualTorneo'),
+    categoria_id: valor('altaManualCategoria'),
+    subcategoria_id: selectSubcategoria.value || null,
+    aprobar: document.getElementById('altaManualAprobar').checked
+  };
+
+  let falta = null;
+  if (!body.club_id) falta = 'Elegí el club.';
+  else if (!body.dni || !body.nombre || !body.apellido) falta = 'Completá DNI, nombre y apellido.';
+  else if (!body.torneo_id || !body.categoria_id) falta = 'Elegí torneo y división.';
+  else if (selectSubcategoria.required && !body.subcategoria_id) falta = 'Elegí la categoría dentro de la división.';
+  if (falta) {
+    errorEl.textContent = falta;
+    errorEl.classList.remove('oculto');
+    return;
+  }
+
+  const botones = [document.getElementById('btnGuardarAltaManual'), document.getElementById('btnGuardarAltaManualOtro')];
+  botones.forEach((b) => { b.disabled = true; });
+  try {
+    const data = await apiFetch('/liga/fichajes/manual', { method: 'POST', body: JSON.stringify(body) });
+    const j = data.jugador;
+    const textoEstado = body.aprobar ? 'fichado y aprobado (carnet generado)' : 'fichado como pendiente';
+    cargarFichajesLiga();
+    if (cargarOtro) {
+      // Se mantienen club, torneo, división y categoría para cargar el
+      // plantel de corrido; sólo se limpian los datos del jugador.
+      limpiarDatosJugadorAltaManual();
+      okEl.textContent = `✓ ${j.apellido}, ${j.nombre} ${textoEstado}${data.jugador_creado ? '' : ' (el jugador ya existía en el club)'}.`;
+      okEl.classList.remove('oculto');
+      document.getElementById('altaManualDni').focus();
+    } else {
+      cerrarAltaManualFichaje();
+    }
+  } catch (err) {
+    errorEl.textContent = 'Error: ' + err.message;
+    errorEl.classList.remove('oculto');
+  } finally {
+    botones.forEach((b) => { b.disabled = false; });
+  }
 }
 
 async function guardarEdicionFichaje() {
