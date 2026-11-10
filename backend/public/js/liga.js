@@ -4298,7 +4298,8 @@ async function cargarCategorias(torneoId) {
       return;
     }
     const categoriaAConservar = categoriasCache.find((c) => c.id === categoriaActualId);
-    if (categoriaAConservar && mostrandoGeneralCategoriaLiga) {
+    if (categoriaAConservar && mostrandoGeneralCategoriaLiga
+        && (categoriaAConservar.subcategorias || []).filter((s) => s.suma_tabla_general !== false).length >= 2) {
       // Se estaba viendo "General" de esta división: se mantiene esa
       // vista tras el refresco en vez de volver a la primera categoría.
       categoriaActualId = categoriaAConservar.id;
@@ -4344,7 +4345,7 @@ function renderTabsSubcategoriasLiga() {
       <button class="btn btn-peligro btn-pequeno btn-icono" title="Eliminar" onclick="event.stopPropagation(); eliminarSubcategoria('${s.id}', '${escapeHtml(s.nombre)}')">${ICONO_BASURA}</button>
     </span>
   `).join('');
-  const botonGeneral = subcategorias.length
+  const botonGeneral = divisionActualTieneGeneral()
     ? `<span class="tab-btn-categoria-grupo"><button class="tab-btn tab-btn-general ${mostrandoGeneralCategoriaLiga ? 'activo' : ''}" onclick="seleccionarGeneralCategoriaLiga()">General</button></span>`
     : '';
   cont.innerHTML = gruposSubcategorias + botonGeneral + `<button class="btn btn-secundario btn-pequeno" onclick="mostrarFormNuevaSubcategoria()">+ Categoría</button>`;
@@ -4467,6 +4468,13 @@ function subcategoriasDeCategoriaActual() {
   return (cat && cat.subcategorias) || [];
 }
 
+// El botón "General" de una división sólo tiene sentido si al menos DOS de
+// sus categorías están marcadas con "Suma a la tabla general" (con una sola
+// sería la misma tabla repetida, y con ninguna quedaría siempre vacía).
+function divisionActualTieneGeneral() {
+  return subcategoriasDeCategoriaActual().filter((s) => s.suma_tabla_general !== false).length >= 2;
+}
+
 function mostrarFormNuevaSubcategoria() {
   document.getElementById('formSubcategoria').reset();
   document.getElementById('subcategoriaIdEdicion').value = '';
@@ -4557,7 +4565,13 @@ function seleccionarCategoriaLiga(categoriaId, subcategoriaIdPreferida) {
     // Igual que en la web pública: al elegir una División con categorías
     // (años) adentro, se muestra de entrada su "General" (suma de todas
     // sus categorías) en vez de forzar a elegir una categoría puntual primero.
-    seleccionarGeneralCategoriaLiga();
+    // Si la división no tiene General (ninguna o una sola categoría suma),
+    // se abre directo la primera categoría.
+    if (divisionActualTieneGeneral()) {
+      seleccionarGeneralCategoriaLiga();
+    } else {
+      seleccionarSubcategoriaLiga(subcategorias[0].id);
+    }
   } else {
     mostrarBloqueDetalleCategoriaLiga();
   }

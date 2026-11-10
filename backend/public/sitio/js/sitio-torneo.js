@@ -250,6 +250,12 @@ function renderTabsCategorias() {
   cont.innerHTML = botonesCategorias + botonGeneral;
 }
 
+// Igual que en el panel: "General" de una división sólo si al menos dos de
+// sus categorías suman a la tabla general.
+function categoriaTieneGeneral(categoria) {
+  return !!categoria && (categoria.subcategorias || []).filter(sumaTablaGeneral).length >= 2;
+}
+
 function renderTabsSubcategorias() {
   const cont = document.getElementById('tabsSubcategorias');
   const categoria = categoriasCache.find((c) => c.id === categoriaSeleccionadaId);
@@ -261,7 +267,9 @@ function renderTabsSubcategorias() {
   cont.classList.remove('oculto');
   cont.innerHTML = categoria.subcategorias.map((s) => `
     <button class="tab-btn ${!mostrandoGeneralCategoria && subcategoriaSeleccionadaId === s.id ? 'activo' : ''}" onclick="seleccionarSubcategoria('${s.id}')">${escapeHtml(s.nombre)}</button>
-  `).join('') + `<button class="tab-btn tab-btn-general ${mostrandoGeneralCategoria ? 'activo' : ''}" onclick="seleccionarGeneralCategoria()">General</button>`;
+  `).join('') + (categoriaTieneGeneral(categoria)
+    ? `<button class="tab-btn tab-btn-general ${mostrandoGeneralCategoria ? 'activo' : ''}" onclick="seleccionarGeneralCategoria()">General</button>`
+    : '');
 }
 
 function seleccionarCategoria(categoriaId) {
@@ -277,8 +285,13 @@ function seleccionarCategoria(categoriaId) {
   if (categoria && categoria.subcategorias && categoria.subcategorias.length) {
     // Al elegir una División con categorías (años) adentro, se muestra de
     // entrada su tabla general (suma de todas sus categorías) en vez de
-    // forzar a elegir una categoría puntual primero.
-    seleccionarGeneralCategoria();
+    // forzar a elegir una categoría puntual primero. Si la división no
+    // tiene General, se abre directo su primera categoría.
+    if (categoriaTieneGeneral(categoria)) {
+      seleccionarGeneralCategoria();
+    } else {
+      seleccionarSubcategoria(categoria.subcategorias[0].id);
+    }
   } else {
     mostrarBloqueContenidoCategoria();
   }
