@@ -4817,8 +4817,12 @@ async function cargarEquipos() {
       `).join('');
     }
 
+    // Traemos TODOS los clubes de la Liga: clubesCache sólo tiene la página
+    // que está abierta en la pestaña Clubes (25 por página), y con más de 25
+    // clubes el resto no aparecía para inscribir.
+    const todosLosClubes = await apiFetch('/liga/clubes?todos=true');
     const idsInscriptos = new Set(equiposCache.map((eq) => eq.club_id));
-    const disponibles = clubesCache.filter((c) => !idsInscriptos.has(c.id));
+    const disponibles = (todosLosClubes.clubes || []).filter((c) => !idsInscriptos.has(c.id));
     if (!disponibles.length) {
       select.innerHTML = '<option value="">No hay clubes disponibles para inscribir</option>';
     } else {
